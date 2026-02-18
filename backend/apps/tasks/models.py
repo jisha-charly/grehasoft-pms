@@ -1,16 +1,29 @@
+
 from django.db import models
 from backend.core.models import SoftDeleteModel
 from django.conf import settings
 
 class TaskType(SoftDeleteModel):
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100, unique=True) # Dev, SEO, Design, Ads
     description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
 
 class Task(SoftDeleteModel):
     PRIORITY_CHOICES = [('low', 'Low'), ('medium', 'Medium'), ('high', 'High')]
-    STATUS_CHOICES = [('todo', 'Todo'), ('in_progress', 'In Progress'), ('done', 'Done'), ('blocked', 'Blocked')]
+    STATUS_CHOICES = [
+        ('todo', 'Todo'), 
+        ('in_progress', 'In Progress'), 
+        ('done', 'Done'), 
+        ('blocked', 'Blocked')
+    ]
 
-    project = models.ForeignKey('projects.Project', on_delete=models.CASCADE, related_name='tasks')
+    project = models.ForeignKey(
+        'projects.Project', 
+        on_delete=models.CASCADE, 
+        related_name='tasks'
+    )
     title = models.CharField(max_length=200)
     description = models.TextField()
     task_type = models.ForeignKey(TaskType, on_delete=models.PROTECT)
@@ -31,6 +44,7 @@ class TaskAssignment(SoftDeleteModel):
     employee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='assigned_tasks')
     assigned_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     assigned_at = models.DateTimeField(auto_now_add=True)
+    unassigned_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = ('task', 'employee')

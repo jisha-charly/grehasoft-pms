@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
@@ -19,30 +20,34 @@ import TaskTypesPage from './pages/admin/task-types/TaskTypesPage';
 import { UserRole, TaskStatus, Task, Project, Lead, ProjectStatus, User, Department, TaskType, Milestone, Client, Role, ProjectMember, ActivityLog, TaskFile, TaskReview } from './types';
 
 const App: React.FC = () => {
-  // Application Data States
   const [roles, setRoles] = useState<Role[]>([
-    { id: 1, name: 'SUPER_ADMIN', description: 'Total system access' },
-    { id: 2, name: 'PROJECT_MANAGER', description: 'Manage projects and teams' },
-    { id: 3, name: 'TEAM_MEMBER', description: 'Task execution' },
-    { id: 4, name: 'SALES_MANAGER', description: 'Manage sales pipeline' },
-    { id: 5, name: 'SALES_EXECUTIVE', description: 'Lead conversion' },
-    { id: 6, name: 'CLIENT', description: 'External project view' }
+    { id: 1, name: 'SUPER_ADMIN', description: 'Full administrative access to all modules.', createdAt: '2024-01-01' },
+    { id: 2, name: 'PROJECT_MANAGER', description: 'Manage projects, teams, and task workflows.', createdAt: '2024-01-01' },
+    { id: 3, name: 'TEAM_MEMBER', description: 'Execute assigned tasks and update progress.', createdAt: '2024-01-01' },
+    { id: 4, name: 'SALES_MANAGER', description: 'Oversee leads and sales performance.', createdAt: '2024-01-01' },
+    { id: 5, name: 'SALES_EXECUTIVE', description: 'Lead generation and prospect follow-ups.', createdAt: '2024-01-01' },
+    { id: 6, name: 'CLIENT', description: 'External visibility into project timelines.', createdAt: '2024-01-01' }
   ]);
 
   const [departments, setDepartments] = useState<Department[]>([
-    { id: 1, name: 'Development', description: 'Core software engineering' },
-    { id: 2, name: 'SEO & Marketing', description: 'Digital growth team' },
-    { id: 3, name: 'Sales', description: 'Revenue generation' }
+    { id: 1, name: 'Software Development', createdAt: '2024-01-01' },
+    { id: 2, name: 'Frontend Engineering', parentId: 1, createdAt: '2024-01-05' },
+    { id: 3, name: 'Backend Engineering', parentId: 1, createdAt: '2024-01-05' },
+    { id: 4, name: 'Digital Marketing', createdAt: '2024-01-10' },
+    { id: 5, name: 'SEO Services', parentId: 4, createdAt: '2024-01-12' }
   ]);
 
   const [taskTypes, setTaskTypes] = useState<TaskType[]>([
-    { id: 1, name: 'Development' }, { id: 2, name: 'SEO' }, { id: 3, name: 'Design' }
+    { id: 1, name: 'DEV', description: 'Core software development and engineering tasks.', createdAt: '2024-01-01' },
+    { id: 2, name: 'SEO', description: 'Search engine optimization and visibility tasks.', createdAt: '2024-01-01' },
+    { id: 3, name: 'DESIGN', description: 'UI/UX and creative asset production.', createdAt: '2024-01-01' },
+    { id: 4, name: 'ADS', description: 'Paid marketing campaigns and advertisement management.', createdAt: '2024-01-01' }
   ]);
 
   const [users, setUsers] = useState<User[]>([
     { id: 1, name: 'Alex Thompson', username: 'alex_admin', email: 'alex@grehasoft.com', role: UserRole.SUPER_ADMIN, departmentId: 1, status: 'active' },
     { id: 2, name: 'Sarah PM', username: 'sarah_pm', email: 'sarah@grehasoft.com', role: UserRole.PROJECT_MANAGER, departmentId: 1, status: 'active' },
-    { id: 3, name: 'John Dev', username: 'john_dev', email: 'john@grehasoft.com', role: UserRole.TEAM_MEMBER, departmentId: 1, status: 'active' }
+    { id: 3, name: 'John Employee', username: 'john_emp', email: 'john@grehasoft.com', role: UserRole.TEAM_MEMBER, departmentId: 1, status: 'active' }
   ]);
 
   const [clients, setClients] = useState<Client[]>([
@@ -73,15 +78,12 @@ const App: React.FC = () => {
   const [taskFiles, setTaskFiles] = useState<TaskFile[]>([]);
   const [taskReviews, setTaskReviews] = useState<TaskReview[]>([]);
 
-  // AUTO-CALCULATION LOGIC
   const runAutoCalculations = useCallback(() => {
-    // Explicitly type updatedMilestones to avoid status widening to string
     const updatedMilestones: Milestone[] = milestones.map(ms => {
       const msTasks = tasks.filter(t => t.milestoneId === ms.id);
       if (msTasks.length === 0) return { ...ms, progress: 0, status: 'pending' as const };
       const doneCount = msTasks.filter(t => t.status === TaskStatus.DONE).length;
       const progress = Math.round((doneCount / msTasks.length) * 100);
-      // Ensure the status property matches the Milestone interface union exactly
       return { ...ms, progress, status: (progress === 100 ? 'completed' : 'pending') as 'completed' | 'pending' };
     });
 
@@ -101,14 +103,18 @@ const App: React.FC = () => {
     runAutoCalculations();
   }, [tasks]);
 
-  // CRUD Handlers
   const handleCRUD = (setter: any, data: any[], domain?: string) => ({
     add: (item: any) => {
       const newId = Date.now();
-      setter((prev: any[]) => [...prev, { ...item, id: domain === 'tasks' ? String(newId) : newId }]);
+      const newItem = { 
+        ...item, 
+        id: domain === 'tasks' ? String(newId) : newId,
+        createdAt: new Date().toISOString().split('T')[0]
+      };
+      setter((prev: any[]) => [...prev, newItem]);
     },
     update: (id: number | string, updates: any) => {
-      setter((prev: any[]) => prev.map(i => i.id === id ? { ...i, ...updates } : i));
+      setter((prev: any[]) => prev.map(i => i.id === id ? { ...i, ...updates, updatedAt: new Date().toISOString().split('T')[0] } : i));
     },
     delete: (id: number | string) => {
       setter((prev: any[]) => prev.filter(i => i.id !== id));
@@ -130,28 +136,18 @@ const App: React.FC = () => {
       <Router>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          
           <Route path="/" element={<ProtectedRoute><Layout><Dashboard projects={projects} /></Layout></ProtectedRoute>} />
-          
           <Route path="/projects" element={<ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.TEAM_MEMBER, UserRole.CLIENT]}><Layout><ProjectsPage projects={projects} users={users} departments={departments} clients={clients} crud={projectCrud} /></Layout></ProtectedRoute>} />
-          
           <Route path="/projects/:id" element={<ProtectedRoute><Layout><ProjectDetailsPage projects={projects} tasks={tasks} users={users} departments={departments} milestones={milestones} members={projectMembers} activity={activityLogs} projectCrud={projectCrud} milestoneCrud={milestoneCrud} memberCrud={memberCrud} taskCrud={taskCrud} taskTypes={taskTypes} taskFiles={taskFiles} taskReviews={taskReviews} fileCrud={{}} reviewCrud={{}} currentUser={users[0]} /></Layout></ProtectedRoute>} />
-          
           <Route path="/projects/:id/kanban" element={<ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.TEAM_MEMBER]}><Layout><ProjectKanbanPage projects={projects} tasks={tasks} setTasks={setTasks} milestones={milestones} users={users} crud={taskCrud} taskTypes={taskTypes} taskFiles={taskFiles} taskReviews={taskReviews} fileCrud={{}} reviewCrud={{}} currentUser={users[0]} /></Layout></ProtectedRoute>} />
-          
           <Route path="/tasks" element={<ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.TEAM_MEMBER]}><Layout><TasksPage tasks={tasks} setTasks={setTasks} milestones={milestones} projects={projects} taskTypes={taskTypes} users={users} crud={taskCrud} taskFiles={taskFiles} taskReviews={taskReviews} fileCrud={{}} reviewCrud={{}} currentUser={users[0]} /></Layout></ProtectedRoute>} />
-          
           <Route path="/clients" element={<ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.SALES_MANAGER]}><Layout><ClientsPage clients={clients} crud={clientCrud} /></Layout></ProtectedRoute>} />
-          
           <Route path="/crm" element={<ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.SALES_MANAGER, UserRole.SALES_EXECUTIVE]}><Layout><LeadsPage leads={[]} crud={{}} /></Layout></ProtectedRoute>} />
-          
           <Route path="/seo" element={<ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.TEAM_MEMBER]}><Layout><SEOPage /></Layout></ProtectedRoute>} />
-
           <Route path="/admin/users" element={<ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}><Layout><UsersPage users={users} roles={roles} departments={departments} crud={userCrud} /></Layout></ProtectedRoute>} />
           <Route path="/admin/roles" element={<ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}><Layout><RolesPage roles={roles} crud={roleCrud} /></Layout></ProtectedRoute>} />
           <Route path="/admin/departments" element={<ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}><Layout><DepartmentsPage departments={departments} crud={deptCrud} /></Layout></ProtectedRoute>} />
           <Route path="/admin/task-types" element={<ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}><Layout><TaskTypesPage taskTypes={taskTypes} crud={taskTypeCrud} /></Layout></ProtectedRoute>} />
-
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>

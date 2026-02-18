@@ -1,3 +1,4 @@
+
 from rest_framework import serializers
 from .models import User, Role, Department
 
@@ -11,7 +12,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Department
-        fields = ['id', 'name', 'parent', 'parent_name', 'description', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'parent', 'parent_name', 'created_at', 'updated_at']
 
 class UserSerializer(serializers.ModelSerializer):
     role_name = serializers.CharField(source='role.name', read_only=True)

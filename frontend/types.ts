@@ -26,27 +26,32 @@ export interface Role {
   id: number;
   name: string;
   description: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Department {
   id: number;
   name: string;
-  description?: string;
+  parentId?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface TaskType {
   id: number;
   name: string;
   description?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-// @google/genai guidelines: Use string-based roles for easier property access and display
 export interface User {
   id: number;
   name: string;
   username: string;
   email: string;
-  password?: string; // Only for UI input, not stored in state
+  password?: string;
   role: UserRole;
   departmentId: number;
   status: 'active' | 'inactive';
