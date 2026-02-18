@@ -4,7 +4,7 @@ import { User, UserRole } from '../types';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, role: UserRole) => Promise<void>;
+  login: (username: string, role: UserRole) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
   hasRole: (roles: UserRole[]) => boolean;
@@ -24,13 +24,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
   }, []);
 
-  const login = async (email: string, role: UserRole) => {
-    // Simulated JWT login logic
+  const login = async (username: string, role: UserRole) => {
+    // Simulated JWT login logic mapping username to mock corporate credentials
     const mockUser: User = {
       id: Math.floor(Math.random() * 1000),
-      name: email.split('@')[0].toUpperCase(),
-      username: email.split('@')[0],
-      email: email,
+      name: username.split('_').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' '),
+      username: username.toLowerCase(),
+      email: `${username.toLowerCase()}@grehasoft.com`,
       role: role,
       departmentId: 1,
       status: 'active'

@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>(UserRole.SUPER_ADMIN);
   const [error, setError] = useState('');
@@ -18,7 +18,7 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login(email, role);
+      await login(username, role);
       navigate(from, { replace: true });
     } catch (err) {
       setError('Invalid credentials');
@@ -33,34 +33,40 @@ const LoginPage: React.FC = () => {
             <div className="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style={{ width: '60px', height: '60px' }}>
               <i className="bi bi-stack fs-2"></i>
             </div>
-            <h3 className="fw-bold">Welcome Back</h3>
+            <h3 className="fw-bold text-dark">Welcome Back</h3>
             <p className="text-muted small">Sign in to access Grehasoft PMS</p>
           </div>
 
-          {error && <div className="alert alert-danger py-2 small">{error}</div>}
+          {error && <div className="alert alert-danger py-2 small border-0">{error}</div>}
 
           <form onSubmit={handleSubmit}>
             <div className="mb-3">
-              <label className="form-label small fw-bold text-secondary uppercase tracking-wider">Corporate Email</label>
-              <input 
-                type="email" 
-                className="form-control form-control-lg bg-light border-0" 
-                placeholder="name@grehasoft.com" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required 
-              />
+              <label className="form-label small fw-bold text-secondary uppercase tracking-wider">Username</label>
+              <div className="input-group">
+                <span className="input-group-text bg-light border-0 text-muted"><i className="bi bi-person"></i></span>
+                <input 
+                  type="text" 
+                  className="form-control form-control-lg bg-light border-0" 
+                  placeholder="e.g. alex_admin" 
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required 
+                />
+              </div>
             </div>
             <div className="mb-3">
               <label className="form-label small fw-bold text-secondary uppercase tracking-wider">Security Key</label>
-              <input 
-                type="password" 
-                className="form-control form-control-lg bg-light border-0" 
-                placeholder="••••••••" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required 
-              />
+              <div className="input-group">
+                <span className="input-group-text bg-light border-0 text-muted"><i className="bi bi-key"></i></span>
+                <input 
+                  type="password" 
+                  className="form-control form-control-lg bg-light border-0" 
+                  placeholder="••••••••" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required 
+                />
+              </div>
             </div>
             <div className="mb-4">
               <label className="form-label small fw-bold text-secondary uppercase tracking-wider">Access Tier (Simulation)</label>
@@ -80,7 +86,7 @@ const LoginPage: React.FC = () => {
           </form>
           
           <div className="mt-4 text-center">
-            <a href="#" className="text-decoration-none small text-muted">Forgot password?</a>
+            <a href="#" className="text-decoration-none small text-muted hover-primary transition">Forgot password?</a>
           </div>
         </div>
       </div>
