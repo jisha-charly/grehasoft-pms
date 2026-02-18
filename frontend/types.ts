@@ -22,20 +22,31 @@ export enum ProjectStatus {
   COMPLETED = 'completed'
 }
 
+export interface Role {
+  id: number;
+  name: string;
+  description: string;
+}
+
 export interface Department {
   id: number;
   name: string;
+  description?: string;
 }
 
 export interface TaskType {
   id: number;
   name: string;
+  description?: string;
 }
 
+// @google/genai guidelines: Use string-based roles for easier property access and display
 export interface User {
   id: number;
   name: string;
+  username: string;
   email: string;
+  password?: string; // Only for UI input, not stored in state
   role: UserRole;
   departmentId: number;
   status: 'active' | 'inactive';
@@ -116,6 +127,7 @@ export interface Milestone {
   title: string;
   dueDate: string;
   status: 'pending' | 'completed';
+  progress: number;
 }
 
 export interface ProjectMember {

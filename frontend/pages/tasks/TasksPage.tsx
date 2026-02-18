@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Task, Project, TaskType, User, TaskStatus, Milestone, TaskFile, TaskReview } from '../../types';
 
@@ -25,7 +24,6 @@ const TasksPage: React.FC<TasksPageProps> = ({
   const [projectFilter, setProjectFilter] = useState<number | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<string | 'all'>('all');
 
-  // Memoized filtering logic
   const filteredTasks = useMemo(() => {
     return tasks.filter(task => {
       const matchesSearch = 
@@ -56,13 +54,11 @@ const TasksPage: React.FC<TasksPageProps> = ({
 
   return (
     <div className="tasks-container">
-      {/* Header */}
       <div className="mb-4">
         <h2 className="fw-bold mb-1 text-dark">All Tasks</h2>
         <p className="text-secondary small mb-0">Browse and filter tasks across all active projects</p>
       </div>
 
-      {/* Search and Filters Bar */}
       <div className="card border-0 shadow-sm p-3 mb-4 bg-white">
         <div className="row g-3">
           <div className="col-lg-4">
@@ -71,18 +67,14 @@ const TasksPage: React.FC<TasksPageProps> = ({
               <input 
                 type="text" 
                 className="form-control bg-light border-start-0" 
-                placeholder="Search tasks by title or description..." 
+                placeholder="Search tasks..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
           <div className="col-lg-2">
-            <select 
-              className="form-select form-select-sm fw-semibold" 
-              value={statusFilter} 
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-            >
+            <select className="form-select form-select-sm fw-semibold" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)}>
               <option value="all">Any Status</option>
               <option value={TaskStatus.TODO}>To Do</option>
               <option value={TaskStatus.IN_PROGRESS}>In Progress</option>
@@ -91,21 +83,13 @@ const TasksPage: React.FC<TasksPageProps> = ({
             </select>
           </div>
           <div className="col-lg-3">
-            <select 
-              className="form-select form-select-sm fw-semibold" 
-              value={projectFilter} 
-              onChange={(e) => setProjectFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-            >
+            <select className="form-select form-select-sm fw-semibold" value={projectFilter} onChange={(e) => setProjectFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}>
               <option value="all">All Projects</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
           <div className="col-lg-3">
-            <select 
-              className="form-select form-select-sm fw-semibold" 
-              value={priorityFilter} 
-              onChange={(e) => setPriorityFilter(e.target.value)}
-            >
+            <select className="form-select form-select-sm fw-semibold" value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
               <option value="all">Any Priority</option>
               <option value="low">Low</option>
               <option value="medium">Medium</option>
@@ -115,7 +99,6 @@ const TasksPage: React.FC<TasksPageProps> = ({
         </div>
       </div>
 
-      {/* Tasks Table */}
       <div className="card border-0 shadow-sm overflow-hidden">
         <div className="table-responsive">
           <table className="table table-hover align-middle mb-0">
@@ -130,40 +113,21 @@ const TasksPage: React.FC<TasksPageProps> = ({
               </tr>
             </thead>
             <tbody>
-              {filteredTasks.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-5 text-muted">
-                    No tasks found matching your criteria.
+              {filteredTasks.map(task => (
+                <tr key={task.id}>
+                  <td className="ps-4">
+                    <div className="fw-bold text-dark">{task.title}</div>
+                    <div className="smaller text-muted text-truncate" style={{ maxWidth: '250px' }}>{task.description}</div>
+                  </td>
+                  <td>{getStatusBadge(task.status)}</td>
+                  <td>{getPriorityBadge(task.priority)}</td>
+                  <td><span className="badge bg-light text-dark border fw-normal">{projects.find(p => p.id === task.projectId)?.name}</span></td>
+                  <td className="small text-secondary fw-semibold"><i className="bi bi-calendar3 me-1"></i> {task.dueDate}</td>
+                  <td className="text-end pe-4">
+                    <button className="btn btn-sm btn-light text-danger" onClick={() => crud.delete(task.id)}><i className="bi bi-trash"></i></button>
                   </td>
                 </tr>
-              ) : (
-                filteredTasks.map(task => (
-                  <tr key={task.id}>
-                    <td className="ps-4">
-                      <div className="fw-bold text-dark">{task.title}</div>
-                      <div className="smaller text-muted text-truncate" style={{ maxWidth: '250px' }}>{task.description}</div>
-                    </td>
-                    <td>{getStatusBadge(task.status)}</td>
-                    <td>{getPriorityBadge(task.priority)}</td>
-                    <td>
-                      <span className="badge bg-light text-dark border fw-normal">
-                        {projects.find(p => p.id === task.projectId)?.name || 'Unknown'}
-                      </span>
-                    </td>
-                    <td className="small text-secondary fw-semibold">
-                      <i className="bi bi-calendar3 me-1"></i> {task.dueDate}
-                    </td>
-                    <td className="text-end pe-4">
-                      <button 
-                        className="btn btn-sm btn-light text-danger" 
-                        onClick={(e) => { e.stopPropagation(); crud.delete(task.id); }}
-                      >
-                        <i className="bi bi-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
         </div>
