@@ -34,3 +34,35 @@ class TaskAssignment(SoftDeleteModel):
 
     class Meta:
         unique_together = ('task', 'employee')
+
+class TaskProgress(models.Model):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='progress_history')
+    progress_percentage = models.IntegerField()
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    updated_at = models.DateTimeField(auto_now_add=True)
+
+class TaskFile(SoftDeleteModel):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='files')
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    file_path = models.CharField(max_length=255)
+    file_type = models.CharField(max_length=50)
+    revision_no = models.IntegerField(default=1)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+class TaskReview(models.Model):
+    ROLE_CHOICES = [('PM', 'Project Manager'), ('ADMIN', 'Admin')]
+    STATUS_CHOICES = [('approved', 'Approved'), ('rework', 'Rework')]
+    
+    task_file = models.ForeignKey(TaskFile, on_delete=models.CASCADE, related_name='reviews')
+    reviewer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    reviewed_by_role = models.CharField(max_length=10, choices=ROLE_CHOICES)
+    review_version = models.IntegerField()
+    comments = models.TextField()
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+class TaskComment(SoftDeleteModel):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='comments')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    comment = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
