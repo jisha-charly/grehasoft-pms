@@ -1,0 +1,8 @@
+{
+  "name": "Grehasoft Enterprise PMS & CRM",
+  "description": "A comprehensive enterprise-grade Project Management and CRM system with Kanban, SEO tracking, and RBAC.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
