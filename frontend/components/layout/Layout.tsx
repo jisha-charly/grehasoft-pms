@@ -1,23 +1,27 @@
 
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { UserRole, User } from '../../types';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { UserRole } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 
 interface LayoutProps {
   children: React.ReactNode;
-  user: User;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, user }) => {
+const Layout: React.FC<LayoutProps> = ({ children }) => {
+  const { user, logout, hasRole } = useAuth();
   const location = useLocation();
-  
+  const navigate = useNavigate();
+
+  if (!user) return null;
+
   const navItems = [
-    { label: 'Dashboard', path: '/', icon: 'bi-speedometer2' },
-    { label: 'Projects', path: '/projects', icon: 'bi-briefcase' },
-    { label: 'Tasks', path: '/tasks', icon: 'bi-check2-square' },
-    { label: 'Clients', path: '/clients', icon: 'bi-people' },
-    { label: 'CRM', path: '/crm', icon: 'bi-graph-up-arrow' },
-    { label: 'SEO', path: '/seo', icon: 'bi-search' },
+    { label: 'Dashboard', path: '/', icon: 'bi-speedometer2', roles: [UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.TEAM_MEMBER, UserRole.SALES_MANAGER] },
+    { label: 'Projects', path: '/projects', icon: 'bi-briefcase', roles: [UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.TEAM_MEMBER, UserRole.CLIENT] },
+    { label: 'Tasks', path: '/tasks', icon: 'bi-check2-square', roles: [UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.TEAM_MEMBER] },
+    { label: 'Clients', path: '/clients', icon: 'bi-people', roles: [UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.SALES_MANAGER] },
+    { label: 'CRM', path: '/crm', icon: 'bi-graph-up-arrow', roles: [UserRole.SUPER_ADMIN, UserRole.SALES_MANAGER, UserRole.SALES_EXECUTIVE] },
+    { label: 'SEO', path: '/seo', icon: 'bi-search', roles: [UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.TEAM_MEMBER] },
   ];
 
   const adminItems = [
@@ -26,6 +30,11 @@ const Layout: React.FC<LayoutProps> = ({ children, user }) => {
     { label: 'Departments', path: '/admin/departments' },
     { label: 'Task Types', path: '/admin/task-types' },
   ];
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <>
@@ -37,10 +46,10 @@ const Layout: React.FC<LayoutProps> = ({ children, user }) => {
           </Link>
           <div className="collapse navbar-collapse" id="navbarNav">
             <ul className="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4">
-              {navItems.map((item) => (
+              {navItems.filter(item => item.roles.includes(user.role)).map((item) => (
                 <li className="nav-item" key={item.path}>
                   <Link
-                    className={`nav-link px-3 d-flex align-items-center ${location.pathname === item.path ? 'active text-primary' : 'text-secondary'}`}
+                    className={`nav-link px-3 d-flex align-items-center ${location.pathname === item.path ? 'active text-primary fw-bold' : 'text-secondary'}`}
                     to={item.path}
                   >
                     <i className={`bi ${item.icon} me-2`}></i>
@@ -62,9 +71,11 @@ const Layout: React.FC<LayoutProps> = ({ children, user }) => {
               )}
               <div className="text-end me-3">
                 <div className="fw-bold small text-dark">{user.name}</div>
-                <div className="text-primary smaller fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.02em' }}>{user.role}</div>
+                <div className="text-primary smaller fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.02em' }}>{user.role.replace('_', ' ')}</div>
               </div>
-              <button className="btn btn-outline-danger btn-sm rounded-circle"><i className="bi bi-box-arrow-right"></i></button>
+              <button className="btn btn-outline-danger btn-sm rounded-circle shadow-sm" onClick={handleLogout} title="Logout">
+                <i className="bi bi-box-arrow-right"></i>
+              </button>
             </div>
           </div>
         </div>
