@@ -1,26 +1,100 @@
-import React, { useState } from 'react';
-import { Lead } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { Lead, LeadAssignment, LeadFollowup, User, UserRole } from '../../types';
+import axiosInstance from '../../api/axiosInstance';
 
 interface LeadsPageProps {
   leads: Lead[];
   crud: any;
+  users: User[];
 }
 
-const LeadsPage: React.FC<LeadsPageProps> = ({ leads, crud }) => {
+const LeadsPage: React.FC<LeadsPageProps> = ({ leads, crud, users }) => {
   const [isModalOpen, setModalOpen] = useState(false);
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [assignments, setAssignments] = useState<LeadAssignment[]>([]);
+  const [followups, setFollowups] = useState<LeadFollowup[]>([]);
+  const [isDetailsModalOpen, setDetailsModalOpen] = useState(false);
+
+  const salesExecs = users.filter(u => u.role === UserRole.SALES_EXECUTIVE || u.role === UserRole.SALES_MANAGER || u.role === UserRole.SUPER_ADMIN);
+
+  useEffect(() => {
+    if (selectedLead) {
+      fetchLeadDetails(selectedLead.id);
+    }
+  }, [selectedLead]);
+
+  const fetchLeadDetails = async (leadId: number) => {
+    try {
+      const [assignRes, followRes] = await Promise.all([
+        axiosInstance.get(`/leads/${leadId}/assignments`),
+        axiosInstance.get(`/leads/${leadId}/followups`)
+      ]);
+      setAssignments(assignRes.data);
+      setFollowups(followRes.data);
+    } catch (error) {
+      console.error("Error fetching lead details:", error);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
-    crud.add({
+    
+    const payload = {
       name: data.name,
       email: data.email,
       phone: data.phone,
       source: data.source,
-      status: 'new'
-    });
+      status: data.status || 'new',
+      converted_project_id: data.converted_project_id ? Number(data.converted_project_id) : null
+    };
+
+    if (editingLead) {
+      crud.update(editingLead.id, payload);
+    } else {
+      crud.add(payload);
+    }
     setModalOpen(false);
+    setEditingLead(null);
+  };
+
+  const handleAddFollowup = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedLead) return;
+    const formData = new FormData(e.currentTarget);
+    const data = Object.fromEntries(formData.entries());
+
+    try {
+      await axiosInstance.post('/lead-followups', {
+        lead_id: selectedLead.id,
+        followup_type: data.followup_type,
+        notes: data.notes,
+        next_followup: data.next_followup,
+        status: 'pending',
+        created_by: users[0].id // Mocking current user
+      });
+      fetchLeadDetails(selectedLead.id);
+      (e.target as HTMLFormElement).reset();
+    } catch (error) {
+      console.error("Error adding followup:", error);
+    }
+  };
+
+  const handleEdit = (lead: Lead) => {
+    setEditingLead(lead);
+    setModalOpen(true);
+  };
+
+  const handleAddNew = () => {
+    setEditingLead(null);
+    setModalOpen(true);
+  };
+
+  const handleViewDetails = (lead: Lead) => {
+    setSelectedLead(lead);
+    setDetailsModalOpen(true);
   };
 
   return (
@@ -30,7 +104,7 @@ const LeadsPage: React.FC<LeadsPageProps> = ({ leads, crud }) => {
           <h4 className="fw-bold mb-0 text-dark">Sales Pipeline</h4>
           <p className="text-secondary small mb-0">Tracking prospects and conversion rates</p>
         </div>
-        <button className="btn btn-primary btn-sm fw-bold px-3" onClick={() => setModalOpen(true)}>
+        <button className="btn btn-primary btn-sm fw-bold px-3 shadow-sm" onClick={handleAddNew}>
           <i className="bi bi-person-plus me-2"></i>New Lead
         </button>
       </div>
@@ -48,16 +122,35 @@ const LeadsPage: React.FC<LeadsPageProps> = ({ leads, crud }) => {
           </thead>
           <tbody>
             {leads.map(lead => (
-              <tr key={lead.id}>
+              <tr key={lead.id} className="hover-bg-light transition">
                 <td className="px-4 fw-bold text-dark">{lead.name}</td>
                 <td>
                   <div className="small text-dark">{lead.email}</div>
                   <div className="smaller text-muted">{lead.phone}</div>
                 </td>
                 <td><span className="badge bg-light text-dark border fw-normal">{lead.source}</span></td>
-                <td><span className={`badge rounded-pill ${lead.status === 'converted' ? 'bg-success' : 'bg-primary'}`}>{lead.status}</span></td>
+                <td>
+                  <span className={`badge rounded-pill ${lead.status === 'converted' ? 'bg-success' : 'bg-primary'}`}>{lead.status}</span>
+                  {lead.status === 'converted' && lead.converted_project_id && (
+                    <div className="smaller mt-1">
+                      <a href={`#/projects/${lead.converted_project_id}`} className="text-decoration-none text-success fw-bold">
+                        <i className="bi bi-box-arrow-up-right me-1"></i>View Project
+                      </a>
+                    </div>
+                  )}
+                </td>
                 <td className="text-end px-4">
-                  <button className="btn btn-sm btn-light text-danger" onClick={() => crud.delete(lead.id)}><i className="bi bi-trash"></i></button>
+                  <div className="btn-group shadow-sm rounded-3 overflow-hidden">
+                    <button className="btn btn-sm btn-white border-end" onClick={() => handleViewDetails(lead)} title="View Details">
+                      <i className="bi bi-eye text-info"></i>
+                    </button>
+                    <button className="btn btn-sm btn-white border-end" onClick={() => handleEdit(lead)} title="Edit Lead">
+                      <i className="bi bi-pencil text-primary"></i>
+                    </button>
+                    <button className="btn btn-sm btn-white" onClick={() => { if(confirm('Are you sure?')) crud.delete(lead.id); }} title="Delete Lead">
+                      <i className="bi bi-trash text-danger"></i>
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -65,26 +158,153 @@ const LeadsPage: React.FC<LeadsPageProps> = ({ leads, crud }) => {
         </table>
       </div>
 
+      {/* Add/Edit Lead Modal */}
       {isModalOpen && (
         <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
           <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 rounded-4 shadow-lg">
+            <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
               <form onSubmit={handleSubmit}>
                 <div className="modal-header border-0 bg-white pt-4 px-4">
-                  <h5 className="modal-title fw-bold">Add New Prospect</h5>
+                  <h5 className="modal-title fw-bold text-dark">{editingLead ? 'Update Prospect Profile' : 'Register New Prospect'}</h5>
                   <button type="button" className="btn-close" onClick={() => setModalOpen(false)}></button>
                 </div>
                 <div className="modal-body p-4 bg-white">
-                  <div className="mb-3"><label className="form-label smaller fw-bold">Full Name</label><input name="name" className="form-control" required /></div>
-                  <div className="mb-3"><label className="form-label smaller fw-bold">Email</label><input name="email" type="email" className="form-control" required /></div>
-                  <div className="mb-3"><label className="form-label smaller fw-bold">Phone</label><input name="phone" className="form-control" /></div>
-                  <div className="mb-3"><label className="form-label smaller fw-bold">Source</label><select name="source" className="form-select"><option value="Web">Website</option><option value="Ads">Ads</option><option value="Referral">Referral</option></select></div>
+                  <div className="row g-3">
+                    <div className="col-12">
+                      <label className="form-label smaller fw-bold text-secondary text-uppercase">Full Name *</label>
+                      <input name="name" className="form-control bg-light border-0" defaultValue={editingLead?.name} required />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label smaller fw-bold text-secondary text-uppercase">Email *</label>
+                      <input name="email" type="email" className="form-control bg-light border-0" defaultValue={editingLead?.email} required />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label smaller fw-bold text-secondary text-uppercase">Phone</label>
+                      <input name="phone" className="form-control bg-light border-0" defaultValue={editingLead?.phone} />
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label smaller fw-bold text-secondary text-uppercase">Source</label>
+                      <select name="source" className="form-select bg-light border-0" defaultValue={editingLead?.source}>
+                        <option value="Web">Website</option>
+                        <option value="Ads">Ads</option>
+                        <option value="Referral">Referral</option>
+                        <option value="Direct">Direct</option>
+                      </select>
+                    </div>
+                    {editingLead && (
+                      <>
+                        <div className="col-md-6">
+                          <label className="form-label smaller fw-bold text-secondary text-uppercase">Status</label>
+                          <select name="status" className="form-select bg-light border-0" defaultValue={editingLead?.status}>
+                            <option value="new">New</option>
+                            <option value="contacted">Contacted</option>
+                            <option value="qualified">Qualified</option>
+                            <option value="converted">Converted</option>
+                            <option value="lost">Lost</option>
+                          </select>
+                        </div>
+                        <div className="col-md-6">
+                          <label className="form-label smaller fw-bold text-secondary text-uppercase">Converted Project ID</label>
+                          <input name="converted_project_id" type="number" className="form-control bg-light border-0" defaultValue={editingLead?.converted_project_id || ''} placeholder="Project ID" />
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div className="modal-footer border-0 bg-white pb-4 px-4 gap-2">
-                  <button type="button" className="btn btn-light fw-bold" onClick={() => setModalOpen(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary fw-bold">Add Lead</button>
+                  <button type="button" className="btn btn-light fw-bold px-4" onClick={() => setModalOpen(false)}>Discard</button>
+                  <button type="submit" className="btn btn-primary fw-bold px-4 shadow-sm">{editingLead ? 'Save Changes' : 'Confirm Registration'}</button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lead Details Modal (Assignments & Followups) */}
+      {isDetailsModalOpen && selectedLead && (
+        <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
+          <div className="modal-dialog modal-xl modal-dialog-centered">
+            <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
+              <div className="modal-header border-0 bg-white pt-4 px-4">
+                <div>
+                  <h5 className="modal-title fw-bold text-dark">{selectedLead.name}</h5>
+                  <p className="text-secondary smaller mb-0">{selectedLead.email} | {selectedLead.phone}</p>
+                </div>
+                <button type="button" className="btn-close" onClick={() => setDetailsModalOpen(false)}></button>
+              </div>
+              <div className="modal-body p-4 bg-light">
+                <div className="row g-4">
+                  <div className="col-lg-4">
+                    <div className="card border-0 shadow-sm h-100 p-3">
+                      <h6 className="fw-bold mb-3 d-flex align-items-center"><i className="bi bi-person-badge me-2 text-primary"></i>Assignments</h6>
+                      {assignments.length === 0 ? (
+                        <p className="text-muted smaller italic">No executives assigned yet.</p>
+                      ) : (
+                        <ul className="list-group list-group-flush">
+                          {assignments.map(a => {
+                            const exec = users.find(u => u.id === a.sales_exec_id);
+                            return (
+                              <li key={a.id} className="list-group-item bg-transparent px-0 py-2 border-0">
+                                <div className="fw-bold small">{exec?.name || 'Unknown'}</div>
+                                <div className="smaller text-muted">Assigned: {new Date(a.assigned_at).toLocaleDateString()}</div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                  <div className="col-lg-8">
+                    <div className="card border-0 shadow-sm p-3 mb-4">
+                      <h6 className="fw-bold mb-3 d-flex align-items-center"><i className="bi bi-chat-dots me-2 text-primary"></i>Follow-up History</h6>
+                      <div className="overflow-auto" style={{ maxHeight: '300px' }}>
+                        {followups.length === 0 ? (
+                          <p className="text-muted smaller italic text-center py-4">No follow-up history found.</p>
+                        ) : (
+                          <div className="timeline-simple">
+                            {followups.map(f => (
+                              <div key={f.id} className="mb-3 border-start border-primary border-3 ps-3 py-1">
+                                <div className="d-flex justify-content-between">
+                                  <span className="badge bg-primary-subtle text-primary smaller text-uppercase">{f.followup_type}</span>
+                                  <span className="smaller text-muted">{new Date(f.created_at).toLocaleDateString()}</span>
+                                </div>
+                                <p className="small mb-1 mt-1 text-dark">{f.notes}</p>
+                                {f.next_followup && <div className="smaller fw-bold text-warning">Next: {f.next_followup}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="card border-0 shadow-sm p-3">
+                      <h6 className="fw-bold mb-3 d-flex align-items-center"><i className="bi bi-plus-circle me-2 text-success"></i>New Follow-up</h6>
+                      <form onSubmit={handleAddFollowup}>
+                        <div className="row g-2">
+                          <div className="col-md-4">
+                            <select name="followup_type" className="form-select form-select-sm bg-light border-0" required>
+                              <option value="call">Call</option>
+                              <option value="whatsapp">WhatsApp</option>
+                              <option value="meeting">Meeting</option>
+                              <option value="email">Email</option>
+                            </select>
+                          </div>
+                          <div className="col-md-4">
+                            <input name="next_followup" type="date" className="form-control form-control-sm bg-light border-0" />
+                          </div>
+                          <div className="col-12">
+                            <textarea name="notes" className="form-control form-control-sm bg-light border-0" rows={2} placeholder="Add notes here..." required></textarea>
+                          </div>
+                          <div className="col-12 text-end">
+                            <button type="submit" className="btn btn-success btn-sm fw-bold px-3">Log Follow-up</button>
+                          </div>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

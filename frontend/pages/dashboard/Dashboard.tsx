@@ -4,26 +4,38 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell 
 } from 'recharts';
+import { Project, Task, TaskStatus, ProjectStatus } from '../../types';
 
-const activityData = [
-  { name: 'Mon', tasks: 12 },
-  { name: 'Tue', tasks: 19 },
-  { name: 'Wed', tasks: 15 },
-  { name: 'Thu', tasks: 22 },
-  { name: 'Fri', tasks: 30 },
-  { name: 'Sat', tasks: 8 },
-  { name: 'Sun', tasks: 5 },
-];
+const Dashboard: React.FC<{ projects: Project[]; tasks: Task[] }> = ({ projects, tasks }) => {
+  const activeCount = projects.filter(p => p.status === ProjectStatus.IN_PROGRESS).length;
+  const completedTasksCount = tasks.filter(t => t.status === TaskStatus.DONE).length;
+  const pendingTasksCount = tasks.filter(t => t.status === TaskStatus.TODO || t.status === TaskStatus.IN_PROGRESS).length;
 
-const statusData = [
-  { name: 'Active', value: 70, color: '#0d6efd' },
-  { name: 'Delayed', value: 20, color: '#dc3545' },
-  { name: 'Pending', value: 10, color: '#ffc107' },
-];
+  // Calculate project health distribution
+  const statusCounts = {
+    active: projects.filter(p => p.status === ProjectStatus.IN_PROGRESS).length,
+    completed: projects.filter(p => p.status === ProjectStatus.COMPLETED).length,
+    delayed: projects.filter(p => p.status === ProjectStatus.NOT_STARTED).length, // Using not_started as delayed for mock
+  };
 
-const Dashboard: React.FC<{ projects: any[] }> = ({ projects }) => {
-  const activeCount = projects.filter(p => p.status === 'in_progress').length;
-  
+  const totalProjects = projects.length || 1;
+  const statusData = [
+    { name: 'Active', value: Math.round((statusCounts.active / totalProjects) * 100), color: '#0d6efd' },
+    { name: 'Completed', value: Math.round((statusCounts.completed / totalProjects) * 100), color: '#198754' },
+    { name: 'Pending', value: Math.round((statusCounts.delayed / totalProjects) * 100), color: '#ffc107' },
+  ];
+
+  // Mock activity data for now, but could be derived from tasks' createdAt/updatedAt
+  const activityData = [
+    { name: 'Mon', tasks: 12 },
+    { name: 'Tue', tasks: 19 },
+    { name: 'Wed', tasks: 15 },
+    { name: 'Thu', tasks: 22 },
+    { name: 'Fri', tasks: 30 },
+    { name: 'Sat', tasks: 8 },
+    { name: 'Sun', tasks: 5 },
+  ];
+
   return (
     <div className="container-fluid p-0">
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -37,9 +49,9 @@ const Dashboard: React.FC<{ projects: any[] }> = ({ projects }) => {
       <div className="row g-4 mb-4">
         {[
           { label: 'Active Projects', value: activeCount, icon: 'bi-briefcase', color: 'primary' },
-          { label: 'Pending Approvals', value: '08', icon: 'bi-clock-history', color: 'warning' },
+          { label: 'Completed Tasks', value: completedTasksCount, icon: 'bi-check2-circle', color: 'success' },
+          { label: 'Pending Tasks', value: pendingTasksCount, icon: 'bi-clock-history', color: 'warning' },
           { label: 'Client Satisfaction', value: '98%', icon: 'bi-heart', color: 'danger' },
-          { label: 'Revenue Growth', value: '+14%', icon: 'bi-trending-up', color: 'success' },
         ].map((stat, i) => (
           <div className="col-md-3" key={i}>
             <div className="card p-4 h-100 border-0 shadow-sm">

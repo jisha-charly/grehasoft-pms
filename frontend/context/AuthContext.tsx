@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserRole } from '../types';
+import { User, UserRole, Permission, ROLE_PERMISSIONS } from '../types';
 
 interface AuthContextType {
   user: User | null;
@@ -8,6 +8,7 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   hasRole: (roles: UserRole[]) => boolean;
+  hasPermission: (permission: Permission) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,10 +52,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return user ? roles.includes(user.role) : false;
   };
 
+  const hasPermission = (permission: Permission) => {
+    if (!user) return false;
+    const permissions = ROLE_PERMISSIONS[user.role] || [];
+    return permissions.includes(permission);
+  };
+
   if (loading) return null;
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, hasRole }}>
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, hasRole, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

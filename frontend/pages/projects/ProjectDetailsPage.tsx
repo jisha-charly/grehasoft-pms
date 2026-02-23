@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Project, Task, User, Department, Milestone, ProjectMember, ActivityLog, TaskStatus, TaskType, ProjectStatus, TaskFile, TaskReview } from '../../types';
 import TaskDetailsModal from '../../components/TaskDetailsModal';
+import axiosInstance from '../../api/axiosInstance';
 
 interface ProjectDetailsPageProps {
   projects: Project[];
@@ -25,11 +26,18 @@ interface ProjectDetailsPageProps {
 }
 
 const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({ 
-  projects, tasks, users, departments, milestones, members, activity, projectCrud, milestoneCrud, memberCrud, taskCrud, taskTypes,
+  projects: initialProjects, tasks: initialTasks, users, departments, milestones: initialMilestones, 
+  members: initialMembers, activity: initialActivity, projectCrud, milestoneCrud, memberCrud, taskCrud, taskTypes,
   taskFiles, taskReviews, fileCrud, reviewCrud, currentUser 
 }) => {
   const { id } = useParams<{ id: string }>();
-  const project = projects.find(p => p.id === Number(id));
+  const [project, setProject] = useState<Project | null>(null);
+  const [projectTasks, setProjectTasks] = useState<Task[]>([]);
+  const [projectMilestones, setProjectMilestones] = useState<Milestone[]>([]);
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
+  const [projectActivity, setProjectActivity] = useState<ActivityLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
@@ -43,14 +51,36 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [editingMember, setEditingMember] = useState<ProjectMember | null>(null);
 
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!id) return;
+      setLoading(true);
+      try {
+        const [projRes, tasksRes, milestonesRes, membersRes, activityRes] = await Promise.all([
+          axiosInstance.get(`/projects/${id}`),
+          axiosInstance.get(`/projects/${id}/tasks`),
+          axiosInstance.get(`/projects/${id}/milestones`),
+          axiosInstance.get(`/projects/${id}/members`),
+          axiosInstance.get(`/projects/${id}/activity`),
+        ]);
+        setProject(projRes.data);
+        setProjectTasks(tasksRes.data);
+        setProjectMilestones(milestonesRes.data);
+        setProjectMembers(membersRes.data);
+        setProjectActivity(activityRes.data);
+      } catch (error) {
+        console.error("Error fetching project data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [id]);
+
+  if (loading) return <div className="p-5 text-center"><div className="spinner-border text-primary" role="status"></div><p className="mt-2">Loading project details...</p></div>;
   if (!project) return <div className="p-5 text-center"><h3 className="text-muted">Project not found</h3><Link to="/projects">Back to list</Link></div>;
 
-  const projectTasks = tasks.filter(t => t.projectId === project.id);
-  const projectMilestones = milestones.filter(m => m.projectId === project.id);
-  const projectMembers = members.filter(m => m.projectId === project.id);
-  const projectActivity = activity.filter(a => a.projectId === project.id);
-
-  const handleTaskSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleTaskSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const payload = {
@@ -65,16 +95,32 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
       assignees: [Number(fd.get('assignee'))]
     };
 
-    if (editingTask) {
-      taskCrud.update(editingTask.id, payload);
-    } else {
-      taskCrud.add(payload);
+    try {
+      if (editingTask) {
+        const res = await axiosInstance.patch(`/tasks/${editingTask.id}`, payload);
+        setProjectTasks(prev => prev.map(t => t.id === editingTask.id ? res.data : t));
+      } else {
+        const res = await axiosInstance.post('/tasks', payload);
+        setProjectTasks(prev => [...prev, res.data]);
+      }
+      setTaskModalOpen(false);
+      setEditingTask(null);
+    } catch (error) {
+      console.error("Error saving task:", error);
     }
-    setTaskModalOpen(false);
-    setEditingTask(null);
   };
 
-  const handleMilestoneSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleTaskDelete = async (taskId: string) => {
+    if (!confirm("Are you sure you want to delete this task?")) return;
+    try {
+      await axiosInstance.delete(`/tasks/${taskId}`);
+      setProjectTasks(prev => prev.filter(t => t.id !== taskId));
+    } catch (error) {
+      console.error("Error deleting task:", error);
+    }
+  };
+
+  const handleMilestoneSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const payload = {
@@ -83,16 +129,42 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
       dueDate: fd.get('dueDate'),
     };
 
-    if (editingMilestone) {
-      milestoneCrud.update(editingMilestone.id, payload);
-    } else {
-      milestoneCrud.add({ ...payload, status: 'pending', progress: 0 });
+    try {
+      if (editingMilestone) {
+        const res = await axiosInstance.patch(`/milestones/${editingMilestone.id}`, payload);
+        setProjectMilestones(prev => prev.map(m => m.id === editingMilestone.id ? res.data : m));
+      } else {
+        const res = await axiosInstance.post('/milestones', payload);
+        setProjectMilestones(prev => [...prev, res.data]);
+      }
+      setMilestoneModalOpen(false);
+      setEditingMilestone(null);
+    } catch (error) {
+      console.error("Error saving milestone:", error);
     }
-    setMilestoneModalOpen(false);
-    setEditingMilestone(null);
   };
 
-  const handleMemberSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleMilestoneToggle = async (milestone: Milestone) => {
+    try {
+      const newStatus = milestone.status === 'completed' ? 'pending' : 'completed';
+      const res = await axiosInstance.patch(`/milestones/${milestone.id}`, { status: newStatus });
+      setProjectMilestones(prev => prev.map(m => m.id === milestone.id ? res.data : m));
+    } catch (error) {
+      console.error("Error toggling milestone status:", error);
+    }
+  };
+
+  const handleMilestoneDelete = async (milestoneId: number) => {
+    if (!confirm("Are you sure you want to delete this milestone?")) return;
+    try {
+      await axiosInstance.delete(`/milestones/${milestoneId}`);
+      setProjectMilestones(prev => prev.filter(m => m.id !== milestoneId));
+    } catch (error) {
+      console.error("Error deleting milestone:", error);
+    }
+  };
+
+  const handleMemberSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const payload = {
@@ -101,14 +173,26 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
       roleInProject: fd.get('roleInProject'),
     };
 
-    if (editingMember) {
-      memberCrud.update(editingMember.id, { roleInProject: payload.roleInProject });
-    } else {
-      memberCrud.add({ ...payload, addedAt: new Date().toISOString() });
+    try {
+      const res = await axiosInstance.post('/members', payload);
+      setProjectMembers(prev => [...prev, res.data]);
+      setMemberModalOpen(false);
+      setEditingMember(null);
+    } catch (error) {
+      console.error("Error adding member:", error);
     }
-    setMemberModalOpen(false);
-    setEditingMember(null);
   };
+
+  const handleMemberDelete = async (memberId: number) => {
+    if (!confirm("Are you sure you want to remove this member?")) return;
+    try {
+      await axiosInstance.delete(`/members/${memberId}`);
+      setProjectMembers(prev => prev.filter(m => m.id !== memberId));
+    } catch (error) {
+      console.error("Error removing member:", error);
+    }
+  };
+
 
   return (
     <div className="container-fluid p-0">
@@ -132,7 +216,7 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
       <div className="row g-3 mb-4">
         {[
           { label: 'Status', value: project.status.replace('_', ' '), icon: 'bi-activity', color: 'primary' },
-          { label: 'Progress', value: `${project.progress}%`, icon: 'bi-bullseye', color: 'info' },
+          { label: 'Progress', value: `${project.progressPercentage}%`, icon: 'bi-bullseye', color: 'info' },
           { label: 'Total Tasks', value: projectTasks.length, icon: 'bi-check2-circle', color: 'dark' },
           { label: 'Deadline', value: project.endDate, icon: 'bi-calendar3', color: 'danger' }
         ].map((s, i) => (
@@ -215,7 +299,7 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                               <button className="btn btn-sm btn-light" onClick={(e) => { e.stopPropagation(); setEditingTask(t); setTaskModalOpen(true); }}>
                                 <i className="bi bi-pencil"></i>
                               </button>
-                              <button className="btn btn-sm btn-light text-danger" onClick={(e) => { e.stopPropagation(); taskCrud.delete(t.id); }}>
+                              <button className="btn btn-sm btn-light text-danger" onClick={(e) => { e.stopPropagation(); handleTaskDelete(t.id); }}>
                                 <i className="bi bi-trash"></i>
                               </button>
                             </div>
@@ -248,7 +332,7 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                           <div 
                             className={`p-2 rounded-circle me-3 shadow-sm border d-flex align-items-center justify-content-center ${m.status === 'completed' ? 'bg-success text-white' : 'bg-white text-secondary'}`}
                             style={{width: '32px', height: '32px', cursor: 'pointer', fontSize: '0.8rem'}}
-                            onClick={() => milestoneCrud.update(m.id, { status: m.status === 'completed' ? 'pending' : 'completed' })}
+                            onClick={() => handleMilestoneToggle(m)}
                           >
                             <i className={`bi ${m.status === 'completed' ? 'bi-check-lg' : 'bi-circle'}`}></i>
                           </div>
@@ -263,7 +347,7 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                             <button className="btn btn-sm btn-light py-0 px-2" onClick={() => { setEditingMilestone(m); setMilestoneModalOpen(true); }}>
                               <i className="bi bi-pencil smaller"></i>
                             </button>
-                            <button className="btn btn-sm btn-light text-danger py-0 px-2" onClick={() => milestoneCrud.delete(m.id)}>
+                            <button className="btn btn-sm btn-light text-danger py-0 px-2" onClick={() => handleMilestoneDelete(m.id)}>
                               <i className="bi bi-trash smaller"></i>
                             </button>
                           </div>
@@ -305,7 +389,7 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                             <button className="btn btn-link text-primary p-0 text-decoration-none" onClick={() => { setEditingMember(m); setMemberModalOpen(true); }}>
                               <i className="bi bi-pencil smaller"></i>
                             </button>
-                            <button className="btn btn-link text-danger p-0 text-decoration-none" onClick={() => memberCrud.delete(m.id)}>
+                            <button className="btn btn-link text-danger p-0 text-decoration-none" onClick={() => handleMemberDelete(m.id)}>
                               <i className="bi bi-person-dash fs-6"></i>
                             </button>
                           </div>
