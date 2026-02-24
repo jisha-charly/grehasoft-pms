@@ -18,17 +18,13 @@ interface ProjectDetailsPageProps {
   memberCrud: any;
   taskCrud: any;
   taskTypes: TaskType[];
-  taskFiles: TaskFile[];
-  taskReviews: TaskReview[];
-  fileCrud: any;
-  reviewCrud: any;
   currentUser: User;
 }
 
 const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({ 
   projects: initialProjects, tasks: initialTasks, users, departments, milestones: initialMilestones, 
   members: initialMembers, activity: initialActivity, projectCrud, milestoneCrud, memberCrud, taskCrud, taskTypes,
-  taskFiles, taskReviews, fileCrud, reviewCrud, currentUser 
+  currentUser 
 }) => {
   const { id } = useParams<{ id: string }>();
   const [project, setProject] = useState<Project | null>(null);
@@ -527,8 +523,14 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
 
       {selectedTask && (
         <TaskDetailsModal 
-          task={selectedTask} onClose={() => setSelectedTask(null)} files={taskFiles} reviews={taskReviews} users={users} currentUser={currentUser}
-          onAddFile={fileCrud.add} onAddReview={reviewCrud.add} onUpdateStatus={taskCrud.update}
+          task={selectedTask} 
+          onClose={() => setSelectedTask(null)} 
+          users={users} 
+          currentUser={currentUser}
+          onUpdateStatus={async (id, updates) => {
+            const res = await axiosInstance.patch(`/tasks/${id}`, updates);
+            setProjectTasks(prev => prev.map(t => t.id === id ? res.data : t));
+          }}
         />
       )}
     </div>

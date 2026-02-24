@@ -1,6 +1,8 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { TaskType } from '../../../types';
+import { useForm } from '../../../hooks/useForm';
+import FormField from '../../../components/FormField';
 
 interface TaskTypesPageProps {
   taskTypes: TaskType[];
@@ -19,24 +21,45 @@ const TaskTypesPage: React.FC<TaskTypesPageProps> = ({ taskTypes, crud }) => {
     );
   }, [taskTypes, searchTerm]);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const data = { 
-      name: (formData.get('name') as string).toUpperCase(), 
-      description: formData.get('description') as string 
-    };
-    
-    if (editingType) {
-      crud.update(editingType.id, data);
-    } else {
-      crud.add(data);
-    }
-    setModalOpen(false);
-    setEditingType(null);
+  const validationSchema = {
+    name: { required: true, message: 'Classification name is required.' },
+    description: { required: true, message: 'Description is required.' }
   };
 
-  const openEdit = (tt: TaskType) => {
+  const { values, errors, isSubmitting, handleChange, handleSubmit, resetForm, setValues } = useForm({
+    initialValues: {
+      name: '',
+      description: ''
+    },
+    validationSchema,
+    onSubmit: async (formData) => {
+      const data = { 
+        name: formData.name.toUpperCase(), 
+        description: formData.description 
+      };
+      
+      if (editingType) {
+        await crud.update(editingType.id, data);
+      } else {
+        await crud.add(data);
+      }
+      setModalOpen(false);
+      setEditingType(null);
+    }
+  });
+
+  useEffect(() => {
+    if (editingType) {
+      setValues({
+        name: editingType.name,
+        description: editingType.description || ''
+      });
+    } else {
+      resetForm();
+    }
+  }, [editingType, setValues, resetForm]);
+
+  const handleOpenModal = (tt: TaskType | null = null) => {
     setEditingType(tt);
     setModalOpen(true);
   };
@@ -49,7 +72,7 @@ const TaskTypesPage: React.FC<TaskTypesPageProps> = ({ taskTypes, crud }) => {
             <h4 className="fw-bold mb-1 text-dark">Task Classifications</h4>
             <p className="text-secondary small mb-0">Define and manage categorical work types for project workflows</p>
           </div>
-          <button className="btn btn-primary fw-bold px-4 shadow-sm" onClick={() => { setEditingType(null); setModalOpen(true); }}>
+          <button className="btn btn-primary fw-bold px-4 shadow-sm" onClick={() => handleOpenModal(null)}>
             <i className="bi bi-tag-fill me-2"></i>Register Task Type
           </button>
         </div>
@@ -110,7 +133,7 @@ const TaskTypesPage: React.FC<TaskTypesPageProps> = ({ taskTypes, crud }) => {
                     <td className="small text-muted">{tt.createdAt || 'N/A'}</td>
                     <td className="text-end px-4">
                       <div className="btn-group shadow-sm rounded-3 overflow-hidden border">
-                        <button className="btn btn-sm btn-white border-end" onClick={() => openEdit(tt)} title="Configure Type">
+                        <button className="btn btn-sm btn-white border-end" onClick={() => handleOpenModal(tt)} title="Configure Type">
                           <i className="bi bi-pencil-square text-primary"></i>
                         </button>
                         <button className="btn btn-sm btn-white" onClick={() => { if(confirm(`Revoke classification type: ${tt.name}?`)) crud.delete(tt.id); }} title="Remove Type">
@@ -130,7 +153,7 @@ const TaskTypesPage: React.FC<TaskTypesPageProps> = ({ taskTypes, crud }) => {
         <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 rounded-4 overflow-hidden shadow-lg">
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit} noValidate>
                 <div className="modal-header border-0 pt-4 px-4 bg-white">
                   <h5 className="modal-title fw-bold text-dark">
                     {editingType ? <><i className="bi bi-gear-fill me-2"></i>Modify Classification</> : <><i className="bi bi-plus-circle-fill me-2"></i>New Classification</>}
@@ -138,34 +161,40 @@ const TaskTypesPage: React.FC<TaskTypesPageProps> = ({ taskTypes, crud }) => {
                   <button type="button" className="btn-close" onClick={() => setModalOpen(false)}></button>
                 </div>
                 <div className="modal-body p-4 bg-white">
-                  <div className="mb-4">
-                    <label className="form-label smaller fw-bold text-secondary uppercase tracking-wider">Classification Name *</label>
+                  <FormField
+                    label="Classification Name *"
+                    error={errors.name}
+                    required
+                  >
                     <input 
                       name="name" 
                       type="text" 
                       className="form-control form-control-lg border-light bg-light font-monospace" 
-                      defaultValue={editingType?.name} 
+                      value={values.name} 
+                      onChange={(e) => handleChange('name', e.target.value)}
                       placeholder="e.g. DEV, SEO, DESIGN" 
                       style={{ textTransform: 'uppercase' }}
-                      required 
                     />
-                    <div className="form-text smaller text-muted">Use concise unique identifiers for reporting purposes.</div>
-                  </div>
+                  </FormField>
+                  <div className="form-text smaller text-muted mb-4">Use concise unique identifiers for reporting purposes.</div>
+
                   <div className="mb-0">
                     <label className="form-label smaller fw-bold text-secondary uppercase tracking-wider">Description</label>
                     <textarea 
                       name="description" 
-                      className="form-control border-light bg-light" 
+                      className={`form-control border-light bg-light ${errors.description ? 'is-invalid' : ''}`}
                       rows={4} 
-                      defaultValue={editingType?.description} 
+                      value={values.description}
+                      onChange={(e) => handleChange('description', e.target.value)}
                       placeholder="Explain the scope of tasks that fall under this classification..."
                     ></textarea>
+                    {errors.description && <div className="invalid-feedback">{errors.description}</div>}
                   </div>
                 </div>
                 <div className="modal-footer border-0 p-4 pt-0 bg-white gap-2">
                   <button type="button" className="btn btn-light fw-bold px-4 py-2 border" onClick={() => setModalOpen(false)}>Discard</button>
-                  <button type="submit" className="btn btn-dark fw-bold px-4 py-2 shadow-sm">
-                    {editingType ? 'Update Classification' : 'Register Type'}
+                  <button type="submit" className="btn btn-dark fw-bold px-4 py-2 shadow-sm" disabled={isSubmitting}>
+                    {isSubmitting ? 'Processing...' : (editingType ? 'Update Classification' : 'Register Type')}
                   </button>
                 </div>
               </form>

@@ -1,6 +1,8 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Department } from '../../../types';
+import { useForm } from '../../../hooks/useForm';
+import FormField from '../../../components/FormField';
 
 interface DepartmentsPageProps {
   departments: Department[];
@@ -12,37 +14,55 @@ const DepartmentsPage: React.FC<DepartmentsPageProps> = ({ departments, crud }) 
   const [editingDept, setEditingDept] = useState<Department | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const validationSchema = {
+    name: { required: true, message: 'Department name is required.' }
+  };
+
+  const { values, errors, isSubmitting, handleChange, handleSubmit, resetForm, setValues } = useForm({
+    initialValues: {
+      name: '',
+      parentId: '' as string | number
+    },
+    validationSchema,
+    onSubmit: async (formData) => {
+      const data = {
+        name: formData.name,
+        parentId: formData.parentId ? Number(formData.parentId) : null
+      };
+      
+      if (editingDept) {
+        await crud.update(editingDept.id, data);
+      } else {
+        await crud.add(data);
+      }
+      setModalOpen(false);
+      setEditingDept(null);
+    }
+  });
+
+  useEffect(() => {
+    if (editingDept) {
+      setValues({
+        name: editingDept.name,
+        parentId: editingDept.parentId || ''
+      });
+    } else {
+      resetForm();
+    }
+  }, [editingDept, setValues, resetForm]);
+
   const filteredDepartments = useMemo(() => {
     return departments.filter(dept => 
       dept.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [departments, searchTerm]);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const parentIdStr = formData.get('parentId') as string;
-    
-    const data = {
-      name: formData.get('name') as string,
-      parentId: parentIdStr ? Number(parentIdStr) : null
-    };
-    
-    if (editingDept) {
-      crud.update(editingDept.id, data);
-    } else {
-      crud.add(data);
-    }
-    setModalOpen(false);
-    setEditingDept(null);
-  };
-
   const getParentName = (parentId?: number) => {
     if (!parentId) return null;
     return departments.find(d => d.id === parentId)?.name;
   };
 
-  const openEdit = (dept: Department) => {
+  const handleOpenModal = (dept: Department | null = null) => {
     setEditingDept(dept);
     setModalOpen(true);
   };
@@ -55,7 +75,7 @@ const DepartmentsPage: React.FC<DepartmentsPageProps> = ({ departments, crud }) 
             <h4 className="fw-bold mb-1 text-dark">Organizational Units</h4>
             <p className="text-secondary small mb-0">Define corporate departments and functional sub-units</p>
           </div>
-          <button className="btn btn-primary fw-bold px-4 shadow-sm" onClick={() => { setEditingDept(null); setModalOpen(true); }}>
+          <button className="btn btn-primary fw-bold px-4 shadow-sm" onClick={() => handleOpenModal(null)}>
             <i className="bi bi-diagram-3-fill me-2"></i>Create Department
           </button>
         </div>
@@ -122,7 +142,7 @@ const DepartmentsPage: React.FC<DepartmentsPageProps> = ({ departments, crud }) 
                       <td className="small text-muted">{dept.createdAt || 'N/A'}</td>
                       <td className="text-end px-4">
                         <div className="btn-group shadow-sm rounded-3 overflow-hidden border">
-                          <button className="btn btn-sm btn-white border-end" onClick={() => openEdit(dept)} title="Modify Configuration">
+                          <button className="btn btn-sm btn-white border-end" onClick={() => handleOpenModal(dept)} title="Modify Configuration">
                             <i className="bi bi-pencil-square text-primary"></i>
                           </button>
                           <button className="btn btn-sm btn-white" onClick={() => { if(confirm(`Confirm deletion of ${dept.name}?`)) crud.delete(dept.id); }} title="Remove Unit">
@@ -143,7 +163,7 @@ const DepartmentsPage: React.FC<DepartmentsPageProps> = ({ departments, crud }) 
         <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 rounded-4 overflow-hidden shadow-lg">
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit} noValidate>
                 <div className="modal-header border-0 pt-4 px-4 bg-white">
                   <h5 className="modal-title fw-bold text-dark">
                     {editingDept ? <><i className="bi bi-gear-wide me-2"></i>Edit Department</> : <><i className="bi bi-plus-circle me-2"></i>New Department</>}
@@ -151,23 +171,28 @@ const DepartmentsPage: React.FC<DepartmentsPageProps> = ({ departments, crud }) 
                   <button type="button" className="btn-close" onClick={() => setModalOpen(false)}></button>
                 </div>
                 <div className="modal-body p-4 bg-white">
-                  <div className="mb-4">
-                    <label className="form-label smaller fw-bold text-secondary uppercase tracking-wider">Unit Name *</label>
+                  <FormField
+                    label="Unit Name *"
+                    error={errors.name}
+                    required
+                  >
                     <input 
                       name="name" 
                       type="text" 
                       className="form-control form-control-lg border-light bg-light" 
-                      defaultValue={editingDept?.name} 
+                      value={values.name} 
+                      onChange={(e) => handleChange('name', e.target.value)}
                       placeholder="e.g. Design Services" 
-                      required 
                     />
-                  </div>
+                  </FormField>
+                  
                   <div className="mb-0">
                     <label className="form-label smaller fw-bold text-secondary uppercase tracking-wider">Parent Division</label>
                     <select 
                       name="parentId" 
-                      className="form-select form-select-lg border-light bg-light" 
-                      defaultValue={editingDept?.parentId || ''}
+                      className={`form-select form-select-lg border-light bg-light ${errors.parentId ? 'is-invalid' : ''}`}
+                      value={values.parentId}
+                      onChange={(e) => handleChange('parentId', e.target.value)}
                     >
                       <option value="">None (Primary Department)</option>
                       {departments
@@ -177,13 +202,14 @@ const DepartmentsPage: React.FC<DepartmentsPageProps> = ({ departments, crud }) 
                         ))
                       }
                     </select>
+                    {errors.parentId && <div className="invalid-feedback">{errors.parentId}</div>}
                     <div className="form-text smaller text-muted">Nested departments help organize sub-services and specialized teams.</div>
                   </div>
                 </div>
                 <div className="modal-footer border-0 p-4 pt-0 bg-white gap-2">
                   <button type="button" className="btn btn-light fw-bold px-4 py-2 border" onClick={() => setModalOpen(false)}>Discard</button>
-                  <button type="submit" className="btn btn-dark fw-bold px-4 py-2 shadow-sm">
-                    {editingDept ? 'Update Details' : 'Confirm Definition'}
+                  <button type="submit" className="btn btn-dark fw-bold px-4 py-2 shadow-sm" disabled={isSubmitting}>
+                    {isSubmitting ? 'Processing...' : (editingDept ? 'Update Details' : 'Confirm Definition')}
                   </button>
                 </div>
               </form>

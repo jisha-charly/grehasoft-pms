@@ -1,6 +1,8 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Role } from '../../../types';
+import { useForm } from '../../../hooks/useForm';
+import FormField from '../../../components/FormField';
 
 interface RolesPageProps {
   roles: Role[];
@@ -12,6 +14,48 @@ const RolesPage: React.FC<RolesPageProps> = ({ roles, crud }) => {
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const validationSchema = {
+    name: { 
+      required: true, 
+      message: 'Internal name is required.',
+      validate: (v: string) => /^[A-Z0-9_]+$/.test(v.toUpperCase().replace(/\s+/g, '_')) || 'Invalid format.'
+    },
+    description: { required: true, message: 'Description is required.' }
+  };
+
+  const { values, errors, isSubmitting, handleChange, handleSubmit, resetForm, setValues } = useForm({
+    initialValues: {
+      name: '',
+      description: ''
+    },
+    validationSchema,
+    onSubmit: async (formData) => {
+      const data = {
+        name: formData.name.toUpperCase().replace(/\s+/g, '_'),
+        description: formData.description
+      };
+      
+      if (editingRole) {
+        await crud.update(editingRole.id, data);
+      } else {
+        await crud.add(data);
+      }
+      setModalOpen(false);
+      setEditingRole(null);
+    }
+  });
+
+  useEffect(() => {
+    if (editingRole) {
+      setValues({
+        name: editingRole.name,
+        description: editingRole.description
+      });
+    } else {
+      resetForm();
+    }
+  }, [editingRole, setValues, resetForm]);
+
   const filteredRoles = useMemo(() => {
     return roles.filter(role => 
       role.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -19,24 +63,7 @@ const RolesPage: React.FC<RolesPageProps> = ({ roles, crud }) => {
     );
   }, [roles, searchTerm]);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const data = {
-      name: (formData.get('name') as string).toUpperCase().replace(/\s+/g, '_'),
-      description: formData.get('description') as string
-    };
-    
-    if (editingRole) {
-      crud.update(editingRole.id, data);
-    } else {
-      crud.add(data);
-    }
-    setModalOpen(false);
-    setEditingRole(null);
-  };
-
-  const openEdit = (role: Role) => {
+  const handleOpenModal = (role: Role | null = null) => {
     setEditingRole(role);
     setModalOpen(true);
   };
@@ -56,7 +83,7 @@ const RolesPage: React.FC<RolesPageProps> = ({ roles, crud }) => {
             <h4 className="fw-bold mb-1 text-dark">Access Roles</h4>
             <p className="text-secondary small mb-0">Manage system permissions and functional authorization levels</p>
           </div>
-          <button className="btn btn-primary fw-bold px-4 shadow-sm" onClick={() => { setEditingRole(null); setModalOpen(true); }}>
+          <button className="btn btn-primary fw-bold px-4 shadow-sm" onClick={() => handleOpenModal(null)}>
             <i className="bi bi-shield-lock-fill me-2"></i>Define New Role
           </button>
         </div>
@@ -114,7 +141,7 @@ const RolesPage: React.FC<RolesPageProps> = ({ roles, crud }) => {
                     <td className="small text-muted">{role.createdAt || 'N/A'}</td>
                     <td className="text-end px-4">
                       <div className="btn-group shadow-sm rounded-3 overflow-hidden border">
-                        <button className="btn btn-sm btn-white border-end" onClick={() => openEdit(role)} title="Modify Permissions">
+                        <button className="btn btn-sm btn-white border-end" onClick={() => handleOpenModal(role)} title="Modify Permissions">
                           <i className="bi bi-pencil-square text-primary"></i>
                         </button>
                         <button className="btn btn-sm btn-white" onClick={() => { if(confirm(`Confirm deletion of role: ${role.name}?`)) crud.delete(role.id); }} title="Revoke Role">
@@ -134,7 +161,7 @@ const RolesPage: React.FC<RolesPageProps> = ({ roles, crud }) => {
         <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 rounded-4 overflow-hidden shadow-lg">
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit} noValidate>
                 <div className="modal-header border-0 pt-4 px-4 bg-white">
                   <h5 className="modal-title fw-bold text-dark">
                     {editingRole ? <><i className="bi bi-gear-wide-connected me-2"></i>Update Role Schema</> : <><i className="bi bi-shield-plus me-2"></i>Provision New Role</>}
@@ -142,34 +169,40 @@ const RolesPage: React.FC<RolesPageProps> = ({ roles, crud }) => {
                   <button type="button" className="btn-close" onClick={() => setModalOpen(false)}></button>
                 </div>
                 <div className="modal-body p-4 bg-white">
-                  <div className="mb-3">
-                    <label className="form-label smaller fw-bold text-secondary uppercase tracking-wider">Internal Identifier *</label>
+                  <FormField
+                    label="Internal Identifier *"
+                    error={errors.name}
+                    required
+                  >
                     <input 
                       name="name" 
                       type="text" 
                       className="form-control form-control-lg border-light bg-light font-monospace" 
-                      defaultValue={editingRole?.name} 
+                      value={values.name} 
+                      onChange={(e) => handleChange('name', e.target.value)}
                       placeholder="e.g. PROJECT_MANAGER" 
                       style={{ textTransform: 'uppercase' }}
-                      required 
                     />
-                    <div className="form-text smaller text-muted">Use uppercase and underscores for system compatibility.</div>
-                  </div>
+                  </FormField>
+                  <div className="form-text smaller text-muted mb-3">Use uppercase and underscores for system compatibility.</div>
+
                   <div className="mb-0">
                     <label className="form-label smaller fw-bold text-secondary uppercase tracking-wider">Functional Description</label>
                     <textarea 
                       name="description" 
-                      className="form-control border-light bg-light" 
+                      className={`form-control border-light bg-light ${errors.description ? 'is-invalid' : ''}`}
                       rows={4} 
-                      defaultValue={editingRole?.description} 
+                      value={values.description}
+                      onChange={(e) => handleChange('description', e.target.value)}
                       placeholder="Specify the scope of access and responsibilities..."
                     ></textarea>
+                    {errors.description && <div className="invalid-feedback">{errors.description}</div>}
                   </div>
                 </div>
                 <div className="modal-footer border-0 p-4 pt-0 bg-white gap-2">
                   <button type="button" className="btn btn-light fw-bold px-4 py-2 border" onClick={() => setModalOpen(false)}>Discard</button>
-                  <button type="submit" className="btn btn-dark fw-bold px-4 py-2 shadow-sm">
-                    {editingRole ? 'Save Changes' : 'Confirm Role Definition'}
+                  <button type="submit" className="btn btn-dark fw-bold px-4 py-2 shadow-sm" disabled={isSubmitting}>
+                    {isSubmitting ? 'Processing...' : (editingRole ? 'Save Changes' : 'Confirm Role Definition')}
                   </button>
                 </div>
               </form>

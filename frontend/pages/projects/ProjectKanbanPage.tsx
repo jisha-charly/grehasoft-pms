@@ -14,15 +14,11 @@ interface ProjectKanbanPageProps {
   milestones: Milestone[];
   crud: any;
   taskTypes: TaskType[];
-  taskFiles: TaskFile[];
-  taskReviews: TaskReview[];
-  fileCrud: any;
-  reviewCrud: any;
   currentUser: User;
 }
 
 const ProjectKanbanPage: React.FC<ProjectKanbanPageProps> = ({ 
-  projects: initialProjects, tasks: initialTasks, setTasks, users, milestones: initialMilestones, crud, taskTypes, taskFiles, taskReviews, fileCrud, reviewCrud, currentUser 
+  projects: initialProjects, tasks: initialTasks, setTasks, users, milestones: initialMilestones, crud, taskTypes, currentUser 
 }) => {
   const { id } = useParams<{ id: string }>();
   const [project, setProject] = useState<Project | null>(null);
@@ -200,12 +196,8 @@ const ProjectKanbanPage: React.FC<ProjectKanbanPageProps> = ({
         <TaskDetailsModal 
           task={selectedTask} 
           onClose={() => setSelectedTask(null)} 
-          files={taskFiles} 
-          reviews={taskReviews} 
           users={users} 
           currentUser={currentUser}
-          onAddFile={fileCrud.add} 
-          onAddReview={reviewCrud.add} 
           onUpdateStatus={handleTaskUpdate}
         />
       )}

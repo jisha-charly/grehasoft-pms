@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Project, ProjectStatus, User, Department, Client, Permission } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { useForm } from '../../hooks/useForm';
+import FormField from '../../components/FormField';
 
 interface ProjectsPageProps {
   projects: Project[];
@@ -19,9 +21,77 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ projects, users, department
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const canManage = hasPermission(Permission.MANAGE_PROJECTS);
+
+  const validationSchema = {
+    name: {
+      required: true,
+      minLength: 3,
+      message: 'Project title must be at least 3 characters.'
+    },
+    clientId: {
+      required: true,
+      message: 'Please select a client.'
+    },
+    departmentId: {
+      required: true,
+      message: 'Please select a department.'
+    },
+    startDate: {
+      required: true,
+      message: 'Start date is required.'
+    },
+    endDate: {
+      required: true,
+      message: 'Deadline is required.',
+      validate: (value: string, values: any) => {
+        if (values.startDate && value && new Date(values.startDate) > new Date(value)) {
+          return 'Deadline cannot be before start date.';
+        }
+        return true;
+      }
+    }
+  };
+
+  const {
+    values,
+    errors,
+    isSubmitting,
+    handleChange,
+    handleSubmit,
+    resetForm,
+    setValues
+  } = useForm({
+    initialValues: {
+      name: '',
+      clientId: '',
+      departmentId: '',
+      projectManagerId: users[0]?.id || '',
+      startDate: '',
+      endDate: '',
+      status: 'not_started' as ProjectStatus,
+      progressPercentage: 0
+    },
+    validationSchema,
+    onSubmit: async (formData) => {
+      const payload = {
+        ...formData,
+        clientId: Number(formData.clientId),
+        departmentId: Number(formData.departmentId),
+        projectManagerId: Number(formData.projectManagerId),
+        createdBy: editingProject ? editingProject.createdBy : (currentUser?.id || 1),
+        progressPercentage: Number(formData.progressPercentage || 0)
+      };
+
+      if (editingProject) {
+        await crud.update(editingProject.id, payload);
+      } else {
+        await crud.add(payload);
+      }
+      setModalOpen(false);
+    }
+  });
 
   // Search & Filter
   const filteredProjects = useMemo(() => {
@@ -38,47 +108,23 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ projects, users, department
     return filteredProjects.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredProjects, currentPage]);
 
-  const validate = (data: any) => {
-    const newErrors: Record<string, string> = {};
-    if (!data.name || data.name.length < 3) newErrors.name = 'Project title must be at least 3 characters.';
-    if (!data.clientId) newErrors.clientId = 'Please select a client.';
-    if (!data.departmentId) newErrors.departmentId = 'Please select a department.';
-    if (!data.startDate) newErrors.startDate = 'Start date is required.';
-    if (!data.endDate) newErrors.endDate = 'Deadline is required.';
-    if (data.startDate && data.endDate && new Date(data.startDate) > new Date(data.endDate)) {
-      newErrors.endDate = 'Deadline cannot be before start date.';
-    }
-    return newErrors;
-  };
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const data = {
-      name: fd.get('name') as string,
-      clientId: Number(fd.get('clientId')),
-      departmentId: Number(fd.get('departmentId')),
-      projectManagerId: Number(fd.get('projectManagerId')),
-      createdBy: editingProject ? editingProject.createdBy : (currentUser?.id || 1),
-      startDate: fd.get('startDate') as string,
-      endDate: fd.get('endDate') as string,
-      status: fd.get('status') as ProjectStatus,
-      progressPercentage: Number(fd.get('progressPercentage') || 0)
-    };
-
-    const validationErrors = validate(data);
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      return;
-    }
-
-    if (editingProject) {
-      crud.update(editingProject.id, data);
+  const handleOpenModal = (project: Project | null = null) => {
+    setEditingProject(project);
+    if (project) {
+      setValues({
+        name: project.name,
+        clientId: project.clientId.toString(),
+        departmentId: project.departmentId.toString(),
+        projectManagerId: project.projectManagerId.toString(),
+        startDate: project.startDate,
+        endDate: project.endDate,
+        status: project.status,
+        progressPercentage: project.progressPercentage
+      });
     } else {
-      crud.add(data);
+      resetForm();
     }
-    setModalOpen(false);
-    setErrors({});
+    setModalOpen(true);
   };
 
   return (
@@ -101,7 +147,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ projects, users, department
             />
           </div>
           {canManage && (
-            <button className="btn btn-dark fw-bold px-4 shadow-sm rounded-pill" onClick={() => { setEditingProject(null); setModalOpen(true); setErrors({}); }}>
+            <button className="btn btn-dark fw-bold px-4 shadow-sm rounded-pill" onClick={() => handleOpenModal(null)}>
               <i className="bi bi-plus-lg me-2"></i>New Project
             </button>
           )}
@@ -133,7 +179,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ projects, users, department
               <div className="d-flex gap-2 mt-auto">
                 {canManage && (
                   <>
-                    <button className="btn btn-light btn-sm flex-grow-1 fw-bold text-secondary rounded-pill" onClick={() => { setEditingProject(p); setModalOpen(true); setErrors({}); }}>Edit</button>
+                    <button className="btn btn-light btn-sm flex-grow-1 fw-bold text-secondary rounded-pill" onClick={() => handleOpenModal(p)}>Edit</button>
                     <button className="btn btn-light btn-sm fw-bold text-danger rounded-circle p-2" onClick={() => { if(confirm('Delete project?')) crud.delete(p.id); }}><i className="bi bi-trash"></i></button>
                   </>
                 )}
@@ -173,71 +219,119 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ projects, users, department
         <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
           <div className="modal-dialog modal-dialog-centered modal-lg">
             <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit} noValidate>
                 <div className="modal-header border-0 pt-4 px-4 bg-white">
                   <h5 className="modal-title fw-bold text-dark">{editingProject ? 'Edit Project Profile' : 'Initiate New Project'}</h5>
                   <button type="button" className="btn-close" onClick={() => setModalOpen(false)}></button>
                 </div>
                 <div className="modal-body p-4 bg-white">
-                  <div className="mb-3">
-                    <label className="form-label small fw-bold text-secondary uppercase">Project Title *</label>
-                    <input name="name" className={`form-control bg-light border-0 ${errors.name ? 'is-invalid' : ''}`} defaultValue={editingProject?.name} placeholder="Enter project name" />
-                    {errors.name && <div className="invalid-feedback">{errors.name}</div>}
-                  </div>
+                  <FormField
+                    label="Project Title *"
+                    name="name"
+                    value={values.name}
+                    onChange={handleChange}
+                    error={errors.name}
+                    placeholder="Enter project name"
+                  />
+                  
                   <div className="row g-3 mb-3">
                     <div className="col-md-6">
-                      <label className="form-label small fw-bold text-secondary uppercase">Client *</label>
-                      <select name="clientId" className={`form-select bg-light border-0 ${errors.clientId ? 'is-invalid' : ''}`} defaultValue={editingProject?.clientId}>
-                        <option value="">Select Client</option>
-                        {clients.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
-                      </select>
-                      {errors.clientId && <div className="invalid-feedback">{errors.clientId}</div>}
+                      <FormField
+                        label="Client *"
+                        name="clientId"
+                        type="select"
+                        value={values.clientId}
+                        onChange={handleChange}
+                        error={errors.clientId}
+                        options={[
+                          { label: 'Select Client', value: '' },
+                          ...clients.map(c => ({ label: c.companyName, value: c.id.toString() }))
+                        ]}
+                      />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label small fw-bold text-secondary uppercase">Department *</label>
-                      <select name="departmentId" className={`form-select bg-light border-0 ${errors.departmentId ? 'is-invalid' : ''}`} defaultValue={editingProject?.departmentId}>
-                        <option value="">Select Department</option>
-                        {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      </select>
-                      {errors.departmentId && <div className="invalid-feedback">{errors.departmentId}</div>}
+                      <FormField
+                        label="Department *"
+                        name="departmentId"
+                        type="select"
+                        value={values.departmentId}
+                        onChange={handleChange}
+                        error={errors.departmentId}
+                        options={[
+                          { label: 'Select Department', value: '' },
+                          ...departments.map(d => ({ label: d.name, value: d.id.toString() }))
+                        ]}
+                      />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label small fw-bold text-secondary uppercase">Start Date *</label>
-                      <input name="startDate" type="date" className={`form-control bg-light border-0 ${errors.startDate ? 'is-invalid' : ''}`} defaultValue={editingProject?.startDate} />
-                      {errors.startDate && <div className="invalid-feedback">{errors.startDate}</div>}
+                      <FormField
+                        label="Start Date *"
+                        name="startDate"
+                        type="date"
+                        value={values.startDate}
+                        onChange={handleChange}
+                        error={errors.startDate}
+                      />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label small fw-bold text-secondary uppercase">Deadline *</label>
-                      <input name="endDate" type="date" className={`form-control bg-light border-0 ${errors.endDate ? 'is-invalid' : ''}`} defaultValue={editingProject?.endDate} />
-                      {errors.endDate && <div className="invalid-feedback">{errors.endDate}</div>}
+                      <FormField
+                        label="Deadline *"
+                        name="endDate"
+                        type="date"
+                        value={values.endDate}
+                        onChange={handleChange}
+                        error={errors.endDate}
+                      />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label small fw-bold text-secondary uppercase">Project Manager</label>
-                      <select name="projectManagerId" className="form-select bg-light border-0" defaultValue={editingProject?.projectManagerId}>
-                        {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                      </select>
+                      <FormField
+                        label="Project Manager"
+                        name="projectManagerId"
+                        type="select"
+                        value={values.projectManagerId}
+                        onChange={handleChange}
+                        options={users.map(u => ({ label: u.name, value: u.id.toString() }))}
+                      />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label small fw-bold text-secondary uppercase">Status</label>
-                      <select name="status" className="form-select bg-light border-0" defaultValue={editingProject?.status}>
-                        <option value="not_started">Not Started</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="on_hold">On Hold</option>
-                        <option value="completed">Completed</option>
-                      </select>
+                      <FormField
+                        label="Status"
+                        name="status"
+                        type="select"
+                        value={values.status}
+                        onChange={handleChange}
+                        options={[
+                          { label: 'Not Started', value: 'not_started' },
+                          { label: 'In Progress', value: 'in_progress' },
+                          { label: 'On Hold', value: 'on_hold' },
+                          { label: 'Completed', value: 'completed' }
+                        ]}
+                      />
                     </div>
                     {editingProject && (
                       <div className="col-md-12">
-                        <label className="form-label small fw-bold text-secondary uppercase">Progress ({editingProject.progressPercentage}%)</label>
-                        <input type="range" name="progressPercentage" className="form-range" min="0" max="100" defaultValue={editingProject.progressPercentage} />
+                        <label className="form-label small fw-bold text-secondary uppercase">Progress ({values.progressPercentage}%)</label>
+                        <input 
+                          type="range" 
+                          name="progressPercentage" 
+                          className="form-range" 
+                          min="0" 
+                          max="100" 
+                          value={values.progressPercentage} 
+                          onChange={handleChange}
+                        />
                       </div>
                     )}
                   </div>
                 </div>
                 <div className="modal-footer border-0 p-4 pt-0 bg-white d-flex gap-2">
                   <button type="button" className="btn btn-light fw-bold px-4 rounded-pill" onClick={() => setModalOpen(false)}>Discard</button>
-                  <button type="submit" className="btn btn-primary fw-bold px-4 shadow-sm rounded-pill">
-                    {editingProject ? 'Update Project' : 'Launch Project'}
+                  <button type="submit" className="btn btn-primary fw-bold px-4 shadow-sm rounded-pill" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <><span className="spinner-border spinner-border-sm me-2"></span>Processing...</>
+                    ) : (
+                      editingProject ? 'Update Project' : 'Launch Project'
+                    )}
                   </button>
                 </div>
               </form>

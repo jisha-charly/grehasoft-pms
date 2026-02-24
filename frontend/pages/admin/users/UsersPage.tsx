@@ -1,6 +1,8 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { User, Role, Department, UserRole } from '../../../types';
+import { useForm, ValidationSchema } from '../../../hooks/useForm';
+import FormField from '../../../components/FormField';
 
 interface UsersPageProps {
   users: User[];
@@ -14,6 +16,78 @@ const UsersPage: React.FC<UsersPageProps> = ({ users, roles, departments, crud }
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const validationSchema: ValidationSchema<any> = {
+    name: { required: true, message: 'Full name is required.' },
+    username: { 
+      required: true, 
+      pattern: /^[a-zA-Z0-9_]+$/,
+      message: 'System username is required and can only contain letters, numbers and underscores.' 
+    },
+    email: { 
+      required: true, 
+      pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+      message: 'Enter a valid corporate email address.' 
+    },
+    password: { 
+      validate: (v) => {
+        if (!editingUser && !v) return 'Security password is required for new accounts.';
+        if (v && v.length < 8) return 'Password must be at least 8 characters.';
+        return true;
+      },
+      message: 'Password validation failed.'
+    },
+    role: { required: true, message: 'Please select an access role.' },
+    departmentId: { required: true, message: 'Please choose a department.' }
+  };
+
+  const { values, errors, handleChange, handleSubmit, setValues, resetForm, isSubmitting } = useForm({
+    initialValues: {
+      name: '',
+      username: '',
+      email: '',
+      password: '',
+      role: '' as UserRole,
+      departmentId: '' as any,
+      status: 'active' as 'active' | 'inactive'
+    },
+    validationSchema,
+    onSubmit: async (formValues) => {
+      const data = {
+        ...formValues,
+        departmentId: Number(formValues.departmentId)
+      };
+
+      if (editingUser) {
+        await crud.update(editingUser.id, data);
+      } else {
+        await crud.add(data);
+      }
+      handleCloseModal();
+    }
+  });
+
+  useEffect(() => {
+    if (editingUser) {
+      setValues({
+        name: editingUser.name,
+        username: editingUser.username,
+        email: editingUser.email,
+        password: '',
+        role: editingUser.role,
+        departmentId: editingUser.departmentId,
+        status: editingUser.status
+      });
+    } else {
+      resetForm();
+    }
+  }, [editingUser, setValues, resetForm]);
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setEditingUser(null);
+    resetForm();
+  };
+
   const filteredUsers = useMemo(() => {
     return users.filter(u => 
       u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -21,27 +95,6 @@ const UsersPage: React.FC<UsersPageProps> = ({ users, roles, departments, crud }
       u.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [users, searchTerm]);
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const data = {
-      name: fd.get('name') as string,
-      username: fd.get('username') as string,
-      email: fd.get('email') as string,
-      role: fd.get('role') as UserRole, // @google/genai guidelines: Use the string-based role property
-      departmentId: Number(fd.get('departmentId')),
-      status: fd.get('status') as 'active' | 'inactive',
-    };
-
-    if (editingUser) {
-      crud.update(editingUser.id, data);
-    } else {
-      crud.add(data);
-    }
-    setModalOpen(false);
-    setEditingUser(null);
-  };
 
   const handleEdit = (user: User) => {
     setEditingUser(user);
@@ -150,59 +203,107 @@ const UsersPage: React.FC<UsersPageProps> = ({ users, roles, departments, crud }
         <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
           <div className="modal-dialog modal-lg modal-dialog-centered">
             <div className="modal-content border-0 rounded-4 overflow-hidden shadow-lg">
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit} noValidate>
                 <div className="modal-header border-0 pt-4 px-4 bg-white">
                   <h5 className="modal-title fw-bold text-dark">
                     {editingUser ? <><i className="bi bi-person-gear me-2"></i>Update User Account</> : <><i className="bi bi-person-plus me-2"></i>Provision New Account</>}
                   </h5>
-                  <button type="button" className="btn-close" onClick={() => setModalOpen(false)}></button>
+                  <button type="button" className="btn-close" onClick={handleCloseModal}></button>
                 </div>
                 <div className="modal-body p-4 bg-white">
                   <div className="row g-3">
                     <div className="col-md-6">
-                      <label className="form-label smaller fw-bold text-secondary uppercase tracking-wider">Full Legal Name *</label>
-                      <input name="name" className="form-control form-control-lg border-light bg-light" defaultValue={editingUser?.name} placeholder="e.g. Alex Thompson" required />
+                      <FormField label="Full Legal Name" error={errors.name} required>
+                        <input 
+                          name="name" 
+                          className="form-control form-control-lg border-light bg-light" 
+                          value={values.name} 
+                          onChange={(e) => handleChange('name', e.target.value)}
+                          placeholder="e.g. Alex Thompson" 
+                        />
+                      </FormField>
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label smaller fw-bold text-secondary uppercase tracking-wider">System Username *</label>
-                      <div className="input-group input-group-lg">
-                        <span className="input-group-text border-light bg-light text-muted">@</span>
-                        <input name="username" className="form-control border-light bg-light" defaultValue={editingUser?.username} placeholder="username" required />
-                      </div>
+                      <FormField label="System Username" error={errors.username} required>
+                        <div className="input-group input-group-lg">
+                          <span className={`input-group-text border-light bg-light text-muted ${errors.username ? 'border-danger' : ''}`}>@</span>
+                          <input 
+                            name="username" 
+                            className="form-control border-light bg-light" 
+                            value={values.username} 
+                            onChange={(e) => handleChange('username', e.target.value)}
+                            placeholder="username" 
+                          />
+                        </div>
+                      </FormField>
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label smaller fw-bold text-secondary uppercase tracking-wider">Corporate Email *</label>
-                      <input name="email" type="email" className="form-control form-control-lg border-light bg-light" defaultValue={editingUser?.email} placeholder="alex@grehasoft.com" required />
+                      <FormField label="Corporate Email" error={errors.email} required>
+                        <input 
+                          name="email" 
+                          type="email" 
+                          className="form-control form-control-lg border-light bg-light" 
+                          value={values.email} 
+                          onChange={(e) => handleChange('email', e.target.value)}
+                          placeholder="alex@grehasoft.com" 
+                        />
+                      </FormField>
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label smaller fw-bold text-secondary uppercase tracking-wider">Security Password {editingUser && '(Optional)'}</label>
-                      <input name="password" type="password" className="form-control form-control-lg border-light bg-light" placeholder="••••••••" required={!editingUser} />
+                      <FormField label={`Security Password ${editingUser ? '(Optional)' : ''}`} error={errors.password} required={!editingUser}>
+                        <input 
+                          name="password" 
+                          type="password" 
+                          className="form-control form-control-lg border-light bg-light" 
+                          value={values.password} 
+                          onChange={(e) => handleChange('password', e.target.value)}
+                          placeholder="••••••••" 
+                        />
+                      </FormField>
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label smaller fw-bold text-secondary uppercase tracking-wider">Access Role *</label>
-                      <select name="role" className="form-select form-select-lg border-light bg-light" defaultValue={editingUser?.role} required>
-                        <option value="">Assign a role...</option>
-                        {Object.values(UserRole).map(role => <option key={role} value={role}>{role.replace('_', ' ')}</option>)}
-                      </select>
+                      <FormField label="Access Role" error={errors.role} required>
+                        <select 
+                          name="role" 
+                          className="form-select form-select-lg border-light bg-light" 
+                          value={values.role} 
+                          onChange={(e) => handleChange('role', e.target.value)}
+                        >
+                          <option value="">Assign a role...</option>
+                          {Object.values(UserRole).map(role => <option key={role} value={role}>{role.replace('_', ' ')}</option>)}
+                        </select>
+                      </FormField>
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label smaller fw-bold text-secondary uppercase tracking-wider">Assigned Department *</label>
-                      <select name="departmentId" className="form-select form-select-lg border-light bg-light" defaultValue={editingUser?.departmentId} required>
-                        <option value="">Choose department...</option>
-                        {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      </select>
+                      <FormField label="Assigned Department" error={errors.departmentId} required>
+                        <select 
+                          name="departmentId" 
+                          className="form-select form-select-lg border-light bg-light" 
+                          value={values.departmentId} 
+                          onChange={(e) => handleChange('departmentId', e.target.value)}
+                        >
+                          <option value="">Choose department...</option>
+                          {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        </select>
+                      </FormField>
                     </div>
                     <div className="col-12">
-                      <label className="form-label smaller fw-bold text-secondary uppercase tracking-wider">Account Visibility & Status</label>
-                      <select name="status" className="form-select form-select-lg border-light bg-light" defaultValue={editingUser?.status}>
-                        <option value="active">Active - Full Platform Access</option>
-                        <option value="inactive">Inactive - Account Suspended</option>
-                      </select>
+                      <FormField label="Account Visibility & Status">
+                        <select 
+                          name="status" 
+                          className="form-select form-select-lg border-light bg-light" 
+                          value={values.status} 
+                          onChange={(e) => handleChange('status', e.target.value)}
+                        >
+                          <option value="active">Active - Full Platform Access</option>
+                          <option value="inactive">Inactive - Account Suspended</option>
+                        </select>
+                      </FormField>
                     </div>
                   </div>
                 </div>
                 <div className="modal-footer border-0 p-4 pt-0 bg-white gap-2">
-                  <button type="button" className="btn btn-light fw-bold px-4 py-2 border" onClick={() => setModalOpen(false)}>Discard</button>
+                  <button type="button" className="btn btn-light fw-bold px-4 py-2 border" onClick={handleCloseModal}>Discard</button>
                   <button type="submit" className="btn btn-dark fw-bold px-4 py-2 shadow-sm">
                     {editingUser ? 'Save Account Changes' : 'Confirm Provisioning'}
                   </button>

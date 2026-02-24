@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Lead, LeadAssignment, LeadFollowup, User, UserRole } from '../../types';
 import axiosInstance from '../../api/axiosInstance';
+import { useForm } from '../../hooks/useForm';
+import FormField from '../../components/FormField';
 
 interface LeadsPageProps {
   leads: Lead[];
@@ -37,28 +39,51 @@ const LeadsPage: React.FC<LeadsPageProps> = ({ leads, crud, users }) => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const data = Object.fromEntries(formData.entries());
-    
-    const payload = {
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      source: data.source,
-      status: data.status || 'new',
-      converted_project_id: data.converted_project_id ? Number(data.converted_project_id) : null
-    };
-
-    if (editingLead) {
-      crud.update(editingLead.id, payload);
-    } else {
-      crud.add(payload);
+  const validationSchema = {
+    name: {
+      required: true,
+      message: 'Full name is required.'
+    },
+    email: {
+      required: true,
+      pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+      message: 'Enter a valid corporate email address.'
     }
-    setModalOpen(false);
-    setEditingLead(null);
   };
+
+  const {
+    values,
+    errors,
+    isSubmitting,
+    handleChange,
+    handleSubmit,
+    resetForm,
+    setValues
+  } = useForm({
+    initialValues: {
+      name: '',
+      email: '',
+      phone: '',
+      source: 'Web',
+      status: 'new',
+      converted_project_id: ''
+    },
+    validationSchema,
+    onSubmit: async (formData) => {
+      const payload = {
+        ...formData,
+        converted_project_id: formData.converted_project_id ? Number(formData.converted_project_id) : null
+      };
+
+      if (editingLead) {
+        await crud.update(editingLead.id, payload);
+      } else {
+        await crud.add(payload);
+      }
+      setModalOpen(false);
+      setEditingLead(null);
+    }
+  });
 
   const handleAddFollowup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -84,11 +109,20 @@ const LeadsPage: React.FC<LeadsPageProps> = ({ leads, crud, users }) => {
 
   const handleEdit = (lead: Lead) => {
     setEditingLead(lead);
+    setValues({
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone || '',
+      source: lead.source,
+      status: lead.status,
+      converted_project_id: lead.converted_project_id?.toString() || ''
+    });
     setModalOpen(true);
   };
 
   const handleAddNew = () => {
     setEditingLead(null);
+    resetForm();
     setModalOpen(true);
   };
 
@@ -163,7 +197,7 @@ const LeadsPage: React.FC<LeadsPageProps> = ({ leads, crud, users }) => {
         <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit} noValidate>
                 <div className="modal-header border-0 bg-white pt-4 px-4">
                   <h5 className="modal-title fw-bold text-dark">{editingLead ? 'Update Prospect Profile' : 'Register New Prospect'}</h5>
                   <button type="button" className="btn-close" onClick={() => setModalOpen(false)}></button>
@@ -171,41 +205,77 @@ const LeadsPage: React.FC<LeadsPageProps> = ({ leads, crud, users }) => {
                 <div className="modal-body p-4 bg-white">
                   <div className="row g-3">
                     <div className="col-12">
-                      <label className="form-label smaller fw-bold text-secondary text-uppercase">Full Name *</label>
-                      <input name="name" className="form-control bg-light border-0" defaultValue={editingLead?.name} required />
+                      <FormField
+                        label="Full Name *"
+                        name="name"
+                        value={values.name}
+                        onChange={handleChange}
+                        error={errors.name}
+                        placeholder="e.g. Alex Thompson"
+                      />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label smaller fw-bold text-secondary text-uppercase">Email *</label>
-                      <input name="email" type="email" className="form-control bg-light border-0" defaultValue={editingLead?.email} required />
+                      <FormField
+                        label="Email *"
+                        name="email"
+                        type="email"
+                        value={values.email}
+                        onChange={handleChange}
+                        error={errors.email}
+                        placeholder="alex@example.com"
+                      />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label smaller fw-bold text-secondary text-uppercase">Phone</label>
-                      <input name="phone" className="form-control bg-light border-0" defaultValue={editingLead?.phone} />
+                      <FormField
+                        label="Phone"
+                        name="phone"
+                        value={values.phone}
+                        onChange={handleChange}
+                        placeholder="+91 00000 00000"
+                      />
                     </div>
                     <div className="col-12">
-                      <label className="form-label smaller fw-bold text-secondary text-uppercase">Source</label>
-                      <select name="source" className="form-select bg-light border-0" defaultValue={editingLead?.source}>
-                        <option value="Web">Website</option>
-                        <option value="Ads">Ads</option>
-                        <option value="Referral">Referral</option>
-                        <option value="Direct">Direct</option>
-                      </select>
+                      <FormField
+                        label="Source"
+                        name="source"
+                        type="select"
+                        value={values.source}
+                        onChange={handleChange}
+                        options={[
+                          { label: 'Website', value: 'Web' },
+                          { label: 'Ads', value: 'Ads' },
+                          { label: 'Referral', value: 'Referral' },
+                          { label: 'Direct', value: 'Direct' }
+                        ]}
+                      />
                     </div>
                     {editingLead && (
                       <>
                         <div className="col-md-6">
-                          <label className="form-label smaller fw-bold text-secondary text-uppercase">Status</label>
-                          <select name="status" className="form-select bg-light border-0" defaultValue={editingLead?.status}>
-                            <option value="new">New</option>
-                            <option value="contacted">Contacted</option>
-                            <option value="qualified">Qualified</option>
-                            <option value="converted">Converted</option>
-                            <option value="lost">Lost</option>
-                          </select>
+                          <FormField
+                            label="Status"
+                            name="status"
+                            type="select"
+                            value={values.status}
+                            onChange={handleChange}
+                            options={[
+                              { label: 'New', value: 'new' },
+                              { label: 'Contacted', value: 'contacted' },
+                              { label: 'Qualified', value: 'qualified' },
+                              { label: 'Converted', value: 'converted' },
+                              { label: 'Lost', value: 'lost' }
+                            ]}
+                          />
                         </div>
                         <div className="col-md-6">
-                          <label className="form-label smaller fw-bold text-secondary text-uppercase">Converted Project ID</label>
-                          <input name="converted_project_id" type="number" className="form-control bg-light border-0" defaultValue={editingLead?.converted_project_id || ''} placeholder="Project ID" />
+                          <FormField
+                            label="Converted Project ID"
+                            name="converted_project_id"
+                            type="number"
+                            value={values.converted_project_id}
+                            onChange={handleChange}
+                            placeholder="Project ID"
+                          />
                         </div>
                       </>
                     )}
@@ -213,7 +283,13 @@ const LeadsPage: React.FC<LeadsPageProps> = ({ leads, crud, users }) => {
                 </div>
                 <div className="modal-footer border-0 bg-white pb-4 px-4 gap-2">
                   <button type="button" className="btn btn-light fw-bold px-4" onClick={() => setModalOpen(false)}>Discard</button>
-                  <button type="submit" className="btn btn-primary fw-bold px-4 shadow-sm">{editingLead ? 'Save Changes' : 'Confirm Registration'}</button>
+                  <button type="submit" className="btn btn-primary fw-bold px-4 shadow-sm" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <><span className="spinner-border spinner-border-sm me-2"></span>Saving...</>
+                    ) : (
+                      editingLead ? 'Save Changes' : 'Confirm Registration'
+                    )}
+                  </button>
                 </div>
               </form>
             </div>

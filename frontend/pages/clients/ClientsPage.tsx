@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Client } from '../../types';
+import { useForm } from '../../hooks/useForm';
+import FormField from '../../components/FormField';
 
 interface ClientsPageProps {
   clients: Client[];
@@ -11,6 +13,51 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ clients, crud }) => {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const validationSchema = {
+    name: {
+      required: true,
+      message: 'Contact person name is required.'
+    },
+    companyName: {
+      required: true,
+      message: 'Company name is required.'
+    },
+    email: {
+      required: true,
+      pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+      message: 'Enter a valid corporate email address.'
+    }
+  };
+
+  const {
+    values,
+    errors,
+    isSubmitting,
+    handleChange,
+    handleSubmit,
+    resetForm,
+    setValues
+  } = useForm({
+    initialValues: {
+      name: '',
+      email: '',
+      phone: '',
+      companyName: '',
+      gstNo: '',
+      address: '',
+    },
+    validationSchema,
+    onSubmit: async (formData) => {
+      if (editingClient) {
+        await crud.update(editingClient.id, formData);
+      } else {
+        await crud.add(formData);
+      }
+      setModalOpen(false);
+      setEditingClient(null);
+    }
+  });
+
   const filteredClients = useMemo(() => {
     return clients.filter(c => 
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -19,30 +66,22 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ clients, crud }) => {
     );
   }, [clients, searchTerm]);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    
-    const payload = {
-      name: fd.get('name') as string,
-      email: fd.get('email') as string,
-      phone: fd.get('phone') as string,
-      companyName: fd.get('companyName') as string,
-      gstNo: fd.get('gstNo') as string,
-      address: fd.get('address') as string,
-    };
-
-    if (editingClient) {
-      crud.update(editingClient.id, payload);
-    } else {
-      crud.add(payload);
-    }
-    setModalOpen(false);
-    setEditingClient(null);
-  };
-
   const handleEdit = (client: Client) => {
     setEditingClient(client);
+    setValues({
+      name: client.name,
+      email: client.email,
+      phone: client.phone || '',
+      companyName: client.companyName,
+      gstNo: client.gstNo || '',
+      address: client.address || '',
+    });
+    setModalOpen(true);
+  };
+
+  const handleAddNew = () => {
+    setEditingClient(null);
+    resetForm();
     setModalOpen(true);
   };
 
@@ -53,7 +92,7 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ clients, crud }) => {
           <h3 className="fw-bold mb-1 text-dark">Client Management</h3>
           <p className="text-secondary small mb-0">Manage business accounts, GST details, and contact information</p>
         </div>
-        <button className="btn btn-primary fw-bold shadow-sm px-4" onClick={() => { setEditingClient(null); setModalOpen(true); }}>
+        <button className="btn btn-primary fw-bold shadow-sm px-4" onClick={handleAddNew}>
           <i className="bi bi-person-plus-fill me-2"></i>Register New Client
         </button>
       </div>
@@ -154,7 +193,7 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ clients, crud }) => {
         <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
           <div className="modal-dialog modal-lg modal-dialog-centered">
             <div className="modal-content border-0 rounded-4 overflow-hidden shadow-lg">
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit} noValidate>
                 <div className="modal-header border-0 bg-white pt-4 px-4">
                   <h5 className="modal-title fw-bold text-dark">
                     {editingClient ? <><i className="bi bi-pencil-square me-2"></i>Update Client Profile</> : <><i className="bi bi-person-plus me-2"></i>Register New Client</>}
@@ -164,42 +203,76 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ clients, crud }) => {
                 <div className="modal-body p-4 bg-white">
                   <div className="row g-3">
                     <div className="col-md-6">
-                      <label className="form-label smaller fw-bold text-secondary text-uppercase tracking-wider">Contact Person Name *</label>
-                      <input name="name" type="text" className="form-control form-control-lg border-light bg-light" defaultValue={editingClient?.name} placeholder="e.g. John Doe" required />
+                      <FormField
+                        label="Contact Person Name *"
+                        name="name"
+                        value={values.name}
+                        onChange={handleChange}
+                        error={errors.name}
+                        placeholder="e.g. John Doe"
+                      />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label smaller fw-bold text-secondary text-uppercase tracking-wider">Company Name *</label>
-                      <input name="companyName" type="text" className="form-control form-control-lg border-light bg-light" defaultValue={editingClient?.companyName} placeholder="e.g. Grehasoft Solutions" required />
+                      <FormField
+                        label="Company Name *"
+                        name="companyName"
+                        value={values.companyName}
+                        onChange={handleChange}
+                        error={errors.companyName}
+                        placeholder="e.g. Grehasoft Solutions"
+                      />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label smaller fw-bold text-secondary text-uppercase tracking-wider">Email Address *</label>
-                      <div className="input-group">
-                        <span className="input-group-text bg-light border-light"><i className="bi bi-envelope"></i></span>
-                        <input name="email" type="email" className="form-control form-control-lg border-light bg-light" defaultValue={editingClient?.email} placeholder="client@company.com" required />
-                      </div>
+                      <FormField
+                        label="Email Address *"
+                        name="email"
+                        type="email"
+                        value={values.email}
+                        onChange={handleChange}
+                        error={errors.email}
+                        placeholder="client@company.com"
+                      />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label smaller fw-bold text-secondary text-uppercase tracking-wider">Phone Number</label>
-                      <div className="input-group">
-                        <span className="input-group-text bg-light border-light"><i className="bi bi-phone"></i></span>
-                        <input name="phone" type="text" className="form-control form-control-lg border-light bg-light" defaultValue={editingClient?.phone} placeholder="+91 00000 00000" />
-                      </div>
+                      <FormField
+                        label="Phone Number"
+                        name="phone"
+                        value={values.phone}
+                        onChange={handleChange}
+                        placeholder="+91 00000 00000"
+                      />
                     </div>
                     <div className="col-md-12">
-                      <label className="form-label smaller fw-bold text-secondary text-uppercase tracking-wider">GST Registration Number</label>
-                      <input name="gstNo" type="text" className="form-control form-control-lg border-light bg-light" defaultValue={editingClient?.gstNo} placeholder="Enter 15-digit GSTIN" />
-                      <div className="form-text smaller text-muted">Optional: Required for tax invoicing.</div>
+                      <FormField
+                        label="GST Registration Number"
+                        name="gstNo"
+                        value={values.gstNo}
+                        onChange={handleChange}
+                        placeholder="Enter 15-digit GSTIN"
+                        helpText="Optional: Required for tax invoicing."
+                      />
                     </div>
                     <div className="col-md-12">
-                      <label className="form-label smaller fw-bold text-secondary text-uppercase tracking-wider">Office Address</label>
-                      <textarea name="address" className="form-control border-light bg-light" rows={3} defaultValue={editingClient?.address} placeholder="Enter full registered business address..."></textarea>
+                      <FormField
+                        label="Office Address"
+                        name="address"
+                        type="textarea"
+                        value={values.address}
+                        onChange={handleChange}
+                        placeholder="Enter full registered business address..."
+                        rows={3}
+                      />
                     </div>
                   </div>
                 </div>
                 <div className="modal-footer border-0 p-4 pt-0 bg-white gap-2">
                   <button type="button" className="btn btn-light fw-bold px-4 py-2" onClick={() => setModalOpen(false)}>Discard Changes</button>
-                  <button type="submit" className="btn btn-primary fw-bold px-4 py-2 shadow-sm">
-                    {editingClient ? 'Save Profile Updates' : 'Confirm Registration'}
+                  <button type="submit" className="btn btn-primary fw-bold px-4 py-2 shadow-sm" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <><span className="spinner-border spinner-border-sm me-2"></span>Saving...</>
+                    ) : (
+                      editingClient ? 'Save Profile Updates' : 'Confirm Registration'
+                    )}
                   </button>
                 </div>
               </form>

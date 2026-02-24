@@ -1,7 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Task, Project, TaskType, User, TaskStatus, Milestone, TaskFile, TaskReview, Permission } from '../../types';
+import { Task, Project, TaskType, User, TaskStatus, Milestone, Permission } from '../../types';
 import WeeklyTaskInsights from './WeeklyTaskInsights';
 import { useAuth } from '../../context/AuthContext';
+import TaskDetailsModal from '../../components/TaskDetailsModal';
+import { useForm } from '../../hooks/useForm';
+import FormField from '../../components/FormField';
 
 interface TasksPageProps {
   tasks: Task[];
@@ -11,15 +14,11 @@ interface TasksPageProps {
   taskTypes: TaskType[];
   users: User[];
   crud: any;
-  taskFiles: TaskFile[];
-  taskReviews: TaskReview[];
-  fileCrud: any;
-  reviewCrud: any;
   currentUser: User;
 }
 
 const TasksPage: React.FC<TasksPageProps> = ({ 
-  tasks, projects, taskTypes, users, milestones, crud, taskFiles, taskReviews, fileCrud, reviewCrud, currentUser 
+  tasks, projects, taskTypes, users, milestones, crud, currentUser 
 }) => {
   const { hasPermission } = useAuth();
   const [viewMode, setViewMode] = useState<'list' | 'insights'>('list');
@@ -28,6 +27,58 @@ const TasksPage: React.FC<TasksPageProps> = ({
   const [projectFilter, setProjectFilter] = useState<number | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<string | 'all'>('all');
   const [isModalOpen, setModalOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  const validationSchema = {
+    projectId: {
+      required: true,
+      message: 'Please select a project.'
+    },
+    title: {
+      required: true,
+      message: 'Task title is required.'
+    },
+    dueDate: {
+      required: true,
+      message: 'Due date is required.'
+    }
+  };
+
+  const {
+    values,
+    errors,
+    isSubmitting,
+    handleChange,
+    handleSubmit,
+    resetForm
+  } = useForm({
+    initialValues: {
+      projectId: '',
+      milestoneId: '',
+      title: '',
+      description: '',
+      priority: 'medium',
+      status: TaskStatus.TODO,
+      dueDate: '',
+      taskTypeId: taskTypes[0]?.id.toString() || '',
+      assignee: currentUser.id.toString()
+    },
+    validationSchema,
+    onSubmit: async (formData) => {
+      await crud.add({
+        projectId: Number(formData.projectId),
+        milestoneId: formData.milestoneId ? Number(formData.milestoneId) : undefined,
+        title: formData.title,
+        description: formData.description,
+        priority: formData.priority,
+        status: formData.status as TaskStatus,
+        dueDate: formData.dueDate,
+        taskTypeId: Number(formData.taskTypeId),
+        assignees: [Number(formData.assignee)]
+      });
+      setModalOpen(false);
+    }
+  });
 
   const filteredTasks = useMemo(() => {
     return tasks.filter(task => {
@@ -43,23 +94,6 @@ const TasksPage: React.FC<TasksPageProps> = ({
     });
   }, [tasks, searchTerm, statusFilter, projectFilter, priorityFilter]);
 
-  const handleNewTaskSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    crud.add({
-      projectId: Number(fd.get('projectId')),
-      milestoneId: fd.get('milestoneId') ? Number(fd.get('milestoneId')) : undefined,
-      title: fd.get('title'),
-      description: fd.get('description'),
-      priority: fd.get('priority'),
-      status: fd.get('status') as TaskStatus || TaskStatus.TODO,
-      dueDate: fd.get('dueDate'),
-      taskTypeId: Number(fd.get('taskTypeId')),
-      assignees: [Number(fd.get('assignee'))]
-    });
-    setModalOpen(false);
-  };
-
   const getStatusBadge = (status: TaskStatus) => {
     switch (status) {
       case TaskStatus.DONE: return <span className="badge bg-success-subtle text-success px-2 py-1 small fw-bold">done</span>;
@@ -72,6 +106,11 @@ const TasksPage: React.FC<TasksPageProps> = ({
   const getPriorityBadge = (priority: string) => {
     const colors: Record<string, string> = { high: 'bg-danger text-white', medium: 'bg-warning text-dark', low: 'bg-info text-white' };
     return <span className={`badge ${colors[priority] || 'bg-secondary'} px-2 py-1 small fw-bold ms-1`}>{priority.toUpperCase()}</span>;
+  };
+
+  const handleOpenNewTask = () => {
+    resetForm();
+    setModalOpen(true);
   };
 
   return (
@@ -97,7 +136,7 @@ const TasksPage: React.FC<TasksPageProps> = ({
             </button>
           </div>
           {hasPermission(Permission.MANAGE_TASKS) && (
-            <button className="btn btn-primary btn-sm fw-bold px-3 shadow-sm" onClick={() => setModalOpen(true)}>
+            <button className="btn btn-primary btn-sm fw-bold px-3 shadow-sm" onClick={handleOpenNewTask}>
               <i className="bi bi-plus-lg me-2"></i>New Task
             </button>
           )}
@@ -166,7 +205,7 @@ const TasksPage: React.FC<TasksPageProps> = ({
                     </tr>
                   ) : (
                     filteredTasks.map(task => (
-                      <tr key={task.id}>
+                      <tr key={task.id} onClick={() => setSelectedTask(task)} style={{ cursor: 'pointer' }}>
                         <td className="ps-4">
                           <div className="fw-bold text-dark">{task.title}</div>
                           <div className="smaller text-muted text-truncate" style={{ maxWidth: '250px' }}>{task.description}</div>
@@ -177,7 +216,7 @@ const TasksPage: React.FC<TasksPageProps> = ({
                         <td className="small text-secondary fw-semibold"><i className="bi bi-calendar3 me-1"></i> {task.dueDate}</td>
                         <td className="text-end pe-4">
                           {hasPermission(Permission.MANAGE_TASKS) && (
-                            <button className="btn btn-sm btn-light text-danger" onClick={() => crud.delete(task.id)}><i className="bi bi-trash"></i></button>
+                            <button className="btn btn-sm btn-light text-danger" onClick={(e) => { e.stopPropagation(); crud.delete(task.id); }}><i className="bi bi-trash"></i></button>
                           )}
                         </td>
                       </tr>
@@ -195,7 +234,7 @@ const TasksPage: React.FC<TasksPageProps> = ({
         <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
           <div className="modal-dialog modal-lg modal-dialog-centered">
             <div className="modal-content border-0 rounded-4 bg-white shadow-lg overflow-hidden">
-              <form onSubmit={handleNewTaskSubmit}>
+              <form onSubmit={handleSubmit} noValidate>
                 <div className="modal-header pt-4 px-4 bg-white border-0">
                   <h5 className="modal-title fw-bold">Create New Task</h5>
                   <button type="button" className="btn-close" onClick={() => setModalOpen(false)}></button>
@@ -203,70 +242,138 @@ const TasksPage: React.FC<TasksPageProps> = ({
                 <div className="modal-body p-4 bg-white">
                   <div className="row g-3">
                     <div className="col-md-6">
-                      <label className="form-label smaller fw-bold uppercase text-secondary">Project *</label>
-                      <select name="projectId" className="form-select bg-light border-0" required>
-                        <option value="">Select Project...</option>
-                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                      </select>
+                      <FormField
+                        label="Project *"
+                        name="projectId"
+                        type="select"
+                        value={values.projectId}
+                        onChange={handleChange}
+                        error={errors.projectId}
+                        options={[
+                          { label: 'Select Project...', value: '' },
+                          ...projects.map(p => ({ label: p.name, value: p.id.toString() }))
+                        ]}
+                      />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label smaller fw-bold uppercase text-secondary">Milestone</label>
-                      <select name="milestoneId" className="form-select bg-light border-0">
-                        <option value="">Select Milestone...</option>
-                        {milestones.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
-                      </select>
+                      <FormField
+                        label="Milestone"
+                        name="milestoneId"
+                        type="select"
+                        value={values.milestoneId}
+                        onChange={handleChange}
+                        options={[
+                          { label: 'Select Milestone...', value: '' },
+                          ...milestones.map(m => ({ label: m.title, value: m.id.toString() }))
+                        ]}
+                      />
                     </div>
                     <div className="col-12">
-                      <label className="form-label smaller fw-bold uppercase text-secondary">Task Title *</label>
-                      <input name="title" className="form-control" required placeholder="What needs to be done?" />
+                      <FormField
+                        label="Task Title *"
+                        name="title"
+                        value={values.title}
+                        onChange={handleChange}
+                        error={errors.title}
+                        placeholder="What needs to be done?"
+                      />
                     </div>
                     <div className="col-12">
-                      <label className="form-label smaller fw-bold uppercase text-secondary">Description</label>
-                      <textarea name="description" className="form-control" rows={3} placeholder="Provide details..."></textarea>
+                      <FormField
+                        label="Description"
+                        name="description"
+                        type="textarea"
+                        value={values.description}
+                        onChange={handleChange}
+                        placeholder="Provide details..."
+                        rows={3}
+                      />
                     </div>
                     <div className="col-md-4">
-                      <label className="form-label smaller fw-bold uppercase text-secondary">Priority</label>
-                      <select name="priority" className="form-select">
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                      </select>
+                      <FormField
+                        label="Priority"
+                        name="priority"
+                        type="select"
+                        value={values.priority}
+                        onChange={handleChange}
+                        options={[
+                          { label: 'Low', value: 'low' },
+                          { label: 'Medium', value: 'medium' },
+                          { label: 'High', value: 'high' }
+                        ]}
+                      />
                     </div>
                     <div className="col-md-4">
-                      <label className="form-label smaller fw-bold uppercase text-secondary">Status</label>
-                      <select name="status" className="form-select">
-                        <option value="todo">To Do</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="blocked">Blocked</option>
-                        <option value="done">Completed</option>
-                      </select>
+                      <FormField
+                        label="Status"
+                        name="status"
+                        type="select"
+                        value={values.status}
+                        onChange={handleChange}
+                        options={[
+                          { label: 'To Do', value: 'todo' },
+                          { label: 'In Progress', value: 'in_progress' },
+                          { label: 'Blocked', value: 'blocked' },
+                          { label: 'Completed', value: 'done' }
+                        ]}
+                      />
                     </div>
                     <div className="col-md-4">
-                      <label className="form-label smaller fw-bold uppercase text-secondary">Task Type</label>
-                      <select name="taskTypeId" className="form-select">
-                        {taskTypes.map(tt => <option key={tt.id} value={tt.id}>{tt.name}</option>)}
-                      </select>
+                      <FormField
+                        label="Task Type"
+                        name="taskTypeId"
+                        type="select"
+                        value={values.taskTypeId}
+                        onChange={handleChange}
+                        options={taskTypes.map(tt => ({ label: tt.name, value: tt.id.toString() }))}
+                      />
                     </div>
                     <div className="col-md-4">
-                      <label className="form-label smaller fw-bold uppercase text-secondary">Due Date</label>
-                      <input name="dueDate" type="date" className="form-control" required />
+                      <FormField
+                        label="Due Date *"
+                        name="dueDate"
+                        type="date"
+                        value={values.dueDate}
+                        onChange={handleChange}
+                        error={errors.dueDate}
+                      />
                     </div>
                     <div className="col-md-8">
-                      <label className="form-label smaller fw-bold uppercase text-secondary">Assignee</label>
-                      <select name="assignee" className="form-select">
-                        {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                      </select>
+                      <FormField
+                        label="Assignee"
+                        name="assignee"
+                        type="select"
+                        value={values.assignee}
+                        onChange={handleChange}
+                        options={users.map(u => ({ label: u.name, value: u.id.toString() }))}
+                      />
                     </div>
                   </div>
                 </div>
                 <div className="modal-footer bg-white border-0 pb-4 px-4 gap-2">
                   <button type="button" className="btn btn-light fw-bold px-4" onClick={() => setModalOpen(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary fw-bold px-4">Create Task</button>
+                  <button type="submit" className="btn btn-primary fw-bold px-4" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <><span className="spinner-border spinner-border-sm me-2"></span>Creating...</>
+                    ) : (
+                      'Create Task'
+                    )}
+                  </button>
                 </div>
               </form>
             </div>
           </div>
         </div>
+      )}
+
+      {selectedTask && (
+        <TaskDetailsModal 
+          task={selectedTask} 
+          onClose={() => setSelectedTask(null)} 
+          users={users} 
+          currentUser={currentUser}
+          onUpdateStatus={crud.update}
+        />
       )}
     </div>
   );
