@@ -1,5 +1,5 @@
 from django.db import models
-from backend.core.models import SoftDeleteModel
+from core.models import SoftDeleteModel
 
 class SEOTask(SoftDeleteModel):
     TYPE_CHOICES = [

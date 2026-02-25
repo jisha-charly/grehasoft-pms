@@ -1,7 +1,7 @@
 
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-from backend.core.models import SoftDeleteModel
+from core.models import SoftDeleteModel
 
 class Role(SoftDeleteModel):
     # Strictly follows frontend enums: SUPER_ADMIN, PROJECT_MANAGER, TEAM_MEMBER, SALES_MANAGER, SALES_EXECUTIVE, CLIENT

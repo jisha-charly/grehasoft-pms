@@ -1,6 +1,6 @@
 
 from django.db import models
-from backend.core.models import SoftDeleteModel
+from core.models import SoftDeleteModel
 from django.conf import settings
 
 class TaskType(SoftDeleteModel):

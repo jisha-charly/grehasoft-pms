@@ -1,19 +1,23 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework import routers
-from backend.apps.projects.views import ProjectViewSet, ClientViewSet
-from backend.apps.users.views import UserViewSet, RoleViewSet, DepartmentViewSet
-from backend.apps.crm.views import LeadViewSet, LeadFollowupViewSet
-from backend.apps.tasks.views import (
+from apps.projects.views import ProjectViewSet, ClientViewSet
+from apps.users.views import UserViewSet, RoleViewSet, DepartmentViewSet
+from apps.crm.views import LeadViewSet, LeadFollowupViewSet
+from apps.tasks.views import (
     TaskViewSet, TaskTypeViewSet, TaskFileViewSet, 
     TaskCommentViewSet, TaskReviewViewSet
 )
-from backend.apps.activity.views import ActivityLogViewSet
-from backend.apps.reports.views import DashboardStatsView
-from backend.apps.seo.views import (
+from apps.activity.views import ActivityLogViewSet
+from apps.reports.views import DashboardStatsView
+from apps.seo.views import (
     SEOTaskViewSet, SEOOnPageViewSet, SEOOffPageViewSet,
     SEOTechnicalViewSet, SEOKeywordsViewSet, GMBProfileViewSet,
     SocialMediaPostViewSet, SocialMetricsViewSet
+)
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
 )
 
 router = routers.DefaultRouter()
@@ -53,6 +57,10 @@ router.register(r'social-metrics', SocialMetricsViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+     # JWT Authentication
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/v1/', include(router.urls)),
     path('api/v1/dashboard/stats/', DashboardStatsView.as_view(), name='dashboard-stats'),
     path('api/v1/auth/', include('rest_framework.urls')), 

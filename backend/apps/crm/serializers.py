@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import Lead, LeadAssignment, LeadFollowup
-from backend.apps.users.serializers import UserSerializer
+from apps.users.serializers import UserSerializer
 
 class LeadFollowupSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.name', read_only=True)

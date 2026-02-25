@@ -1,7 +1,7 @@
 from rest_framework import viewsets, permissions
 from .models import Project, Client
 from .serializers import ProjectSerializer, ClientSerializer
-from backend.core.permissions import IsProjectManager
+from core.permissions import IsProjectManager
 
 class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all()

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import ActivityLog
-from backend.apps.users.serializers import UserSerializer
+from apps.users.serializers import UserSerializer
 
 class ActivityLogSerializer(serializers.ModelSerializer):
     user_details = UserSerializer(source='user', read_only=True)

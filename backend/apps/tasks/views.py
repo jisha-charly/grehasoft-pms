@@ -2,8 +2,8 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from .models import Task, TaskType, TaskFile, TaskComment, TaskReview, TaskProgress
 from .serializers import TaskSerializer, TaskTypeSerializer, TaskFileSerializer, TaskCommentSerializer, TaskReviewSerializer
-from backend.apps.activity.utils import log_system_activity
-from backend.core.permissions import IsProjectManager
+from apps.activity.utils import log_system_activity
+from core.permissions import IsProjectManager
 
 class TaskTypeViewSet(viewsets.ModelViewSet):
     queryset = TaskType.objects.all()

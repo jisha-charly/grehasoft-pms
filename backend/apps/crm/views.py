@@ -3,9 +3,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Lead, LeadFollowup, LeadAssignment
 from .serializers import LeadSerializer, LeadFollowupSerializer
-from backend.apps.projects.models import Project
-from backend.apps.projects.serializers import ProjectSerializer
-from backend.core.permissions import IsSalesManager
+from apps.projects.models import Project
+from apps.projects.serializers import ProjectSerializer
+from core.permissions import IsSalesManager
 from django.db import transaction
 
 class LeadViewSet(viewsets.ModelViewSet):

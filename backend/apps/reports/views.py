@@ -2,10 +2,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions
 from django.db.models import Count, Avg
-from backend.apps.projects.models import Project
-from backend.apps.tasks.models import Task
-from backend.apps.users.models import User
-from backend.apps.crm.models import Lead
+from apps.projects.models import Project
+from apps.tasks.models import Task
+from apps.users.models import User
+from apps.crm.models import Lead
 
 class DashboardStatsView(APIView):
     permission_classes = [permissions.IsAuthenticated]

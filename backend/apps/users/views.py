@@ -6,7 +6,7 @@ from .serializers import (
     UserSerializer, UserCreateUpdateSerializer, 
     RoleSerializer, DepartmentSerializer
 )
-from backend.core.permissions import IsSuperAdmin
+from core.permissions import IsSuperAdmin
 
 class RoleViewSet(viewsets.ModelViewSet):
     queryset = Role.objects.all()
