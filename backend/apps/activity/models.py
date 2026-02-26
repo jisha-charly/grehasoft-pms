@@ -3,7 +3,11 @@ from django.db import models
 from django.conf import settings
 
 class ActivityLog(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(
+    settings.AUTH_USER_MODEL,
+    on_delete=models.CASCADE,
+    related_name="activity_app_logs"
+)
     project = models.ForeignKey('projects.Project', on_delete=models.CASCADE)
     task = models.ForeignKey(
         'tasks.Task', 

@@ -74,21 +74,30 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ projects, users, department
       progressPercentage: 0
     },
     validationSchema,
-    onSubmit: async (formData) => {
+  onSubmit: async (values) => {
       const payload = {
-        ...formData,
-        clientId: Number(formData.clientId),
-        departmentId: Number(formData.departmentId),
-        projectManagerId: Number(formData.projectManagerId),
-        createdBy: editingProject ? editingProject.createdBy : (currentUser?.id || 1),
-        progressPercentage: Number(formData.progressPercentage || 0)
+        name: values.name,
+
+        client: Number(values.clientId),
+        department: Number(values.departmentId),
+        project_manager: Number(values.projectManagerId),
+
+        // ✅ get from logged-in user
+        created_by: currentUser?.id,
+
+        start_date: values.startDate,
+        end_date: values.endDate,
+
+        status: values.status
       };
 
-      if (editingProject) {
+  if (editingProject) {
         await crud.update(editingProject.id, payload);
       } else {
         await crud.add(payload);
       }
+
+      resetForm();
       setModalOpen(false);
     }
   });
@@ -269,7 +278,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ projects, users, department
                     <option value="">Select Client</option>
                     {clients.map(c => (
                       <option key={c.id} value={c.id}>
-                        {c.companyName}
+                        {c.name}
                       </option>
                     ))}
                   </select>

@@ -47,31 +47,67 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [editingMember, setEditingMember] = useState<ProjectMember | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!id) return;
-      setLoading(true);
-      try {
-        const [projRes, tasksRes, milestonesRes, membersRes, activityRes] = await Promise.all([
-          axiosInstance.get(`/projects/${id}`),
-          axiosInstance.get(`/projects/${id}/tasks`),
-          axiosInstance.get(`/projects/${id}/milestones`),
-          axiosInstance.get(`/projects/${id}/members`),
-          axiosInstance.get(`/projects/${id}/activity`),
+useEffect(() => {
+  const fetchData = async () => {
+    if (!id) return;
+
+    setLoading(true);
+
+    try {
+      // ✅ 1. Fetch project FIRST
+      const projRes = await axiosInstance.get(`/projects/${id}/`);
+      setProject(projRes.data);
+
+      // ✅ 2. Fetch others separately (do NOT break page if one fails)
+      const [tasksRes, milestonesRes, membersRes, activityRes] =
+        await Promise.allSettled([
+          axiosInstance.get(`/tasks/?project=${id}`),
+          axiosInstance.get(`/milestones/`),
+          axiosInstance.get(`/members/`),
+          axiosInstance.get(`/activity/`),
         ]);
-        setProject(projRes.data);
-        setProjectTasks(tasksRes.data);
-        setProjectMilestones(milestonesRes.data);
-        setProjectMembers(membersRes.data);
-        setProjectActivity(activityRes.data);
-      } catch (error) {
-        console.error("Error fetching project data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [id]);
+
+       if (tasksRes.status === "fulfilled") {
+  const normalizedTasks = tasksRes.value.data.map((t: any) => ({
+    ...t,
+    dueDate: t.due_date,
+    milestoneId: t.milestone,
+    taskTypeId: t.task_type,
+  }));
+  setProjectTasks(normalizedTasks);
+}
+
+      if (milestonesRes.status === "fulfilled")
+        setProjectMilestones(
+          milestonesRes.value.data.filter(
+            (m: any) => m.project=== Number(id)
+          )
+        );
+
+      if (membersRes.status === "fulfilled")
+        setProjectMembers(
+          membersRes.value.data.filter(
+            (m: any) => m.project === Number(id)
+          )
+        );
+
+      if (activityRes.status === "fulfilled")
+        setProjectActivity(
+          activityRes.value.data.filter(
+            (a: any) => a.project=== Number(id)
+          )
+        );
+
+    } catch (error) {
+      console.error("Error fetching project:", error);
+      setProject(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchData();
+}, [id]);
 
   if (loading) return <div className="p-5 text-center"><div className="spinner-border text-primary" role="status"></div><p className="mt-2">Loading project details...</p></div>;
   if (!project) return <div className="p-5 text-center"><h3 className="text-muted">Project not found</h3><Link to="/projects">Back to list</Link></div>;
@@ -80,24 +116,32 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const payload = {
-      projectId: project.id,
+      project: project.id,
       milestoneId: fd.get('milestoneId') ? Number(fd.get('milestoneId')) : undefined,
       title: fd.get('title'),
       description: fd.get('description'),
       priority: fd.get('priority'),
       status: fd.get('status') as TaskStatus || TaskStatus.TODO,
-      dueDate: fd.get('dueDate'),
-      taskTypeId: Number(fd.get('taskTypeId')),
+      due_date: fd.get('dueDate'),
+      task_type: Number(fd.get('taskTypeId')),
       assignees: [Number(fd.get('assignee'))]
     };
 
     try {
       if (editingTask) {
-        const res = await axiosInstance.patch(`/tasks/${editingTask.id}`, payload);
+        const res = await axiosInstance.patch(`/tasks/${editingTask.id}/`, payload);
         setProjectTasks(prev => prev.map(t => t.id === editingTask.id ? res.data : t));
       } else {
-        const res = await axiosInstance.post('/tasks', payload);
-        setProjectTasks(prev => [...prev, res.data]);
+       const res = await axiosInstance.post('/tasks/', payload);
+
+const newTask = {
+  ...res.data,
+  dueDate: res.data.due_date,
+  milestoneId: res.data.milestone,
+  taskTypeId: res.data.task_type,
+};
+
+setProjectTasks(prev => [...prev, newTask]);
       }
       setTaskModalOpen(false);
       setEditingTask(null);
@@ -109,7 +153,7 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
   const handleTaskDelete = async (taskId: string) => {
     if (!confirm("Are you sure you want to delete this task?")) return;
     try {
-      await axiosInstance.delete(`/tasks/${taskId}`);
+     axiosInstance.delete(`/tasks/${taskId}/`);
       setProjectTasks(prev => prev.filter(t => t.id !== taskId));
     } catch (error) {
       console.error("Error deleting task:", error);
@@ -120,9 +164,9 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const payload = {
-      projectId: project.id,
+      project: project.id,
       title: fd.get('title'),
-      dueDate: fd.get('dueDate'),
+     due_date: fd.get('dueDate'),
     };
 
     try {
@@ -130,7 +174,7 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
         const res = await axiosInstance.patch(`/milestones/${editingMilestone.id}`, payload);
         setProjectMilestones(prev => prev.map(m => m.id === editingMilestone.id ? res.data : m));
       } else {
-        const res = await axiosInstance.post('/milestones', payload);
+        const res = await axiosInstance.post('/milestones/', payload);
         setProjectMilestones(prev => [...prev, res.data]);
       }
       setMilestoneModalOpen(false);
@@ -164,13 +208,13 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const payload = {
-      projectId: project.id,
-      userId: Number(fd.get('userId')),
-      roleInProject: fd.get('roleInProject'),
+      project: project.id,
+      user: Number(fd.get('userId')),
+     role_in_project: fd.get('roleInProject'),
     };
 
     try {
-      const res = await axiosInstance.post('/members', payload);
+      const res = await axiosInstance.post('/members/', payload);
       setProjectMembers(prev => [...prev, res.data]);
       setMemberModalOpen(false);
       setEditingMember(null);
@@ -212,7 +256,7 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
       <div className="row g-3 mb-4">
         {[
           { label: 'Status', value: project.status.replace('_', ' '), icon: 'bi-activity', color: 'primary' },
-          { label: 'Progress', value: `${project.progressPercentage}%`, icon: 'bi-bullseye', color: 'info' },
+          { label: 'Progress', value: `${project.progress_percentage}%`, icon: 'bi-bullseye', color: 'info' },
           { label: 'Total Tasks', value: projectTasks.length, icon: 'bi-check2-circle', color: 'dark' },
           { label: 'Deadline', value: project.endDate, icon: 'bi-calendar3', color: 'danger' }
         ].map((s, i) => (
@@ -245,8 +289,10 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                 <h6 className="fw-bold mb-3">Project Summary</h6>
                 <p className="text-muted small">Comprehensive oversight of {project.name}. All functional requirements and milestones are tracked here.</p>
                 <div className="row g-3 mt-4">
-                  <div className="col-md-6"><div className="p-3 rounded bg-light border-0"><div className="small text-secondary fw-bold uppercase mb-1" style={{fontSize: '0.6rem'}}>Department</div><div className="fw-bold">{departments.find(d => d.id === project.departmentId)?.name || 'N/A'}</div></div></div>
-                  <div className="col-md-6"><div className="p-3 rounded bg-light border-0"><div className="small text-secondary fw-bold uppercase mb-1" style={{fontSize: '0.6rem'}}>Project Manager</div><div className="fw-bold">{users.find(u => u.id === project.projectManagerId)?.name || 'N/A'}</div></div></div>
+                  <div className="col-md-6"><div className="p-3 rounded bg-light border-0"><div className="small text-secondary fw-bold uppercase mb-1" style={{fontSize: '0.6rem'}}>Department</div><div className="fw-bold">{departments.find(d => d.id === project.department
+                    
+                  )?.name || 'N/A'}</div></div></div>
+                  <div className="col-md-6"><div className="p-3 rounded bg-light border-0"><div className="small text-secondary fw-bold uppercase mb-1" style={{fontSize: '0.6rem'}}>Project Manager</div><div className="fw-bold">{users.find(u => u.id === project.project_manager)?.name || 'N/A'}</div></div></div>
                 </div>
               </div>
               <div className="col-lg-4">
@@ -261,7 +307,7 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                   <div className="mt-4 pt-3 border-top">
                     <div className="small fw-bold mb-2">Completion Rate</div>
                     <div className="progress" style={{height: '8px'}}>
-                      <div className="progress-bar bg-success" style={{width: `${project.progress}%`}}></div>
+                      <div className="progress-bar bg-success"style={{ width: `${project.progress_percentage}%` }}></div>
                     </div>
                   </div>
                 </div>

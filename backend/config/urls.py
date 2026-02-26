@@ -1,14 +1,14 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework import routers
-from apps.projects.views import ProjectViewSet, ClientViewSet
+from apps.projects.views import ProjectViewSet, ClientViewSet,MilestoneViewSet,ProjectMemberViewSet,ActivityLogViewSet
 from apps.users.views import UserViewSet, RoleViewSet, DepartmentViewSet
 from apps.crm.views import LeadViewSet, LeadFollowupViewSet
 from apps.tasks.views import (
     TaskViewSet, TaskTypeViewSet, TaskFileViewSet, 
     TaskCommentViewSet, TaskReviewViewSet
 )
-from apps.activity.views import ActivityLogViewSet
+#from apps.activity.views import ActivityLogViewSet
 from apps.reports.views import DashboardStatsView
 from apps.seo.views import (
     SEOTaskViewSet, SEOOnPageViewSet, SEOOffPageViewSet,
@@ -25,6 +25,9 @@ router = routers.DefaultRouter()
 # Project Management
 router.register(r'projects', ProjectViewSet)
 router.register(r'clients', ClientViewSet)
+router.register(r'milestones', MilestoneViewSet)
+router.register(r'members', ProjectMemberViewSet)
+router.register(r'activity', ActivityLogViewSet)
 
 # User Management (RBAC)
 router.register(r'users', UserViewSet)
@@ -43,7 +46,7 @@ router.register(r'task-comments', TaskCommentViewSet)
 router.register(r'task-reviews', TaskReviewViewSet)
 
 # Activity & Audit
-router.register(r'activity-logs', ActivityLogViewSet)
+#router.register(r'activity-logs', ActivityLogViewSet)
 
 # SEO & Social Module
 router.register(r'seo-tasks', SEOTaskViewSet)

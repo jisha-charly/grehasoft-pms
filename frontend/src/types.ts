@@ -143,13 +143,13 @@ export interface Project {
   name: string;
   clientId: number;
   clientName?: string;
-  departmentId: number;
-  projectManagerId: number;
+  department: number;
+  project_manager: number;
   createdBy: number;
   startDate: string;
   endDate: string;
   status: ProjectStatus;
-  progressPercentage: number;
+  progress_percentage: number;
   createdAt: string;
   updatedAt?: string;
   deletedAt?: string;

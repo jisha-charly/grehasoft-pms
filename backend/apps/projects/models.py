@@ -37,19 +37,54 @@ class Project(SoftDeleteModel):
             models.Index(fields=['client']),
         ]
 
-class ProjectMilestone(SoftDeleteModel):
-    STATUS_CHOICES = [('pending', 'Pending'), ('completed', 'Completed')]
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='milestones')
-    title = models.CharField(max_length=200)
+class Milestone(models.Model):
+    project = models.ForeignKey(
+        "projects.Project",  # adjust if app name differs
+        on_delete=models.CASCADE,
+        related_name="milestones"
+    )
+    title = models.CharField(max_length=255)
     due_date = models.DateField()
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(
+        max_length=20,
+        choices=[("pending", "Pending"), ("completed", "Completed")],
+        default="pending"
+    )
+    progress = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+
 
 class ProjectMember(models.Model):
-    ROLE_IN_PROJECT = [('PM', 'PM'), ('MEMBER', 'Member'), ('QA', 'QA'), ('VIEWER', 'Viewer')]
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='members')
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    role_in_project = models.CharField(max_length=10, choices=ROLE_IN_PROJECT)
-    added_at = models.DateTimeField(auto_now_add=True)
+    project = models.ForeignKey(
+        "projects.Project",
+        on_delete=models.CASCADE,
+        related_name="members"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE
+    )
+    role_in_project = models.CharField(max_length=100)
 
-    class Meta:
-        unique_together = ('project', 'user')
+    def __str__(self):
+        return f"{self.user} - {self.project}"
+
+
+class ActivityLog(models.Model):
+    project = models.ForeignKey(
+        "projects.Project",
+        on_delete=models.CASCADE,
+        related_name="activities"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE
+    )
+    action = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.action
