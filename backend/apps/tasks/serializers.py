@@ -2,6 +2,29 @@ from rest_framework import serializers
 from .models import Task, TaskType, TaskAssignment, TaskProgress, TaskFile, TaskReview, TaskComment
 from apps.users.serializers import UserSerializer
 
+class TaskTypeSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = TaskType
+        fields = "__all__"
+
+    def validate_name(self, value):
+        value = value.upper().strip()
+
+        # 🔥 Exclude current instance during update
+        queryset = TaskType.objects.filter(name=value)
+
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+
+        if queryset.exists():
+            raise serializers.ValidationError(
+                "Task type with this name already exists."
+            )
+
+        return value
+
+
 class TaskCommentSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.name', read_only=True)
     class Meta:
@@ -32,10 +55,7 @@ class TaskAssignmentSerializer(serializers.ModelSerializer):
         model = TaskAssignment
         fields = '__all__'
 
-class TaskTypeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TaskType
-        fields = '__all__'
+
 
 class TaskSerializer(serializers.ModelSerializer):
     task_type_name = serializers.CharField(source='task_type.name', read_only=True)

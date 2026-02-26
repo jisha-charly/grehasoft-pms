@@ -13,7 +13,7 @@ const TaskTypesPage: React.FC<TaskTypesPageProps> = ({ taskTypes, crud }) => {
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingType, setEditingType] = useState<TaskType | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-
+const [typeToDelete, setTypeToDelete] = useState<any | null>(null);
   const filteredTypes = useMemo(() => {
     return taskTypes.filter(tt => 
       tt.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -130,13 +130,15 @@ const TaskTypesPage: React.FC<TaskTypesPageProps> = ({ taskTypes, crud }) => {
                         {tt.description || 'No detailed description provided for this classification.'}
                       </p>
                     </td>
-                    <td className="small text-muted">{tt.createdAt || 'N/A'}</td>
+                    <td className="small text-muted">{tt.created_at
+  ? new Date(tt.created_at).toLocaleDateString()
+  : 'N/A'}</td>
                     <td className="text-end px-4">
                       <div className="btn-group shadow-sm rounded-3 overflow-hidden border">
                         <button className="btn btn-sm btn-white border-end" onClick={() => handleOpenModal(tt)} title="Configure Type">
                           <i className="bi bi-pencil-square text-primary"></i>
                         </button>
-                        <button className="btn btn-sm btn-white" onClick={() => { if(confirm(`Revoke classification type: ${tt.name}?`)) crud.delete(tt.id); }} title="Remove Type">
+                        <button className="btn btn-sm btn-white" onClick={() => setTypeToDelete(tt)}title="Remove Type">
                           <i className="bi bi-trash3 text-danger"></i>
                         </button>
                       </div>
@@ -202,6 +204,55 @@ const TaskTypesPage: React.FC<TaskTypesPageProps> = ({ taskTypes, crud }) => {
           </div>
         </div>
       )}
+
+      {typeToDelete && (
+  <div className="modal show d-block bg-dark bg-opacity-50">
+    <div className="modal-dialog modal-dialog-centered">
+      <div className="modal-content border-0 rounded-4 shadow-lg">
+        <div className="modal-header border-0">
+          <h5 className="modal-title fw-bold text-danger">
+            <i className="bi bi-exclamation-triangle-fill me-2"></i>
+            Confirm Revocation
+          </h5>
+          <button
+            type="button"
+            className="btn-close"
+            onClick={() => setTypeToDelete(null)}
+          ></button>
+        </div>
+
+        <div className="modal-body">
+          <p className="mb-0">
+            Are you sure you want to revoke classification:
+            <strong className="ms-1">{typeToDelete.name}</strong>?
+          </p>
+          <p className="text-muted small mt-2">
+            This action can be reversed if soft delete is enabled.
+          </p>
+        </div>
+
+        <div className="modal-footer border-0">
+          <button
+            className="btn btn-light"
+            onClick={() => setTypeToDelete(null)}
+          >
+            Cancel
+          </button>
+
+          <button
+            className="btn btn-danger"
+            onClick={async () => {
+              await crud.delete(typeToDelete.id);
+              setTypeToDelete(null);
+            }}
+          >
+            Revoke Type
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };

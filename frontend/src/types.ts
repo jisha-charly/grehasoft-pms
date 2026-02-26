@@ -87,10 +87,9 @@ export interface Role {
   id: number;
   name: string;
   description: string;
-  createdAt?: string;
-  updatedAt?: string;
+  created_at?: string;
+  updated_at?: string;
 }
-
 export interface Department {
   id: number;
   name: string;
@@ -103,7 +102,7 @@ export interface TaskType {
   id: number;
   name: string;
   description?: string;
-  createdAt?: string;
+ created_at?: string;
   updatedAt?: string;
 }
 
@@ -112,12 +111,19 @@ export interface User {
   name: string;
   username: string;
   email: string;
+
   password?: string;
-  role: UserRole;
-  departmentId: number;
-   department_name?: string; // ✅ ADD THIS
+
+  role: number | null;           // ✅ FK ID
+  role_name?: string;            // ✅ readable name
+
+  department: number | null;     // ✅ FK ID
+  department_name?: string;      // ✅ readable name
+
   status: 'active' | 'inactive';
-  createdAt?: string;   // ✅ ADD THIS
+
+  date_joined?: string;
+  last_login?: string;
 }
 
 

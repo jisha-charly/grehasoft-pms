@@ -13,7 +13,7 @@ const DepartmentsPage: React.FC<DepartmentsPageProps> = ({ departments, crud }) 
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-
+const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(null);
   const validationSchema = {
     name: { required: true, message: 'Department name is required.' }
   };
@@ -145,7 +145,7 @@ const DepartmentsPage: React.FC<DepartmentsPageProps> = ({ departments, crud }) 
                           <button className="btn btn-sm btn-white border-end" onClick={() => handleOpenModal(dept)} title="Modify Configuration">
                             <i className="bi bi-pencil-square text-primary"></i>
                           </button>
-                          <button className="btn btn-sm btn-white" onClick={() => { if(confirm(`Confirm deletion of ${dept.name}?`)) crud.delete(dept.id); }} title="Remove Unit">
+                          <button className="btn btn-sm btn-white" onClick={() => setDepartmentToDelete(dept)} title="Remove Unit">
                             <i className="bi bi-trash3 text-danger"></i>
                           </button>
                         </div>
@@ -217,6 +217,57 @@ const DepartmentsPage: React.FC<DepartmentsPageProps> = ({ departments, crud }) 
           </div>
         </div>
       )}
+
+      {departmentToDelete && (
+  <div className="modal show d-block bg-dark bg-opacity-50">
+    <div className="modal-dialog modal-dialog-centered">
+      <div className="modal-content border-0 rounded-4 shadow-lg">
+
+        <div className="modal-header border-0">
+          <h5 className="modal-title fw-bold text-danger">
+            <i className="bi bi-exclamation-triangle-fill me-2"></i>
+            Confirm Deletion
+          </h5>
+          <button
+            type="button"
+            className="btn-close"
+            onClick={() => setDepartmentToDelete(null)}
+          ></button>
+        </div>
+
+        <div className="modal-body">
+          <p className="mb-0">
+            Are you sure you want to delete:
+            <strong className="ms-1">{departmentToDelete.name}</strong>?
+          </p>
+          <p className="text-muted small mt-2">
+            This action can be restored if soft delete is enabled.
+          </p>
+        </div>
+
+        <div className="modal-footer border-0">
+          <button
+            className="btn btn-light"
+            onClick={() => setDepartmentToDelete(null)}
+          >
+            Cancel
+          </button>
+
+          <button
+            className="btn btn-danger"
+            onClick={async () => {
+              await crud.delete(departmentToDelete.id);
+              setDepartmentToDelete(null);
+            }}
+          >
+            Delete Department
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };

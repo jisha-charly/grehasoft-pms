@@ -15,7 +15,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ users, roles, departments, crud }
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-
+const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const validationSchema: ValidationSchema<any> = {
     name: { required: true, message: 'Full name is required.' },
     username: { 
@@ -46,41 +46,53 @@ const UsersPage: React.FC<UsersPageProps> = ({ users, roles, departments, crud }
       username: '',
       email: '',
       password: '',
-      role: '' as UserRole,
+    role: '' as any,
       departmentId: '' as any,
       status: 'active' as 'active' | 'inactive'
     },
     validationSchema,
     onSubmit: async (formValues) => {
-      const data = {
-        ...formValues,
-        departmentId: Number(formValues.departmentId)
-      };
+  const data: any = {
+    name: formValues.name,
+    username: formValues.username,
+    email: formValues.email,
+    role: Number(formValues.role),               // ✅ role ID
+    department: Number(formValues.departmentId), // ✅ correct key
+    status: formValues.status
+  };
 
-      if (editingUser) {
-        await crud.update(editingUser.id, data);
-      } else {
-        await crud.add(data);
-      }
-      handleCloseModal();
-    }
+  // Only send password if entered
+  if (formValues.password) {
+    data.password = formValues.password;
+  }
+
+  if (editingUser) {
+    await crud.update(editingUser.id, data);
+  } else {
+    await crud.add(data);
+  }
+
+  handleCloseModal();
+}
   });
 
-  useEffect(() => {
-    if (editingUser) {
-      setValues({
-        name: editingUser.name,
-        username: editingUser.username,
-        email: editingUser.email,
-        password: '',
-        role: editingUser.role,
-        departmentId: editingUser.departmentId,
-        status: editingUser.status
-      });
-    } else {
-      resetForm();
-    }
-  }, [editingUser, setValues, resetForm]);
+ useEffect(() => {
+  if (!isModalOpen) return;
+
+  if (editingUser) {
+   setValues({
+  name: editingUser.name || '',
+  username: editingUser.username || '',
+  email: editingUser.email || '',
+  password: '',
+  role: editingUser.role ? String(editingUser.role) : '',
+  departmentId: editingUser.department ? String(editingUser.department) : '',
+  status: editingUser.status || 'active'
+});
+  } else {
+    resetForm();
+  }
+}, [isModalOpen, editingUser]);
 
   const handleCloseModal = () => {
     setModalOpen(false);
@@ -173,9 +185,9 @@ const UsersPage: React.FC<UsersPageProps> = ({ users, roles, departments, crud }
                     </td>
                     <td>
                       <span className="text-primary fw-bold smaller tracking-wider text-uppercase">
-                       {typeof u.role === "string"
-  ? u.role.replace(/_/g, " ")
-  : (u as any).role_name?.replace(/_/g, " ") || "Unknown"}
+                       {u.role_name
+  ? u.role_name.replace(/_/g, " ")
+  : "Unknown"}
                       </span>
                     </td>
                     <td>
@@ -188,7 +200,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ users, roles, departments, crud }
                         <button className="btn btn-sm btn-white border-end" onClick={() => handleEdit(u)} title="Edit User">
                           <i className="bi bi-pencil-square text-primary"></i>
                         </button>
-                        <button className="btn btn-sm btn-white" onClick={() => { if(confirm('Permanently delete this user account?')) crud.delete(u.id); }} title="Delete User">
+                        <button className="btn btn-sm btn-white" onClick={() => setUserToDelete(u)} title="Delete User">
                           <i className="bi bi-trash3 text-danger"></i>
                         </button>
                       </div>
@@ -272,7 +284,11 @@ const UsersPage: React.FC<UsersPageProps> = ({ users, roles, departments, crud }
                           onChange={(e) => handleChange('role', e.target.value)}
                         >
                           <option value="">Assign a role...</option>
-                          {Object.values(UserRole).map(role => <option key={role} value={role}>{role.replace('_', ' ')}</option>)}
+                         {roles.map(role => (
+  <option key={role.id} value={role.id}>
+    {role.name.replace(/_/g, ' ')}
+  </option>
+))}
                         </select>
                       </FormField>
                     </div>
@@ -315,6 +331,55 @@ const UsersPage: React.FC<UsersPageProps> = ({ users, roles, departments, crud }
           </div>
         </div>
       )}
+
+
+      {userToDelete && (
+  <div className="modal show d-block bg-dark bg-opacity-50">
+    <div className="modal-dialog modal-dialog-centered">
+      <div className="modal-content border-0 rounded-4 shadow-lg">
+        
+        <div className="modal-header border-0">
+          <h5 className="modal-title fw-bold text-danger">
+            <i className="bi bi-exclamation-triangle me-2"></i>
+            Confirm Deletion
+          </h5>
+          <button 
+            type="button" 
+            className="btn-close"
+            onClick={() => setUserToDelete(null)}
+          />
+        </div>
+
+        <div className="modal-body">
+          <p className="mb-0">
+            Are you sure you want to permanently delete
+            <strong> {userToDelete.name}</strong>?
+          </p>
+        </div>
+
+        <div className="modal-footer border-0">
+          <button 
+            className="btn btn-light"
+            onClick={() => setUserToDelete(null)}
+          >
+            Cancel
+          </button>
+
+          <button 
+            className="btn btn-danger"
+            onClick={async () => {
+              await crud.delete(userToDelete.id);
+              setUserToDelete(null);
+            }}
+          >
+            Delete User
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };

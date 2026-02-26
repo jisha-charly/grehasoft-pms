@@ -130,22 +130,28 @@ const App: React.FC = () => {
 
   /* ================= CRUD HELPERS ================= */
 
-  const createCrud = (endpoint: string, setter: any) => ({
-    add: async (item: any) => {
-      const res = await axiosInstance.post(endpoint, item);
-      setter((prev: any[]) => [...prev, res.data]);
-    },
-    update: async (id: number | string, updates: any) => {
-      const res = await axiosInstance.patch(`${endpoint}/${id}`, updates);
-      setter((prev: any[]) =>
-        prev.map((i) => (i.id === id ? res.data : i))
-      );
-    },
-    delete: async (id: number | string) => {
-      await axiosInstance.delete(`${endpoint}/${id}`);
-      setter((prev: any[]) => prev.filter((i) => i.id !== id));
-    },
-  });
+ const createCrud = (endpoint: string, setter: any) => ({
+  add: async (item: any) => {
+    const res = await axiosInstance.post(`${endpoint}/`, item);
+
+    const newItem = res.data.data || res.data;   // ✅ FIX
+    setter((prev: any[]) => [...prev, newItem]);
+  },
+
+  update: async (id: number | string, updates: any) => {
+    const res = await axiosInstance.patch(`${endpoint}/${id}/`, updates);
+
+    const updatedItem = res.data.data || res.data;  // ✅ FIX
+    setter((prev: any[]) =>
+      prev.map((i) => (i.id === id ? updatedItem : i))
+    );
+  },
+
+  delete: async (id: number | string) => {
+    await axiosInstance.delete(`${endpoint}/${id}/`);
+    setter((prev: any[]) => prev.filter((i) => i.id !== id));
+  },
+});
 
   const projectCrud = createCrud("/projects", setProjects);
   const taskCrud = createCrud("/tasks", setTasks);

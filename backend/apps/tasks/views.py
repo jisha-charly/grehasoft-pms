@@ -4,11 +4,54 @@ from .models import Task, TaskType, TaskFile, TaskComment, TaskReview, TaskProgr
 from .serializers import TaskSerializer, TaskTypeSerializer, TaskFileSerializer, TaskCommentSerializer, TaskReviewSerializer
 from apps.activity.utils import log_system_activity
 from core.permissions import IsProjectManager
-
+from django.db import IntegrityError
 class TaskTypeViewSet(viewsets.ModelViewSet):
     queryset = TaskType.objects.all()
     serializer_class = TaskTypeSerializer
-    permission_classes = [permissions.IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        name = request.data.get("name", "").upper().strip()
+        description = request.data.get("description", "")
+
+        if not name:
+            return Response(
+                {"error": "Name is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check including soft deleted
+        existing = TaskType.all_objects.filter(name=name).first()
+
+        if existing:
+            # 🔁 If soft deleted → restore
+            if existing.deleted_at is not None:
+                existing.deleted_at = None
+                existing.description = description
+                existing.save()
+
+                serializer = self.get_serializer(existing)
+                return Response(
+                    {"data": serializer.data, "restored": True},
+                    status=status.HTTP_200_OK
+                )
+
+            # ❌ Already active
+            return Response(
+                {"error": "Task type already exists."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ✅ Create new
+        task_type = TaskType.objects.create(
+            name=name,
+            description=description
+        )
+
+        serializer = self.get_serializer(task_type)
+        return Response(
+            {"data": serializer.data, "created": True},
+            status=status.HTTP_201_CREATED
+        )
 
 class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.all()

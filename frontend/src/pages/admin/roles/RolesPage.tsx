@@ -13,7 +13,7 @@ const RolesPage: React.FC<RolesPageProps> = ({ roles, crud }) => {
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-
+  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
   const validationSchema = {
     name: { 
       required: true, 
@@ -56,12 +56,17 @@ const RolesPage: React.FC<RolesPageProps> = ({ roles, crud }) => {
     }
   }, [editingRole, setValues, resetForm]);
 
-  const filteredRoles = useMemo(() => {
-    return roles.filter(role => 
-      role.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      role.description.toLowerCase().includes(searchTerm.toLowerCase())
+ const filteredRoles = useMemo(() => {
+  return roles.filter(role => {
+    const name = role?.name?.toLowerCase() || "";
+    const description = role?.description?.toLowerCase() || "";
+
+    return (
+      name.includes(searchTerm.toLowerCase()) ||
+      description.includes(searchTerm.toLowerCase())
     );
-  }, [roles, searchTerm]);
+  });
+}, [roles, searchTerm]);
 
   const handleOpenModal = (role: Role | null = null) => {
     setEditingRole(role);
@@ -138,13 +143,15 @@ const RolesPage: React.FC<RolesPageProps> = ({ roles, crud }) => {
                       </div>
                     </td>
                     <td><p className="small text-secondary mb-0 text-truncate" style={{ maxWidth: '350px' }}>{role.description}</p></td>
-                    <td className="small text-muted">{role.createdAt || 'N/A'}</td>
+                    <td className="small text-muted">{role.created_at
+  ? new Date(role.created_at).toLocaleDateString()
+  : 'N/A'}</td>
                     <td className="text-end px-4">
                       <div className="btn-group shadow-sm rounded-3 overflow-hidden border">
                         <button className="btn btn-sm btn-white border-end" onClick={() => handleOpenModal(role)} title="Modify Permissions">
                           <i className="bi bi-pencil-square text-primary"></i>
                         </button>
-                        <button className="btn btn-sm btn-white" onClick={() => { if(confirm(`Confirm deletion of role: ${role.name}?`)) crud.delete(role.id); }} title="Revoke Role">
+                        <button className="btn btn-sm btn-white"  onClick={() => setRoleToDelete(role)} title="Revoke Role">
                           <i className="bi bi-trash3 text-danger"></i>
                         </button>
                       </div>
@@ -210,6 +217,56 @@ const RolesPage: React.FC<RolesPageProps> = ({ roles, crud }) => {
           </div>
         </div>
       )}
+
+
+      {roleToDelete && (
+  <div className="modal show d-block bg-dark bg-opacity-50">
+    <div className="modal-dialog modal-dialog-centered">
+      <div className="modal-content border-0 rounded-4 shadow-lg">
+        <div className="modal-header border-0">
+          <h5 className="modal-title fw-bold text-danger">
+            <i className="bi bi-exclamation-triangle-fill me-2"></i>
+            Confirm Deletion
+          </h5>
+          <button
+            type="button"
+            className="btn-close"
+            onClick={() => setRoleToDelete(null)}
+          ></button>
+        </div>
+
+        <div className="modal-body">
+          <p className="mb-0">
+            Are you sure you want to delete role:
+            <strong className="ms-1">{roleToDelete.name}</strong>?
+          </p>
+          <p className="text-muted small mt-2">
+            This action can be reversed if soft delete is enabled.
+          </p>
+        </div>
+
+        <div className="modal-footer border-0">
+          <button
+            className="btn btn-light"
+            onClick={() => setRoleToDelete(null)}
+          >
+            Cancel
+          </button>
+
+          <button
+            className="btn btn-danger"
+            onClick={async () => {
+              await crud.delete(roleToDelete.id);
+              setRoleToDelete(null);
+            }}
+          >
+            Delete Role
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };

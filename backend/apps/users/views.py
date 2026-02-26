@@ -1,4 +1,4 @@
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions,status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import User, Role, Department
@@ -13,6 +13,45 @@ class RoleViewSet(viewsets.ModelViewSet):
     serializer_class = RoleSerializer
     permission_classes = [IsSuperAdmin]
 
+    def create(self, request, *args, **kwargs):
+        name = request.data.get("name")
+        description = request.data.get("description", "")
+
+        if not name:
+            return Response(
+                {"error": "Name is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        name = name.upper()
+
+        # 🔥 Check including soft deleted roles
+        existing_role = Role.all_objects.filter(name=name).first()
+
+        if existing_role:
+            # If soft deleted → restore
+            if existing_role.deleted_at:
+                existing_role.deleted_at = None
+                existing_role.description = description
+                existing_role.save()
+
+            serializer = self.get_serializer(existing_role)
+            return Response(
+                {"data": serializer.data, "created": False},
+                status=status.HTTP_200_OK,
+            )
+
+        # Create new role
+        role = Role.objects.create(
+            name=name,
+            description=description
+        )
+
+        serializer = self.get_serializer(role)
+        return Response(
+            {"data": serializer.data, "created": True},
+            status=status.HTTP_201_CREATED,
+        )
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
