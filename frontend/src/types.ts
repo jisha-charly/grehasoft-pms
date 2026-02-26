@@ -129,13 +129,13 @@ export interface User {
 
 export interface Client {
   id: number;
-  name: string;
+   name: string;  
+  company_name: string;
   email: string;
-  phone: string;
-  companyName: string;
-  gstNo?: string;
-  address: string;
-  createdAt: string;
+  phone?: string;
+  gst_number?: string;
+  address?: string;
+  created_at?: string;
 }
 
 export interface Project {

@@ -12,15 +12,15 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ clients = [], crud }) => {
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-
+const [deleteClientId, setDeleteClientId] = useState<number | null>(null);
   /* ================= VALIDATION ================= */
 
   const validationSchema = {
-    name: {
+    contact_person: {
       required: true,
       message: 'Contact person name is required.'
     },
-    companyName: {
+    company_name: {
       required: true,
       message: 'Company name is required.'
     },
@@ -43,19 +43,29 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ clients = [], crud }) => {
     setValues
   } = useForm({
     initialValues: {
-      name: '',
+      contact_person: '',
       email: '',
       phone: '',
-      companyName: '',
-      gstNo: '',
+      company_name: '',
+      gst_number: '',
       address: ''
     },
     validationSchema,
     onSubmit: async (formData) => {
+
+      const payload = {
+       name: formData.contact_person,   // ✅ map to backend
+        company_name: formData.company_name,
+        email: formData.email,
+        phone: formData.phone,
+        gst_number: formData.gst_number,
+        address: formData.address
+      };
+
       if (editingClient) {
-        await crud.update(editingClient.id, formData);
+        await crud.update(editingClient.id, payload);
       } else {
-        await crud.add(formData);
+        await crud.add(payload);
       }
 
       resetForm();
@@ -71,7 +81,7 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ clients = [], crud }) => {
 
     return clients.filter((c) => {
       const name = c.name?.toLowerCase() || '';
-      const company = c.companyName?.toLowerCase() || '';
+      const company = c.company_name?.toLowerCase() || '';
       const email = c.email?.toLowerCase() || '';
       const term = searchTerm.toLowerCase();
 
@@ -89,11 +99,11 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ clients = [], crud }) => {
     setEditingClient(client);
 
     setValues({
-      name: client.name || '',
+      contact_person: client.name || '',
       email: client.email || '',
       phone: client.phone || '',
-      companyName: client.companyName || '',
-      gstNo: client.gstNo || '',
+      company_name: client.company_name || '',
+      gst_number: client.gst_number || '',
       address: client.address || ''
     });
 
@@ -106,11 +116,16 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ clients = [], crud }) => {
     setModalOpen(true);
   };
 
-  const handleDelete = async (id: number) => {
-    if (window.confirm('Are you sure you want to delete this client?')) {
-      await crud.delete(id);
-    }
-  };
+ const handleDelete = (id: number) => {
+  setDeleteClientId(id);
+};
+
+const confirmDelete = async () => {
+  if (deleteClientId !== null) {
+    await crud.delete(deleteClientId);
+    setDeleteClientId(null);
+  }
+};
 
   /* ================= UI ================= */
 
@@ -181,40 +196,26 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ clients = [], crud }) => {
                   <td colSpan={5} className="text-center py-5 text-muted">
                     <i className="bi bi-people fs-1 opacity-25 d-block mb-3"></i>
                     <h6 className="fw-bold">No clients found</h6>
-                    <p className="small mb-0">
-                      Try adjusting your search or register a new client.
-                    </p>
                   </td>
                 </tr>
               ) : (
                 filteredClients.map((client) => (
                   <tr key={client.id}>
                     <td className="px-4">
-                      <div className="d-flex align-items-center">
-                        <div
-                          className="bg-primary-subtle text-primary rounded-circle me-3 d-flex align-items-center justify-content-center fw-bold shadow-sm"
-                          style={{ width: 38, height: 38 }}
-                        >
-                          {client.name?.charAt(0) || 'C'}
-                        </div>
-
-                        <div>
-                          <div className="fw-bold text-dark">
-                            {client.name}
-                          </div>
-                          <div className="small text-muted">
-                            Joined: {client.createdAt}
-                          </div>
-                        </div>
+                      <div className="fw-bold text-dark">
+                        {client.name}
+                      </div>
+                      <div className="small text-muted">
+                       Joined: {client.created_at}
                       </div>
                     </td>
 
                     <td>
                       <div className="fw-bold text-primary mb-1">
-                        {client.companyName}
+                        {client.company_name}
                       </div>
                       <span className="badge bg-light text-secondary border fw-normal">
-                        GST: {client.gstNo || 'Unregistered'}
+                        GST: {client.gst_number || 'Unregistered'}
                       </span>
                     </td>
 
@@ -228,11 +229,7 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ clients = [], crud }) => {
                     </td>
 
                     <td>
-                      <div
-                        className="small text-muted text-truncate"
-                        style={{ maxWidth: 200 }}
-                        title={client.address}
-                      >
+                      <div className="small text-muted">
                         {client.address || '—'}
                       </div>
                     </td>
@@ -285,22 +282,22 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ clients = [], crud }) => {
 
                 <div className="modal-body">
 
-                  <FormField label="Contact Person Name *" required error={errors.name}>
+                  <FormField label="Contact Person Name *" required error={errors.contact_person}>
                     <input
-                      name="name"
+                      name="contact_person"
                       className="form-control"
-                      value={values.name}
+                      value={values.contact_person}
                       onChange={(e) =>
                         handleChange(e.target.name as keyof typeof values, e.target.value)
                       }
                     />
                   </FormField>
 
-                  <FormField label="Company Name *" required error={errors.companyName}>
+                  <FormField label="Company Name *" required error={errors.company_name}>
                     <input
-                      name="companyName"
+                      name="company_name"
                       className="form-control"
-                      value={values.companyName}
+                      value={values.company_name}
                       onChange={(e) =>
                         handleChange(e.target.name as keyof typeof values, e.target.value)
                       }
@@ -313,6 +310,40 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ clients = [], crud }) => {
                       name="email"
                       className="form-control"
                       value={values.email}
+                      onChange={(e) =>
+                        handleChange(e.target.name as keyof typeof values, e.target.value)
+                      }
+                    />
+                  </FormField>
+
+                  <FormField label="Phone Number">
+                    <input
+                      name="phone"
+                      className="form-control"
+                      value={values.phone}
+                      onChange={(e) =>
+                        handleChange(e.target.name as keyof typeof values, e.target.value)
+                      }
+                    />
+                  </FormField>
+
+                  <FormField label="GST Number">
+                    <input
+                      name="gst_number"
+                      className="form-control"
+                      value={values.gst_number}
+                      onChange={(e) =>
+                        handleChange(e.target.name as keyof typeof values, e.target.value)
+                      }
+                    />
+                  </FormField>
+
+                  <FormField label="Address">
+                    <textarea
+                      name="address"
+                      className="form-control"
+                      rows={3}
+                      value={values.address}
                       onChange={(e) =>
                         handleChange(e.target.name as keyof typeof values, e.target.value)
                       }
@@ -347,6 +378,55 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ clients = [], crud }) => {
           </div>
         </div>
       )}
+
+
+
+      {deleteClientId !== null && (
+  <div className="modal show d-block bg-dark bg-opacity-50">
+    <div className="modal-dialog modal-dialog-centered">
+      <div className="modal-content border-0 rounded-4 shadow-lg">
+
+        <div className="modal-header border-0">
+          <h5 className="modal-title fw-bold text-danger">
+            <i className="bi bi-exclamation-triangle-fill me-2"></i>
+            Confirm Deletion
+          </h5>
+          <button
+            type="button"
+            className="btn-close"
+            onClick={() => setDeleteClientId(null)}
+          ></button>
+        </div>
+
+        <div className="modal-body">
+          <p className="mb-0">
+            Are you sure you want to delete this client?
+            This action cannot be undone.
+          </p>
+        </div>
+
+        <div className="modal-footer border-0">
+          <button
+            type="button"
+            className="btn btn-light"
+            onClick={() => setDeleteClientId(null)}
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-danger"
+            onClick={confirmDelete}
+          >
+            Delete Client
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };
