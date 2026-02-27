@@ -26,6 +26,13 @@ class Task(SoftDeleteModel):
     )
     title = models.CharField(max_length=200)
     description = models.TextField()
+    milestone = models.ForeignKey(
+    'projects.Milestone',
+    on_delete=models.SET_NULL,
+    null=True,
+    blank=True,
+    related_name='tasks'
+)
     task_type = models.ForeignKey(TaskType, on_delete=models.PROTECT)
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='todo')

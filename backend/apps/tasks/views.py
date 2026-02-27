@@ -5,6 +5,8 @@ from .serializers import TaskSerializer, TaskTypeSerializer, TaskFileSerializer,
 from apps.activity.utils import log_system_activity
 from core.permissions import IsProjectManager
 from django.db import IntegrityError
+from rest_framework.permissions import IsAuthenticated
+from apps.projects.utils import log_system_activity
 class TaskTypeViewSet(viewsets.ModelViewSet):
     queryset = TaskType.objects.all()
     serializer_class = TaskTypeSerializer
@@ -56,20 +58,22 @@ class TaskTypeViewSet(viewsets.ModelViewSet):
 class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        project_id = self.request.query_params.get('project_id')
-        
-        queryset = self.queryset
-        if project_id:
+        project_id = self.request.query_params.get('project')
+
+        queryset = Task.objects.all()
+
+        # Filter by project
+        if self.action == 'list' and project_id:
             queryset = queryset.filter(project_id=project_id)
-        
+
+        # Role-based filtering
         if user.role.name in ['SUPER_ADMIN', 'PROJECT_MANAGER']:
             return queryset
-        
-        # Team members see tasks in projects they are part of
+
         return queryset.filter(project__members__user=user)
 
     def perform_create(self, serializer):
@@ -77,10 +81,24 @@ class TaskViewSet(viewsets.ModelViewSet):
         log_system_activity(
             user=self.request.user,
             project=task.project,
-            task=task,
             action=f"Created task: {task.title}"
         )
 
+    def perform_update(self, serializer):
+        task = serializer.save()
+        log_system_activity(
+            user=self.request.user,
+            project=task.project,
+            action=f"Updated task: {task.title}"
+        )
+
+    def perform_destroy(self, instance):
+        log_system_activity(
+            user=self.request.user,
+            project=instance.project,
+            action=f"Deleted task: {instance.title}"
+        )
+        instance.delete()
 class TaskFileViewSet(viewsets.ModelViewSet):
     queryset = TaskFile.objects.all()
     serializer_class = TaskFileSerializer

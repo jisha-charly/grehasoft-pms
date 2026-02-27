@@ -4,7 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Project, Task, User, Department, Milestone, ProjectMember, ActivityLog, TaskStatus, TaskType, ProjectStatus, TaskFile, TaskReview } from '../../types';
 import TaskDetailsModal from '../../components/TaskDetailsModal';
 import axiosInstance from '../../api/axiosInstance';
-
+import DeleteConfirmModal from "../../components/DeleteConfirmModal";
 interface ProjectDetailsPageProps {
   projects: Project[];
   tasks: Task[];
@@ -46,6 +46,11 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [editingMember, setEditingMember] = useState<ProjectMember | null>(null);
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+const [selectedMilestoneId, setSelectedMilestoneId] = useState<number | null>(null);
+const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+const [memberToDelete, setMemberToDelete] = useState<number | null>(null);
 
 useEffect(() => {
   const fetchData = async () => {
@@ -115,50 +120,75 @@ useEffect(() => {
   const handleTaskSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const payload = {
-      project: project.id,
-      milestoneId: fd.get('milestoneId') ? Number(fd.get('milestoneId')) : undefined,
-      title: fd.get('title'),
-      description: fd.get('description'),
-      priority: fd.get('priority'),
-      status: fd.get('status') as TaskStatus || TaskStatus.TODO,
-      due_date: fd.get('dueDate'),
-      task_type: Number(fd.get('taskTypeId')),
-      assignees: [Number(fd.get('assignee'))]
+   const payload = {
+  project: project.id,
+  milestone: fd.get('milestoneId')
+    ? Number(fd.get('milestoneId'))
+    : null,
+  title: fd.get('title'),
+  description: fd.get('description'),
+  priority: fd.get('priority'),
+  status: fd.get('status'),
+  due_date: fd.get('dueDate'),
+  task_type: Number(fd.get('taskTypeId')),
+  assignees: fd.get('assignee')
+    ? [Number(fd.get('assignee'))]
+    : []
+};
+try {
+  if (editingTask) {
+    const res = await axiosInstance.patch(
+      `/tasks/${editingTask.id}/`,
+      payload
+    );
+
+    const updatedTask = {
+      ...res.data,
+      dueDate: res.data.due_date,
+      milestoneId: res.data.milestone,
+      taskTypeId: res.data.task_type,
     };
 
-    try {
-      if (editingTask) {
-        const res = await axiosInstance.patch(`/tasks/${editingTask.id}/`, payload);
-        setProjectTasks(prev => prev.map(t => t.id === editingTask.id ? res.data : t));
-      } else {
-       const res = await axiosInstance.post('/tasks/', payload);
+    setProjectTasks(prev =>
+      prev.map(t =>
+        t.id === editingTask.id ? updatedTask : t
+      )
+    );
+  } else {
+    const res = await axiosInstance.post('/tasks/', payload);
 
-const newTask = {
-  ...res.data,
-  dueDate: res.data.due_date,
-  milestoneId: res.data.milestone,
-  taskTypeId: res.data.task_type,
+    const newTask = {
+      ...res.data,
+      dueDate: res.data.due_date,
+      milestoneId: res.data.milestone,
+      taskTypeId: res.data.task_type,
+    };
+
+    setProjectTasks(prev => [...prev, newTask]);
+  }
+
+  // ✅ CLOSE MODAL INSIDE TRY
+  setTaskModalOpen(false);
+  setEditingTask(null);
+
+} catch (error) {
+  console.error("Error saving task:", error);
+}};
+
+ const handleTaskDelete = async (taskId: number) => {
+  if (!confirm("Are you sure you want to delete this task?")) return;
+
+  try {
+    await axiosInstance.delete(`/tasks/${taskId}/`);
+
+    // 🔥 Always reload from backend
+    const res = await axiosInstance.get(`/tasks/?project=${project.id}`);
+    setProjectTasks(res.data);
+
+  } catch (error) {
+    console.error("Error deleting task:", error);
+  }
 };
-
-setProjectTasks(prev => [...prev, newTask]);
-      }
-      setTaskModalOpen(false);
-      setEditingTask(null);
-    } catch (error) {
-      console.error("Error saving task:", error);
-    }
-  };
-
-  const handleTaskDelete = async (taskId: string) => {
-    if (!confirm("Are you sure you want to delete this task?")) return;
-    try {
-     axiosInstance.delete(`/tasks/${taskId}/`);
-      setProjectTasks(prev => prev.filter(t => t.id !== taskId));
-    } catch (error) {
-      console.error("Error deleting task:", error);
-    }
-  };
 
   const handleMilestoneSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -171,7 +201,7 @@ setProjectTasks(prev => [...prev, newTask]);
 
     try {
       if (editingMilestone) {
-        const res = await axiosInstance.patch(`/milestones/${editingMilestone.id}`, payload);
+        const res = await axiosInstance.patch( `/milestones/${editingMilestone.id}/`, payload);
         setProjectMilestones(prev => prev.map(m => m.id === editingMilestone.id ? res.data : m));
       } else {
         const res = await axiosInstance.post('/milestones/', payload);
@@ -194,44 +224,74 @@ setProjectTasks(prev => [...prev, newTask]);
     }
   };
 
-  const handleMilestoneDelete = async (milestoneId: number) => {
-    if (!confirm("Are you sure you want to delete this milestone?")) return;
-    try {
-      await axiosInstance.delete(`/milestones/${milestoneId}`);
-      setProjectMilestones(prev => prev.filter(m => m.id !== milestoneId));
-    } catch (error) {
-      console.error("Error deleting milestone:", error);
-    }
-  };
+  const confirmDeleteMilestone = async () => {
+  if (!selectedMilestoneId) return;
 
-  const handleMemberSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const payload = {
-      project: project.id,
-      user: Number(fd.get('userId')),
-     role_in_project: fd.get('roleInProject'),
-    };
+  try {
+    await axiosInstance.delete(`/milestones/${selectedMilestoneId}/`);
+    setProjectMilestones(prev =>
+      prev.filter(m => m.id !== selectedMilestoneId)
+    );
+  } catch (error) {
+    console.error("Error deleting milestone:", error);
+  }
+};
 
-    try {
-      const res = await axiosInstance.post('/members/', payload);
+ const handleMemberSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+  const fd = new FormData(e.currentTarget);
+
+  try {
+    if (editingMember) {
+      // ✅ UPDATE EXISTING MEMBER
+      const res = await axiosInstance.patch(
+        `/members/${editingMember.id}/`,
+        {
+          role_in_project: fd.get("roleInProject"),
+        }
+      );
+
+      setProjectMembers(prev =>
+        prev.map(m =>
+          m.id === editingMember.id ? res.data : m
+        )
+      );
+
+    } else {
+      // ✅ ADD NEW MEMBER
+      const payload = {
+        project: project.id,
+        user: Number(fd.get("userId")),
+        role_in_project: fd.get("roleInProject"),
+      };
+
+      const res = await axiosInstance.post("/members/", payload);
+
       setProjectMembers(prev => [...prev, res.data]);
-      setMemberModalOpen(false);
-      setEditingMember(null);
-    } catch (error) {
-      console.error("Error adding member:", error);
     }
-  };
 
-  const handleMemberDelete = async (memberId: number) => {
-    if (!confirm("Are you sure you want to remove this member?")) return;
-    try {
-      await axiosInstance.delete(`/members/${memberId}`);
-      setProjectMembers(prev => prev.filter(m => m.id !== memberId));
-    } catch (error) {
-      console.error("Error removing member:", error);
-    }
-  };
+    setMemberModalOpen(false);
+    setEditingMember(null);
+
+  } catch (error) {
+    console.error("Error saving member:", error);
+  }
+};
+
+  const handleMemberDelete = async () => {
+  if (!memberToDelete) return;
+
+  try {
+    await axiosInstance.delete(`/members/${memberToDelete}/`);
+    setProjectMembers(prev =>
+      prev.filter(m => m.id !== memberToDelete)
+    );
+  } catch (error) {
+    console.error("Error removing member:", error);
+  }
+
+  setMemberToDelete(null);
+};
 
 
   return (
@@ -341,7 +401,10 @@ setProjectTasks(prev => [...prev, newTask]);
                               <button className="btn btn-sm btn-light" onClick={(e) => { e.stopPropagation(); setEditingTask(t); setTaskModalOpen(true); }}>
                                 <i className="bi bi-pencil"></i>
                               </button>
-                              <button className="btn btn-sm btn-light text-danger" onClick={(e) => { e.stopPropagation(); handleTaskDelete(t.id); }}>
+                              <button className="btn btn-sm btn-light text-danger" onClick={(e) => {
+  e.stopPropagation();
+  setTaskToDelete(t);
+}}>
                                 <i className="bi bi-trash"></i>
                               </button>
                             </div>
@@ -384,19 +447,22 @@ setProjectTasks(prev => [...prev, newTask]);
                           </div>
                         </div>
                         <div className="text-end">
-                          <div className="small fw-bold text-dark mb-1">{m.progress}% Complete</div>
+                          <div className="small fw-bold text-dark mb-1">{m.progress_percentage}% Complete</div>
                           <div className="btn-group">
                             <button className="btn btn-sm btn-light py-0 px-2" onClick={() => { setEditingMilestone(m); setMilestoneModalOpen(true); }}>
                               <i className="bi bi-pencil smaller"></i>
                             </button>
-                            <button className="btn btn-sm btn-light text-danger py-0 px-2" onClick={() => handleMilestoneDelete(m.id)}>
+                            <button className="btn btn-sm btn-light text-danger py-0 px-2" onClick={() => {
+  setSelectedMilestoneId(m.id);
+  setDeleteModalOpen(true);
+}}>
                               <i className="bi bi-trash smaller"></i>
                             </button>
                           </div>
                         </div>
                       </div>
                       <div className="progress mt-2" style={{height: '6px'}}>
-                        <div className={`progress-bar ${m.status === 'completed' ? 'bg-success' : 'bg-primary'}`} style={{width: `${m.progress}%`}}></div>
+                        <div className={`progress-bar ${m.status === 'completed' ? 'bg-success' : 'bg-primary'}`} style={{ width: `${m.progress_percentage}%` }}></div>
                       </div>
                     </div>
                   ))
@@ -417,28 +483,51 @@ setProjectTasks(prev => [...prev, newTask]);
                 {projectMembers.length === 0 ? (
                   <div className="col-12 text-center py-5 text-muted small">No members assigned to this project.</div>
                 ) : (
-                  projectMembers.map(m => {
-                    const user = users.find(u => u.id === m.userId);
-                    return (
-                      <div className="col-md-4" key={m.id}>
-                        <div className="card p-3 bg-light border-0 shadow-none d-flex flex-row align-items-center h-100">
-                          <img src={`https://i.pravatar.cc/40?u=${m.userId}`} className="rounded-circle me-3 border shadow-sm" alt="" />
-                          <div className="flex-grow-1">
-                            <div className="fw-bold text-dark small">{user?.name}</div>
-                            <div className="text-primary smaller fw-bold uppercase">{m.roleInProject}</div>
-                          </div>
-                          <div className="d-flex flex-column gap-1">
-                            <button className="btn btn-link text-primary p-0 text-decoration-none" onClick={() => { setEditingMember(m); setMemberModalOpen(true); }}>
-                              <i className="bi bi-pencil smaller"></i>
-                            </button>
-                            <button className="btn btn-link text-danger p-0 text-decoration-none" onClick={() => handleMemberDelete(m.id)}>
-                              <i className="bi bi-person-dash fs-6"></i>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
+                 projectMembers.map(m => {
+  const user = m.user_details;
+
+  return (
+    <div className="col-md-4" key={m.id}>
+      <div className="card p-3 bg-light border-0 shadow-none d-flex flex-row align-items-center h-100">
+        
+        <img
+          src={`https://i.pravatar.cc/40?u=${m.user}`}
+          className="rounded-circle me-3 border shadow-sm"
+          alt=""
+        />
+
+        <div className="flex-grow-1">
+          <div className="fw-bold text-dark small">
+            {user?.name}
+          </div>
+
+          <div className="text-primary smaller fw-bold uppercase">
+            {m.role_in_project}
+          </div>
+        </div>
+
+        <div className="d-flex flex-column gap-1">
+          <button
+            className="btn btn-link text-primary p-0 text-decoration-none"
+            onClick={() => {
+              setEditingMember(m);
+              setMemberModalOpen(true);
+            }}
+          >
+            <i className="bi bi-pencil smaller"></i>
+          </button>
+
+          <button
+            className="btn btn-link text-danger p-0 text-decoration-none"
+            onClick={() => setMemberToDelete(m.id)}
+          >
+            <i className="bi bi-person-dash fs-6"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+})
                 )}
               </div>
             </div>
@@ -459,10 +548,10 @@ setProjectTasks(prev => [...prev, newTask]);
                     </div>
                     <div>
                       <div className="small fw-bold text-dark mb-1">
-                        {users.find(u => u.id === a.userId)?.name} 
+                        {users.find(u => u.id === a.user)?.name}
                         <span className="fw-normal text-secondary ms-1">{a.action}</span>
                       </div>
-                      <div className="smaller text-muted"><i className="bi bi-clock me-1"></i>{a.createdAt}</div>
+                      <div className="smaller text-muted"><i className="bi bi-clock me-1"></i>{a.created_at}</div>
                     </div>
                   </div>
                 ))
@@ -491,7 +580,7 @@ setProjectTasks(prev => [...prev, newTask]);
                     <div className="col-md-4"><label className="form-label smaller fw-bold uppercase text-secondary">Priority</label><select name="priority" className="form-select" defaultValue={editingTask?.priority}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
                     <div className="col-md-4"><label className="form-label smaller fw-bold uppercase text-secondary">Status</label><select name="status" className="form-select" defaultValue={editingTask?.status || 'todo'}><option value="todo">To Do</option><option value="in_progress">In Progress</option><option value="blocked">Blocked</option><option value="done">Completed</option></select></div>
                     <div className="col-md-4"><label className="form-label smaller fw-bold uppercase text-secondary">Due Date</label><input name="dueDate" type="date" className="form-control" defaultValue={editingTask?.dueDate} required /></div>
-                    <div className="col-md-12"><label className="form-label smaller fw-bold uppercase text-secondary">Assignee</label><select name="assignee" className="form-select" defaultValue={editingTask?.assignees[0]}>{users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+                    <div className="col-md-12"><label className="form-label smaller fw-bold uppercase text-secondary">Assignee</label><select name="assignee" className="form-select" defaultValue={editingTask?.assignees?.[0] || ""}>{users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
                   </div>
                 </div>
                 <div className="modal-footer bg-white border-0 pb-4 px-4 gap-2">
@@ -549,7 +638,7 @@ setProjectTasks(prev => [...prev, newTask]);
                   )}
                   <div className="mb-3">
                     <label className="form-label smaller fw-bold">Internal Project Role</label>
-                    <select name="roleInProject" className="form-select" defaultValue={editingMember?.roleInProject}>
+                    <select name="roleInProject" className="form-select" defaultValue={editingMember?.role_in_project}>
                       <option value="MEMBER">Team Member</option>
                       <option value="QA">Quality Assurance</option>
                       <option value="VIEWER">Observer/Viewer</option>
@@ -574,11 +663,56 @@ setProjectTasks(prev => [...prev, newTask]);
           users={users} 
           currentUser={currentUser}
           onUpdateStatus={async (id, updates) => {
-            const res = await axiosInstance.patch(`/tasks/${id}`, updates);
-            setProjectTasks(prev => prev.map(t => t.id === id ? res.data : t));
+            const res = await axiosInstance.get(`/tasks/?project=${project.id}`);
+
+const normalized = res.data.map((task: any) => ({
+  ...task,
+  id: Number(task.id),
+}));
+
+setProjectTasks(normalized);
           }}
         />
       )}
+      <DeleteConfirmModal
+  isOpen={deleteModalOpen}
+  onClose={() => setDeleteModalOpen(false)}
+  onConfirm={confirmDeleteMilestone}
+  title="Delete Milestone"
+  message="Are you sure you want to delete this milestone?"
+/>
+
+<DeleteConfirmModal
+  isOpen={!!taskToDelete}
+  onClose={() => setTaskToDelete(null)}
+  onConfirm={async () => {
+    if (!taskToDelete) return;
+
+    try {
+      await axiosInstance.delete(`/tasks/${taskToDelete.id}/`);
+
+      setProjectTasks(prev =>
+        prev.filter(t => t.id !== taskToDelete.id)
+      );
+    } catch (error) {
+      console.error("Error deleting task:", error);
+    }
+
+    setTaskToDelete(null);
+  }}
+  title="Delete Task"
+  message={`Are you sure you want to delete "${taskToDelete?.title}"?`}
+/>
+
+
+
+<DeleteConfirmModal
+  isOpen={!!memberToDelete}
+  title="Remove Member"
+  message="Are you sure you want to remove this member from the project?"
+  onConfirm={handleMemberDelete}
+  onClose={() => setMemberToDelete(null)}
+/>
     </div>
   );
 };

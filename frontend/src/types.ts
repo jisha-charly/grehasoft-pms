@@ -156,7 +156,7 @@ export interface Project {
 }
 
 export interface Task {
-  id: string;
+  id: number;
   projectId: number;
   milestoneId?: number;
   title: string;
@@ -260,7 +260,7 @@ export interface Milestone {
   title: string;
   dueDate: string;
   status: 'pending' | 'completed';
-  progress: number;
+ progress_percentage: number;
   createdAt: string;
   updatedAt?: string;
   deletedAt?: string;
@@ -268,19 +268,24 @@ export interface Milestone {
 
 export interface ProjectMember {
   id: number;
-  projectId: number;
-  userId: number;
-  roleInProject: 'PM' | 'MEMBER' | 'QA' | 'VIEWER';
-  addedAt: string;
+  project: number;
+  user: number;
+  role_in_project: string;
+
+  user_details?: {
+    id: number;
+    name: string;
+    email: string;
+  };
 }
 
 export interface ActivityLog {
   id: number;
-  userId: number;
+  user: number;
   projectId: number;
   taskId?: string;
   action: string;
-  createdAt: string;
+  created_at: string;
 }
 
 export interface SEOTask {

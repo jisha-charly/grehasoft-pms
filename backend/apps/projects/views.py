@@ -8,7 +8,7 @@ from .serializers import (
     ProjectMemberSerializer,
     ActivityLogSerializer
 )
-
+from .utils  import log_system_activity
 class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
@@ -35,6 +35,30 @@ class ProjectMemberViewSet(viewsets.ModelViewSet):
     queryset = ProjectMember.objects.all()
     serializer_class = ProjectMemberSerializer
     permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        member = serializer.save()
+        log_system_activity(
+            user=self.request.user,
+            project=member.project,
+            action=f"Added member: {member.user.name}"
+        )
+
+    def perform_update(self, serializer):
+        member = serializer.save()
+        log_system_activity(
+            user=self.request.user,
+            project=member.project,
+            action=f"Updated role of {member.user.name}"
+        )
+
+    def perform_destroy(self, instance):
+        log_system_activity(
+            user=self.request.user,
+            project=instance.project,
+            action=f"Removed member: {instance.user.name}"
+        )
+        instance.delete()
 
 
 class ActivityLogViewSet(viewsets.ModelViewSet):
