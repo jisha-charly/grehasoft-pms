@@ -24,15 +24,15 @@ import { Task, TaskStatus } from '../types';
 
 interface KanbanBoardProps {
   tasks: Task[];
-  onTaskUpdate: (id: string, updates: Partial<Task>) => void;
-  onTasksReorder: (newTasks: Task[]) => void;
+  onTaskUpdate: (id: number, updates: Partial<Task>) => void;
+  onTasksReorder: (newTasks: Task[]) => void;   // ✅ ADD THIS
   onTaskClick: (task: Task) => void;
 }
 
 const SortableTaskCard: React.FC<{ task: Task; onClick: () => void }> = ({ task, onClick }) => {
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
-  } = useSortable({ id: task.id });
+  } = useSortable({ id: String(task.id) })
 
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -75,7 +75,7 @@ const SortableTaskCard: React.FC<{ task: Task; onClick: () => void }> = ({ task,
       <div className="d-flex justify-content-between align-items-center border-top pt-2">
         <div className="avatar-group">
           <img 
-            src={`https://i.pravatar.cc/24?u=${task.assignees[0] || 'default'}`} 
+           src={`https://i.pravatar.cc/24?u=${task.assignees?.[0] ?? 'default'}`}
             className="rounded-circle border border-white shadow-sm" 
             alt="assignee" 
             style={{ width: '24px', height: '24px' }}
@@ -102,7 +102,7 @@ const KanbanColumn: React.FC<{ status: TaskStatus; tasks: Task[]; title: string;
       </div>
       
       <div ref={setNodeRef} className="flex-grow-1" style={{ minHeight: '400px' }}>
-        <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+       <SortableContext items={tasks.map(t => String(t.id))} strategy={verticalListSortingStrategy}>
           {tasks.length === 0 ? (
             <div className="h-100 d-flex align-items-center justify-content-center text-muted small opacity-50 border border-dashed rounded-3 p-4 text-center">
               Drop tasks here
@@ -117,46 +117,50 @@ const KanbanColumn: React.FC<{ status: TaskStatus; tasks: Task[]; title: string;
 };
 
 const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onTaskUpdate, onTasksReorder, onTaskClick }) => {
-  const [activeId, setActiveId] = useState<string | null>(null);
+ const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const handleDragStart = (event: DragStartEvent) => setActiveId(event.active.id as string);
+  const handleDragStart = (event: DragStartEvent) =>
+  setActiveId(String(event.active.id));
 
-  const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over) return;
+ const handleDragOver = (event: DragOverEvent) => {
+  const { active, over } = event;
+  if (!over) return;
 
-    const activeId = active.id as string;
-    const overId = over.id as string;
+ const activeId = Number(active.id);
+const overIdRaw = over.id;
 
-    const activeTask = tasks.find((t) => t.id === activeId);
-    if (!activeTask) return;
+const activeTask = tasks.find((t) => t.id === activeId);
+if (!activeTask) return;
 
-    // Check if dropping over a column or another task
-    const isOverAColumn = Object.values(TaskStatus).includes(overId as TaskStatus);
+const isOverAColumn =
+  typeof overIdRaw === "string" &&
+  (Object.values(TaskStatus) as string[]).includes(overIdRaw);
 
-    if (isOverAColumn) {
-      if (activeTask.status !== (overId as TaskStatus)) {
-        onTaskUpdate(activeId, { status: overId as TaskStatus });
-      }
-    } else {
-      const overTask = tasks.find((t) => t.id === overId);
-      if (overTask && activeTask.status !== overTask.status) {
-        onTaskUpdate(activeId, { status: overTask.status });
-      }
-    }
-  };
+if (isOverAColumn) {
+  if (activeTask.status !== overIdRaw) {
+    onTaskUpdate(activeId, { status: overIdRaw as TaskStatus });
+  }
+} else {
+  const overId = Number(overIdRaw);
+  const overTask = tasks.find((t) => t.id === overId);
+
+  if (overTask && activeTask.status !== overTask.status) {
+    onTaskUpdate(activeId, { status: overTask.status });
+  }
+}
+};
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      const oldIndex = tasks.findIndex((t) => t.id === active.id);
-      const newIndex = tasks.findIndex((t) => t.id === over.id);
+      const oldIndex = tasks.findIndex((t) => t.id === Number(active.id));
+const newIndex = tasks.findIndex((t) => t.id === Number(over.id));
 
       if (newIndex !== -1) {
         onTasksReorder(arrayMove(tasks, oldIndex, newIndex));
@@ -173,7 +177,9 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onTaskUpdate, onTasksR
     { status: TaskStatus.DONE, title: 'Completed' },
   ];
 
-  const activeTask = tasks.find(t => t.id === activeId);
+  const activeTask = tasks.find(
+  t => t.id === (activeId ? Number(activeId) : -1)
+);
 
   return (
     <div className="kanban-wrapper" style={{ overflowX: 'auto', paddingBottom: '20px' }}>

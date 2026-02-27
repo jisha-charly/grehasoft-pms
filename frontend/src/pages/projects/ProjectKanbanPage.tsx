@@ -35,12 +35,20 @@ const ProjectKanbanPage: React.FC<ProjectKanbanPageProps> = ({
       setLoading(true);
       try {
         const [projRes, tasksRes, milestonesRes] = await Promise.all([
-          axiosInstance.get(`/projects/${id}`),
-          axiosInstance.get(`/projects/${id}/tasks`),
-          axiosInstance.get(`/projects/${id}/milestones`),
-        ]);
+  axiosInstance.get(`/projects/${id}/`),          // add trailing slash
+  axiosInstance.get(`/tasks/?project=${id}`),    // correct endpoint
+  axiosInstance.get(`/milestones/?project=${id}`), // correct endpoint
+]);
         setProject(projRes.data);
-        setProjectTasks(tasksRes.data);
+       const normalized = tasksRes.data.map((t: any) => ({
+  ...t,
+  dueDate: t.due_date,
+  milestoneId: t.milestone,
+  taskTypeId: t.task_type,
+  assignees: t.assignees || [],
+}));
+
+setProjectTasks(normalized);
         setProjectMilestones(milestonesRes.data);
       } catch (error) {
         console.error("Error fetching kanban data:", error);
@@ -55,17 +63,24 @@ const ProjectKanbanPage: React.FC<ProjectKanbanPageProps> = ({
   if (!project) return <div className="p-5 text-center"><h3>Project not found</h3><Link to="/projects">Back to list</Link></div>;
 
   const handleTasksReorder = async (newTasks: Task[]) => {
-    setProjectTasks(newTasks);
-    try {
-      await axiosInstance.post('/tasks/reorder', { taskIds: newTasks.map(t => t.id) });
-    } catch (error) {
-      console.error("Error reordering tasks:", error);
-    }
-  };
+  setProjectTasks(newTasks);
+
+  try {
+    await Promise.all(
+      newTasks.map((task, index) =>
+        axiosInstance.patch(`/tasks/${task.id}/`, {
+          board_order: index,
+        })
+      )
+    );
+  } catch (error) {
+    console.error("Error reordering tasks:", error);
+  }
+};
 
   const handleTaskUpdate = async (taskId: string | number, updates: Partial<Task>) => {
     try {
-      const res = await axiosInstance.patch(`/tasks/${taskId}`, updates);
+      const res = await axiosInstance.patch(`/tasks/${taskId}/`, updates);
       setProjectTasks(prev => prev.map(t => t.id === taskId ? res.data : t));
       if (selectedTask && selectedTask.id === taskId) {
         setSelectedTask(res.data);
@@ -78,20 +93,22 @@ const ProjectKanbanPage: React.FC<ProjectKanbanPageProps> = ({
   const handleNewTaskSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const payload = {
-      projectId: project.id,
-      milestoneId: fd.get('milestoneId') ? Number(fd.get('milestoneId')) : undefined,
-      title: fd.get('title'),
-      description: fd.get('description'),
-      priority: fd.get('priority'),
-      status: fd.get('status') as TaskStatus || TaskStatus.TODO,
-      dueDate: fd.get('dueDate'),
-      taskTypeId: Number(fd.get('taskTypeId')),
-      assignees: [Number(fd.get('assignee'))]
-    };
+   const payload = {
+  project: project.id,
+  milestone: fd.get('milestoneId')
+    ? Number(fd.get('milestoneId'))
+    : null,
+  title: fd.get('title'),
+  description: fd.get('description'),
+  priority: fd.get('priority'),
+  status: fd.get('status'),
+  due_date: fd.get('dueDate'),
+  task_type: Number(fd.get('taskTypeId')),
+  assignees: [Number(fd.get('assignee'))]
+};
 
     try {
-      const res = await axiosInstance.post('/tasks', payload);
+      const res = await axiosInstance.post('/tasks/', payload);
       setProjectTasks(prev => [...prev, res.data]);
       setModalOpen(false);
     } catch (error) {
