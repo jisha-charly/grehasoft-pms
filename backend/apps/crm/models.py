@@ -1,7 +1,7 @@
 from django.db import models
 from core.models import SoftDeleteModel
 from django.conf import settings
-
+from apps.projects.models import Client
 class Lead(SoftDeleteModel):
     STATUS_CHOICES = [
         ('new', 'New'),
@@ -15,6 +15,14 @@ class Lead(SoftDeleteModel):
     phone = models.CharField(max_length=20)
     source = models.CharField(max_length=100)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
+    client = models.ForeignKey(
+      'projects.Client',
+        on_delete=models.CASCADE,
+        related_name="leads",
+        null=True,
+        blank=True
+    )
+
     converted_project = models.ForeignKey('projects.Project', on_delete=models.SET_NULL, null=True, blank=True)
 
     class Meta:

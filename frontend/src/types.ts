@@ -204,23 +204,24 @@ export interface TaskComment {
 
 export interface TaskFile {
   id: number;
-  taskId: string;
-  uploadedBy: number;
-  filePath: string;
-  fileType: string;
-  revisionNo: number;
-  uploadedAt: string;
+  task: number;
+  uploaded_by: number;
+  file: string;           // actual file URL
+  file_path: string;
+  file_type: string;
+  revision_no: number;
+  uploaded_at: string;
 }
 
 export interface TaskReview {
   id: number;
-  taskFileId: number;
-  reviewerId: number;
-  reviewedByRole: 'PM' | 'ADMIN';
-  reviewVersion: number;
+  task_file: number;
+  reviewer: number;
+  reviewed_by_role: 'PM' | 'ADMIN';
+  review_version: number;
   comments: string;
   status: 'approved' | 'rework';
-  reviewedAt: string;
+  reviewed_at: string;
 }
 
 export interface Lead {
@@ -230,12 +231,13 @@ export interface Lead {
   phone: string;
   source: string;
   status: 'new' | 'contacted' | 'qualified' | 'converted' | 'lost';
-  converted_project_id?: number | null;
+
+  client?: number;               // 🔥 new
+  converted_project?: number | null;
+  client_name?: string | null;  
   createdAt: string;
   updatedAt?: string;
-  deletedAt?: string;
 }
-
 export interface LeadAssignment {
   id: number;
   lead_id: number;

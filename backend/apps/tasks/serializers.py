@@ -33,16 +33,37 @@ class TaskCommentSerializer(serializers.ModelSerializer):
 
 class TaskReviewSerializer(serializers.ModelSerializer):
     reviewer_name = serializers.CharField(source='reviewer.name', read_only=True)
+
     class Meta:
         model = TaskReview
-        fields = '__all__'
+        fields = "__all__"
+        read_only_fields = ["reviewer"]
+    def validate(self, data):
+        task_file = data.get("task_file")
+
+        # Check if already approved
+        if TaskReview.objects.filter(
+            task_file=task_file,
+            status="approved"
+        ).exists():
+            raise serializers.ValidationError(
+                "This file is already approved and locked."
+            )
+
+        return data
 
 class TaskFileSerializer(serializers.ModelSerializer):
-    reviews = TaskReviewSerializer(many=True, read_only=True)
-    uploader_name = serializers.CharField(source='uploaded_by.name', read_only=True)
     class Meta:
         model = TaskFile
-        fields = '__all__'
+        fields = "__all__"
+        read_only_fields = ["file_path", "file_type"]
+    def create(self, validated_data):
+     file = validated_data.get("file")
+
+     validated_data["file_path"] = file.name
+     validated_data["file_type"] = file.content_type
+
+     return super().create(validated_data)
 
 class TaskProgressSerializer(serializers.ModelSerializer):
     class Meta:

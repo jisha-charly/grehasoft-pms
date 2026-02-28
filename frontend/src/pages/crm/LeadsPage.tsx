@@ -153,7 +153,7 @@ const LeadsPage: React.FC<LeadsPageProps> = ({
       phone: lead.phone || '',
       source: lead.source || 'Web',
       status: lead.status || 'new',
-      converted_project_id: lead.converted_project_id?.toString() || ''
+      converted_project_id: lead.converted_project?.toString() || ''
     });
 
     setModalOpen(true);

@@ -9,7 +9,7 @@ interface TaskDetailsModalProps {
   onClose: () => void;
   users: User[];
   currentUser: User;
-  onUpdateStatus: (id: string, status: any) => void;
+  onUpdateStatus: (id: number, status: any) => void;
 }
 
 const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ 
@@ -24,33 +24,28 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const fetchTaskData = async () => {
-      setLoading(true);
-      try {
-        const [filesRes, commentsRes, progressRes, assignmentsRes] = await Promise.all([
-          axiosInstance.get(`/tasks/${task.id}/files`),
-          axiosInstance.get(`/tasks/${task.id}/comments`),
-          axiosInstance.get(`/tasks/${task.id}/progress`),
-          axiosInstance.get(`/tasks/${task.id}/assignments`)
-        ]);
-        setFiles(filesRes.data);
-        setComments(commentsRes.data);
-        setProgress(progressRes.data);
-        setAssignments(assignmentsRes.data);
+  const fetchTaskData = async () => {
+    setLoading(true);
+    try {
+      const [filesRes, commentsRes, reviewsRes] = await Promise.all([
+        axiosInstance.get(`/task-files/?task=${task.id}`),
+        axiosInstance.get(`/task-comments/?task=${task.id}`),
+        axiosInstance.get(`/task-reviews/?task=${task.id}`), // only if backend supports filtering by task
+      ]);
 
-        // Fetch reviews for each file
-        const reviewsPromises = filesRes.data.map((f: TaskFile) => axiosInstance.get(`/task-files/${f.id}/reviews`));
-        const reviewsResponses = await Promise.all(reviewsPromises);
-        const allReviews = reviewsResponses.flatMap(r => r.data);
-        setReviews(allReviews);
-      } catch (error) {
-        console.error("Error fetching task details:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchTaskData();
-  }, [task.id]);
+      setFiles(filesRes.data);
+      setComments(commentsRes.data);
+      setReviews(reviewsRes.data);
+
+    } catch (error) {
+      console.error("Error fetching task details:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchTaskData();
+}, [task.id]);
 
   const latestProgress = progress.length > 0 ? progress[progress.length - 1] : { progressPercentage: 0 };
 
@@ -68,30 +63,43 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     }
   };
 
-  const getFileReviews = (fileId: number) => reviews.filter(r => r.taskFileId === fileId);
+const getFileReviews = (fileId: number) =>
+  reviews.filter(r => r.task_file === fileId);
 
   // File Upload Form
   const fileUploadForm = useForm({
     initialValues: { file: null as File | null },
-    onSubmit: async (values) => {
-      if (values.file) {
-        const file = values.file;
-        const sameNameFiles = files.filter(f => f.filePath === file.name);
-        const nextRevision = sameNameFiles.length + 1;
+   onSubmit: async (values) => {
+  if (!values.file) return;
 
-        const payload = {
-          taskId: task.id,
-          uploadedBy: currentUser.id,
-          filePath: file.name,
-          fileType: file.type,
-          revisionNo: nextRevision
-        };
+  const file = values.file;
 
-        const res = await axiosInstance.post('/task-files', payload);
-        setFiles(prev => [...prev, res.data]);
-        fileUploadForm.resetForm();
+  const sameNameFiles = files.filter(f => f.file_path === file.name);
+  const nextRevision = sameNameFiles.length + 1;
+
+  const formData = new FormData();
+  formData.append("task", String(task.id));
+  formData.append("uploaded_by", String(currentUser.id));
+  formData.append("file", file);
+  formData.append("revision_no", String(nextRevision));
+
+  try {
+    const res = await axiosInstance.post(
+      "/task-files/",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        }
       }
-    }
+    );
+
+    setFiles(prev => [...prev, res.data]);
+    fileUploadForm.resetForm();
+  } catch (error) {
+    console.error("Upload failed:", error);
+  }
+}
   });
 
   // Review Form
@@ -103,16 +111,17 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     },
     onSubmit: async (values) => {
       if (reviewFileId) {
-        const payload = {
-          taskFileId: reviewFileId,
-          reviewerId: currentUser.id,
-          reviewedByRole: currentUser.role === UserRole.SUPER_ADMIN ? 'ADMIN' : 'PM',
-          reviewVersion: getFileReviews(reviewFileId).length + 1,
-          comments: values.comments,
-          status: values.status
-        };
+       const payload = {
+  task_file: reviewFileId,
+  
+  reviewed_by_role:
+    currentUser.role_name === UserRole.SUPER_ADMIN? "ADMIN" : "PM",
+  review_version: getFileReviews(reviewFileId).length + 1,
+  comments: values.comments,
+  status: values.status
+};
 
-        const res = await axiosInstance.post('/task-reviews', payload);
+        const res = await axiosInstance.post('/task-reviews/', payload);
         setReviews(prev => [...prev, res.data]);
         setReviewFileId(null);
         reviewForm.resetForm();
@@ -137,7 +146,9 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     }
   });
 
-  const isReviewer = currentUser.role === UserRole.SUPER_ADMIN || currentUser.role === UserRole.PROJECT_MANAGER;
+ const isReviewer =
+  currentUser.role_name === UserRole.SUPER_ADMIN ||
+  currentUser.role_name === UserRole.PROJECT_MANAGER;
 
   return (
     <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1} style={{ zIndex: 1060 }}>
@@ -243,10 +254,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                           <div key={file.id} className="list-group-item file-item p-3">
                             <div className="d-flex justify-content-between align-items-start">
                               <div className="d-flex align-items-center">
-                                <i className={`bi fs-3 me-3 text-primary ${file.fileType.includes('pdf') ? 'bi-file-earmark-pdf' : 'bi-file-earmark-image'}`}></i>
+                                <i className={`bi fs-3 me-3 text-primary ${(file.file_type || '').includes('pdf') ? 'bi-file-earmark-pdf' : 'bi-file-earmark-image'}`}></i>
                                 <div>
-                                  <div className="fw-bold small text-dark">{file.filePath}</div>
-                                  <div className="smaller text-secondary">Version {file.revisionNo} • {file.uploadedAt}</div>
+                                  <div className="fw-bold small text-dark">{file.file_path}</div>
+                                  <div className="smaller text-secondary">Version {file.revision_no} • {file.uploaded_at}</div>
                                 </div>
                               </div>
                               <div className="text-end">
@@ -257,7 +268,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                                 ) : (
                                   <span className="badge rounded-pill bg-light text-secondary fw-bold border">PENDING</span>
                                 )}
-                                {isReviewer && (
+                                {isReviewer && !latestReview?.status?.includes("approved")  && (
                                   <button className="btn btn-sm btn-link text-primary p-0 ms-2 text-decoration-none fw-bold" onClick={() => setReviewFileId(file.id)}>Review</button>
                                 )}
                               </div>
@@ -267,10 +278,28 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                                 {fileReviews.map(review => (
                                   <div key={review.id} className="smaller p-2 bg-light rounded-2 mb-2">
                                     <div className="d-flex justify-content-between mb-1">
-                                      <span className="fw-bold">{users.find(u => u.id === review.reviewerId)?.name}</span>
-                                      <span className="text-muted" style={{fontSize: '0.65rem'}}>{review.reviewedAt}</span>
+                                      <span className="fw-bold">{users.find(u => u.id === review.reviewer)?.name}</span>
+                                      <span className="text-muted" style={{fontSize: '0.65rem'}}>{review.reviewed_at}</span>
                                     </div>
                                     <div className="text-secondary">{review.comments}</div>
+                                      {/* 👇 ADD THIS PART HERE */}
+    {review.reviewer === currentUser.id && (
+      <button
+        className="btn btn-sm btn-link text-danger p-0"
+        onClick={async () => {
+          try {
+            await axiosInstance.delete(`/task-reviews/${review.id}/`);
+            setReviews(prev =>
+              prev.filter(r => r.id !== review.id)
+            );
+          } catch (err) {
+            console.error("Delete failed", err);
+          }
+        }}
+      >
+        Delete
+      </button>
+    )}
                                   </div>
                                 ))}
                               </div>
@@ -299,7 +328,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
                   {reviewFileId && (
                     <div className="card bg-white border shadow-sm p-3 rounded-3">
-                      <h6 className="fw-bold mb-3 small text-uppercase text-primary">Review: {files.find(f => f.id === reviewFileId)?.filePath}</h6>
+                      <h6 className="fw-bold mb-3 small text-uppercase text-primary">Review: {files.find(f => f.id === reviewFileId)?.file_path}</h6>
                       <form onSubmit={reviewForm.handleSubmit} noValidate>
                         <div className="mb-3">
                           <FormField

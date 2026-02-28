@@ -19,51 +19,46 @@ class LeadViewSet(viewsets.ModelViewSet):
             return Lead.objects.all()
         # Sales Executives only see leads assigned to them
         return Lead.objects.filter(assignments__sales_exec=user)
-
+ 
     @action(detail=True, methods=['post'], permission_classes=[IsSalesManager])
     def convert_to_project(self, request, pk=None):
-        """
-        Custom action to convert a Lead into a Project.
-        Expects project details (department, manager, dates) in request body.
-        """
-        lead = self.get_object()
-        if lead.status == 'converted':
-            return Response({'error': 'Lead is already converted'}, status=status.HTTP_400_BAD_REQUEST)
 
-        with transaction.atomic():
-            # Create the project based on lead data and additional params
-            project_data = {
-                'name': f"Project: {lead.name}",
-                'client': request.data.get('client_id'), # Should exist or be created
-                'department': request.data.get('department_id'),
-                'project_manager': request.data.get('manager_id'),
-                'created_by': request.user.id,
-                'start_date': request.data.get('start_date'),
-                'end_date': request.data.get('end_date'),
-                'status': 'not_started'
-            }
-            
-            # Simple simulation of project creation for the placeholder
-            # In production, use ProjectSerializer to validate and save
-            project = Project.objects.create(
-                name=project_data['name'],
-                client_id=project_data['client'],
-                department_id=project_data['department'],
-                project_manager_id=project_data['project_manager'],
-                created_by_id=project_data['created_by'],
-                start_date=project_data['start_date'],
-                end_date=project_data['end_date']
-            )
+     lead = self.get_object()
 
-            # Update lead status
-            lead.status = 'converted'
-            lead.converted_project = project
-            lead.save()
+     if lead.status == "converted":
+        return Response(
+            {"error": "Lead already converted"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-            return Response({
-                'message': 'Lead converted successfully',
-                'project_id': project.id
-            }, status=status.HTTP_201_CREATED)
+     if not lead.client:
+        return Response(
+            {"error": "Lead must be linked to a client before conversion"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+     with transaction.atomic():
+
+        project = Project.objects.create(
+            name=f"Project: {lead.name}",
+            client=lead.client,
+            department_id=1,
+            project_manager=request.user,
+            created_by=request.user,
+            start_date=timezone.now().date()
+        )
+
+        lead.status = "converted"
+        lead.converted_project = project
+        lead.save()
+
+        return Response(
+            {
+                "message": "Lead converted successfully",
+                "project_id": project.id
+            },
+            status=status.HTTP_201_CREATED
+        )
 
 class LeadFollowupViewSet(viewsets.ModelViewSet):
     queryset = LeadFollowup.objects.all()

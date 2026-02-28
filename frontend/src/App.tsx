@@ -121,7 +121,7 @@ const App: React.FC = () => {
         const done = projTasks.filter((t) => t.status === TaskStatus.DONE).length;
         const progress = Math.round((done / projTasks.length) * 100);
 
-        if (proj.progressPercentage === progress) return proj;
+        if (proj.progress_percentage === progress) return proj;
 
         return { ...proj, progressPercentage: progress };
       })
@@ -225,7 +225,7 @@ const App: React.FC = () => {
       <Route path="/projects/:id/kanban" element={<ProtectedRoute requiredPermission={Permission.MANAGE_TASKS}><Layout ><ProjectKanbanPage projects={projects} tasks={tasks} setTasks={setTasks} milestones={milestones} users={users} crud={taskCrud} taskTypes={taskTypes} currentUser={users[0]} /></Layout></ProtectedRoute>} />
           <Route path="/tasks" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout ><TasksPage tasks={tasks} setTasks={setTasks} milestones={milestones} projects={projects} taskTypes={taskTypes} users={users} crud={taskCrud} currentUser={users[0]} /></Layout></ProtectedRoute>} />
           <Route path="/clients" element={<ProtectedRoute requiredPermission={Permission.VIEW_CLIENTS}><Layout ><ClientsPage clients={clients} crud={clientCrud} /></Layout></ProtectedRoute>} />
-          <Route path="/crm" element={<ProtectedRoute requiredPermission={Permission.VIEW_LEADS}><Layout ><LeadsPage leads={leads} crud={leadCrud} users={users} /></Layout></ProtectedRoute>} />
+          <Route path="/crm" element={<ProtectedRoute requiredPermission={Permission.VIEW_LEADS}><Layout ><LeadsPage leads={leads} crud={leadCrud} users={users}  /></Layout></ProtectedRoute>} />
          <Route path="/seo" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout><SEOPage /></Layout></ProtectedRoute>} />
         <Route path="/admin/users" element={<ProtectedRoute requiredPermission={Permission.MANAGE_USERS}><Layout><UsersPage users={users} roles={roles} departments={departments} crud={userCrud} /></Layout></ProtectedRoute>} />
         <Route

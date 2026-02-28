@@ -65,6 +65,7 @@ class TaskProgress(models.Model):
 class TaskFile(SoftDeleteModel):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='files')
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    file = models.FileField(upload_to='task_files/', null=True, blank=True)
     file_path = models.CharField(max_length=255)
     file_type = models.CharField(max_length=50)
     revision_no = models.IntegerField(default=1)

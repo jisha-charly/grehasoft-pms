@@ -7,6 +7,8 @@ from core.permissions import IsProjectManager
 from django.db import IntegrityError
 from rest_framework.permissions import IsAuthenticated
 from apps.projects.utils import log_system_activity
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.exceptions import PermissionDenied
 class TaskTypeViewSet(viewsets.ModelViewSet):
     queryset = TaskType.objects.all()
     serializer_class = TaskTypeSerializer
@@ -103,6 +105,7 @@ class TaskFileViewSet(viewsets.ModelViewSet):
     queryset = TaskFile.objects.all()
     serializer_class = TaskFileSerializer
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]  # ✅ IMPORTANT
 
 class TaskCommentViewSet(viewsets.ModelViewSet):
     queryset = TaskComment.objects.all()
@@ -115,4 +118,25 @@ class TaskCommentViewSet(viewsets.ModelViewSet):
 class TaskReviewViewSet(viewsets.ModelViewSet):
     queryset = TaskReview.objects.all()
     serializer_class = TaskReviewSerializer
-    permission_classes = [IsProjectManager]
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(reviewer=self.request.user)
+
+    def get_queryset(self):
+     queryset = super().get_queryset()
+     task_id = self.request.query_params.get("task")
+
+     if task_id:
+      queryset = queryset.filter(task_file__task=task_id)
+
+     return queryset
+    def perform_update(self, serializer):
+        if self.request.user != serializer.instance.reviewer:
+            raise PermissionDenied("You can edit only your own review.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if self.request.user != instance.reviewer:
+            raise PermissionDenied("You can delete only your own review.")
+        instance.delete()
