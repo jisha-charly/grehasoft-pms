@@ -26,7 +26,7 @@ class ClientViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
    
     def perform_create(self, serializer):
-     serializer.save(created_by=self.request.user)
+     serializer.save()
 
 class MilestoneViewSet(viewsets.ModelViewSet):
     queryset = Milestone.objects.all()

@@ -2,12 +2,12 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Lead, LeadFollowup, LeadAssignment
-from .serializers import LeadSerializer, LeadFollowupSerializer
+from .serializers import LeadSerializer, LeadFollowupSerializer,LeadAssignmentSerializer
 from apps.projects.models import Project
 from apps.projects.serializers import ProjectSerializer
 from core.permissions import IsSalesManager
 from django.db import transaction
-
+from django.utils import timezone
 class LeadViewSet(viewsets.ModelViewSet):
     queryset = Lead.objects.all()
     serializer_class = LeadSerializer
@@ -40,12 +40,15 @@ class LeadViewSet(viewsets.ModelViewSet):
      with transaction.atomic():
 
         project = Project.objects.create(
-            name=f"Project: {lead.name}",
-            client=lead.client,
-            department_id=1,
-            project_manager=request.user,
-            created_by=request.user,
-            start_date=timezone.now().date()
+           name=request.data.get("name"),
+    client=lead.client,
+    department_id=request.data.get("department"),
+    project_manager_id=request.data.get("project_manager"),
+    created_by=request.user,
+    start_date=request.data.get("start_date"),
+    end_date=request.data.get("end_date"),  # ✅ THIS FIXES YOUR ERROR
+    status=request.data.get("status", "not_started"),
+    progress_percentage=request.data.get("progress_percentage", 0)
         )
 
         lead.status = "converted"
@@ -72,4 +75,14 @@ class LeadFollowupViewSet(viewsets.ModelViewSet):
         lead_id = self.request.query_params.get('lead_id')
         if lead_id:
             return LeadFollowup.objects.filter(lead_id=lead_id)
+        return super().get_queryset()
+class LeadAssignmentViewSet(viewsets.ModelViewSet):
+    queryset = LeadAssignment.objects.all()
+    serializer_class = LeadAssignmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        lead_id = self.request.query_params.get('lead_id')
+        if lead_id:
+            return LeadAssignment.objects.filter(lead_id=lead_id)
         return super().get_queryset()

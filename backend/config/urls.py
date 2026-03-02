@@ -3,7 +3,7 @@ from django.urls import path, include
 from rest_framework import routers
 from apps.projects.views import ProjectViewSet, ClientViewSet,MilestoneViewSet,ProjectMemberViewSet,ActivityLogViewSet
 from apps.users.views import UserViewSet, RoleViewSet, DepartmentViewSet
-from apps.crm.views import LeadViewSet, LeadFollowupViewSet
+from apps.crm.views import LeadViewSet, LeadFollowupViewSet,LeadAssignmentViewSet
 from apps.tasks.views import (
     TaskViewSet, TaskTypeViewSet, TaskFileViewSet, 
     TaskCommentViewSet, TaskReviewViewSet
@@ -38,6 +38,7 @@ router.register(r'departments', DepartmentViewSet)
 # CRM & Sales
 router.register(r'leads', LeadViewSet)
 router.register(r'lead-followups', LeadFollowupViewSet)
+router.register(r'lead-assignments', LeadAssignmentViewSet, basename='lead-assignments')
 
 # Task Management & Collaboration
 router.register(r'tasks', TaskViewSet)

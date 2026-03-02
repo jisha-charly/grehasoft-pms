@@ -10,7 +10,7 @@ import ProjectsPage from "./pages/projects/ProjectsPage";
 import ProjectDetailsPage from "./pages/projects/ProjectDetailsPage";
 import ProjectKanbanPage from "./pages/projects/ProjectKanbanPage";
 import TasksPage from "./pages/tasks/TasksPage";
-import LeadsPage from "./pages/crm/LeadsPage";
+import LeadsPage from "./pages/crm/Leadspage";
 import ClientsPage from "./pages/clients/ClientsPage";
 import SEOPage from "./pages/seo/SEOPage";
 import UsersPage from "./pages/admin/users/UsersPage";
@@ -156,7 +156,57 @@ const App: React.FC = () => {
   const projectCrud = createCrud("/projects", setProjects);
   const taskCrud = createCrud("/tasks", setTasks);
   const clientCrud = createCrud("/clients", setClients);
-  const leadCrud = createCrud("/leads", setLeads);
+const leadCrud = {
+  ...createCrud("/leads", setLeads),
+
+convert: async (
+  leadId: number,
+  clientData: any,
+  projectData: any
+) => {
+  try {
+    let clientId: number | null = null;
+
+    // 🔹 Always create client (or adjust logic if needed)
+    const clientRes = await axiosInstance.post("/clients/", {
+      name: clientData.name,
+      company_name: clientData.companyName,
+      email: clientData.email,
+      phone: clientData.phone,
+      address: clientData.address,
+    });
+
+    clientId = clientRes.data.id;
+
+    // 🔹 Update lead with new client
+    await axiosInstance.patch(`/leads/${leadId}/`, {
+      client: clientId,
+    });
+
+    // 🔹 Convert lead to project
+    const convertRes = await axiosInstance.post(
+      `/leads/${leadId}/convert_to_project/`,
+      {
+         name: projectData.name,
+    client: clientId,
+    department: projectData.departmentId,
+    project_manager: projectData.projectManagerId,
+    created_by: projectData.createdBy,
+    start_date: projectData.startDate,
+    end_date: projectData.endDate,
+    status: projectData.status,
+    progress_percentage: projectData.progressPercentage
+      }
+    );
+
+    return convertRes.data;
+
+  } catch (error) {
+    console.error("Conversion failed:", error);
+    throw error;
+  }
+}
+};
   const roleCrud = createCrud("/roles", setRoles);
   const deptCrud = createCrud("/departments", setDepartments);
   const taskTypeCrud = createCrud("/task-types", setTaskTypes);
@@ -225,7 +275,14 @@ const App: React.FC = () => {
       <Route path="/projects/:id/kanban" element={<ProtectedRoute requiredPermission={Permission.MANAGE_TASKS}><Layout ><ProjectKanbanPage projects={projects} tasks={tasks} setTasks={setTasks} milestones={milestones} users={users} crud={taskCrud} taskTypes={taskTypes} currentUser={users[0]} /></Layout></ProtectedRoute>} />
           <Route path="/tasks" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout ><TasksPage tasks={tasks} setTasks={setTasks} milestones={milestones} projects={projects} taskTypes={taskTypes} users={users} crud={taskCrud} currentUser={users[0]} /></Layout></ProtectedRoute>} />
           <Route path="/clients" element={<ProtectedRoute requiredPermission={Permission.VIEW_CLIENTS}><Layout ><ClientsPage clients={clients} crud={clientCrud} /></Layout></ProtectedRoute>} />
-          <Route path="/crm" element={<ProtectedRoute requiredPermission={Permission.VIEW_LEADS}><Layout ><LeadsPage leads={leads} crud={leadCrud} users={users}  /></Layout></ProtectedRoute>} />
+          <Route path="/crm" element={<ProtectedRoute requiredPermission={Permission.VIEW_LEADS}><Layout ><LeadsPage leads={leads}
+  crud={leadCrud}
+  users={users}
+  clients={clients}
+  clientCrud={clientCrud}
+  projects={projects}
+  projectCrud={projectCrud}
+  departments={departments}     /></Layout></ProtectedRoute>} />
          <Route path="/seo" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout><SEOPage /></Layout></ProtectedRoute>} />
         <Route path="/admin/users" element={<ProtectedRoute requiredPermission={Permission.MANAGE_USERS}><Layout><UsersPage users={users} roles={roles} departments={departments} crud={userCrud} /></Layout></ProtectedRoute>} />
         <Route
