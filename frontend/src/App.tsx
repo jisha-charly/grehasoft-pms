@@ -201,11 +201,29 @@ convert: async (
 
     return convertRes.data;
 
-  } catch (error) {
+  }
+  
+   catch (error) {
     console.error("Conversion failed:", error);
     throw error;
   }
-}
+},
+
+  // ✅ ADD THIS METHOD
+  assign: async (leadId: number, execId: number) => {
+    try {
+      const res = await axiosInstance.post("/lead-assignments/", {
+        lead: leadId,
+        sales_exec: execId,
+      });
+
+      return res.data;
+    } catch (error) {
+      console.error("Assignment failed:", error);
+      throw error;
+    }
+  }
+
 };
   const roleCrud = createCrud("/roles", setRoles);
   const deptCrud = createCrud("/departments", setDepartments);

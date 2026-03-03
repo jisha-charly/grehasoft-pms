@@ -243,6 +243,11 @@ export interface LeadAssignment {
   lead_id: number;
   sales_exec_id: number;
   assigned_at: string;
+    // ✅ ADD THIS
+  sales_exec_details?: {
+    id: number;
+    name: string;
+  };
 }
 
 export interface LeadFollowup {

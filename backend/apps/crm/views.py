@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status, permissions
+from rest_framework import viewsets, status, permissions,filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Lead, LeadFollowup, LeadAssignment
@@ -8,6 +8,7 @@ from apps.projects.serializers import ProjectSerializer
 from core.permissions import IsSalesManager
 from django.db import transaction
 from django.utils import timezone
+from django_filters.rest_framework import DjangoFilterBackend
 class LeadViewSet(viewsets.ModelViewSet):
     queryset = Lead.objects.all()
     serializer_class = LeadSerializer
@@ -67,15 +68,19 @@ class LeadFollowupViewSet(viewsets.ModelViewSet):
     queryset = LeadFollowup.objects.all()
     serializer_class = LeadFollowupSerializer
     permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['lead', 'status', 'followup_type']
+    search_fields = ['notes']
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
-    def get_queryset(self):
-        lead_id = self.request.query_params.get('lead_id')
-        if lead_id:
-            return LeadFollowup.objects.filter(lead_id=lead_id)
-        return super().get_queryset()
+    #def get_queryset(self):
+      #  lead_id = self.request.query_params.get('lead_id')
+       # if lead_id:
+       #     return LeadFollowup.objects.filter(lead_id=lead_id)
+        #return super().get_queryset()
+    
 class LeadAssignmentViewSet(viewsets.ModelViewSet):
     queryset = LeadAssignment.objects.all()
     serializer_class = LeadAssignmentSerializer

@@ -3,7 +3,7 @@ import { Lead, LeadAssignment, LeadFollowup, User, UserRole, Client, Project, De
 import axiosInstance from '../../api/axiosInstance';
 import { useForm } from '../../hooks/useForm';
 import FormField from '../../components/FormField';
-
+import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 interface LeadsPageProps {
   leads: Lead[];
   crud: any;
@@ -33,6 +33,11 @@ const LeadsPage: React.FC<LeadsPageProps> = ({
   const [assignments, setAssignments] = useState<LeadAssignment[]>([]);
   const [followups, setFollowups] = useState<LeadFollowup[]>([]);
   const [isDetailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [leadList, setLeadList] = useState<Lead[]>(leads || []);
+  const [searchTerm, setSearchTerm] = useState("");
+const [statusFilter, setStatusFilter] = useState("");
+const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+const [leadToDelete, setLeadToDelete] = useState<Lead | null>(null);
 const currentUserId = users?.[0]?.id || null;
   const salesExecs = (users || []).filter
   (u =>  u.role_name === UserRole.SALES_EXECUTIVE ||
@@ -46,19 +51,38 @@ const currentUserId = users?.[0]?.id || null;
     }
   }, [selectedLead]);
 
-  const fetchLeadDetails = async (leadId: number) => {
-    try {
-      const [assignRes, followRes] = await Promise.all([
-        axiosInstance.get(`/leads/${leadId}/assignments`),
-        axiosInstance.get(`/leads/${leadId}/followups`)
-      ]);
-      setAssignments(assignRes.data);
-      setFollowups(followRes.data);
-    } catch (error) {
-      console.error("Error fetching lead details:", error);
-    }
-  };
+ const fetchLeadDetails = async (leadId: number) => {
+  try {
+    const [assignRes, followRes] = await Promise.all([
+      axiosInstance.get(`/lead-assignments/?lead_id=${leadId}`),
+      axiosInstance.get(`/lead-followups/?lead_id=${leadId}`)
+    ]);
 
+    setAssignments(assignRes.data);
+    setFollowups(followRes.data);
+
+  } catch (error) {
+    console.error("Error fetching lead details:", error);
+  }
+};
+  
+useEffect(() => {
+  fetchLeads();
+}, [searchTerm, statusFilter]);
+
+  const fetchLeads = async () => {
+  const params: any = {};
+
+  if (searchTerm) params.search = searchTerm;
+
+  // ✅ do NOT send status if it's "all"
+  if (statusFilter && statusFilter !== "all") {
+    params.status = statusFilter;
+  }
+
+  const res = await axiosInstance.get("/leads/", { params });
+  setLeadList(res.data);
+};
   const validationSchema = {
     name: {
       required: true,
@@ -106,27 +130,49 @@ const currentUserId = users?.[0]?.id || null;
   });
 
   const handleAddFollowup = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!selectedLead) return;
-    const formData = new FormData(e.currentTarget);
-    const data = Object.fromEntries(formData.entries());
+  e.preventDefault();
+  if (!selectedLead) return;
 
-    try {
-      await axiosInstance.post('/lead-followups', {
-        lead_id: selectedLead.id,
-        followup_type: data.followup_type,
-        notes: data.notes,
-        next_followup: data.next_followup,
-        status: 'pending',
-        created_by:  currentUserId // Mocking current user
-      });
-      fetchLeadDetails(selectedLead.id);
-      (e.target as HTMLFormElement).reset();
-    } catch (error) {
-      console.error("Error adding followup:", error);
-    }
-  };
+  const formData = new FormData(e.currentTarget);
+  const data = Object.fromEntries(formData.entries());
 
+  try {
+    await axiosInstance.post('/lead-followups/', {
+      lead: selectedLead.id,
+      followup_type: data.followup_type,
+      notes: data.notes,
+      next_followup: data.next_followup || null,
+      status: 'pending'
+    });
+
+    await fetchLeadDetails(selectedLead.id);
+    (e.target as HTMLFormElement).reset();
+
+  } catch (error) {
+    console.error("Error adding followup:", error);
+  }
+};
+ const handleDeleteClick = (lead: Lead) => {
+  setLeadToDelete(lead);
+  setDeleteModalOpen(true);
+};
+
+const handleConfirmDelete = async () => {
+  if (!leadToDelete) return;
+
+  try {
+    await crud.delete(leadToDelete.id);
+
+    // remove from local list
+    setLeadList(prev => prev.filter(l => l.id !== leadToDelete.id));
+
+  } catch (error) {
+    console.error("Delete failed:", error);
+  }
+
+  setDeleteModalOpen(false);
+  setLeadToDelete(null);
+};
   const handleEdit = (lead: Lead) => {
     setEditingLead(lead);
     setValues({
@@ -237,8 +283,43 @@ await axiosInstance.get("/leads/"); // or whatever your list function is
     setSelectedLead(lead);
     setDetailsModalOpen(true);
   };
+  
+ const stats = {
+  total: leadList.length,
+  new: leadList.filter(l => l.status === 'new').length,
+  contacted: leadList.filter(l => l.status === 'contacted').length,
+  qualified: leadList.filter(l => l.status === 'qualified').length,
+  converted: leadList.filter(l => l.status === 'converted').length,
+};
 
   return (
+     <>
+    <div className="container-fluid p-0">
+      {/* Pipeline Summary */}
+      <div className="row g-3 mb-4">
+        {[
+          { label: 'Total Leads', count: stats.total, color: 'primary', icon: 'people' },
+          { label: 'New', count: stats.new, color: 'info', icon: 'plus-circle' },
+          { label: 'Contacted', count: stats.contacted, color: 'warning', icon: 'telephone' },
+          { label: 'Qualified', count: stats.qualified, color: 'indigo', icon: 'check-circle' },
+          { label: 'Converted', count: stats.converted, color: 'success', icon: 'briefcase' },
+        ].map((s, i) => (
+          <div key={i} className="col">
+            <div className="card border-0 shadow-sm p-3">
+              <div className="d-flex align-items-center">
+                <div className={`bg-${s.color}-subtle text-${s.color} rounded-3 p-2 me-3`}>
+                  <i className={`bi bi-${s.icon} fs-5`}></i>
+                </div>
+                <div>
+                  <div className="text-secondary smaller fw-bold uppercase">{s.label}</div>
+                  <div className="fs-4 fw-bold text-dark">{s.count}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      </div>
     <div className="card shadow-sm border-0">
       <div className="card-header bg-white border-0 py-4 px-4 d-flex justify-content-between align-items-center">
         <div>
@@ -249,7 +330,36 @@ await axiosInstance.get("/leads/"); // or whatever your list function is
           <i className="bi bi-person-plus me-2"></i>New Lead
         </button>
       </div>
-
+ <div className="px-4 pb-3 border-bottom">
+        <div className="row g-3">
+          <div className="col-md-4">
+            <div className="input-group input-group-sm">
+              <span className="input-group-text bg-light border-0"><i className="bi bi-search text-muted"></i></span>
+              <input 
+                type="text" 
+                className="form-control bg-light border-0" 
+                placeholder="Search leads..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="col-md-3">
+            <select 
+              className="form-select form-select-sm bg-light border-0"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">All Statuses</option>
+              <option value="new">New</option>
+              <option value="contacted">Contacted</option>
+              <option value="qualified">Qualified</option>
+              <option value="converted">Converted</option>
+              <option value="lost">Lost</option>
+            </select>
+          </div>
+        </div>
+      </div>
       <div className="table-responsive">
         <table className="table table-professional align-middle mb-0">
           <thead>
@@ -262,7 +372,21 @@ await axiosInstance.get("/leads/"); // or whatever your list function is
             </tr>
           </thead>
           <tbody>
-           {(leads || []).map(lead => (
+           {leadList
+  .filter(lead => {
+    const matchesSearch =
+      lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lead.phone && lead.phone.includes(searchTerm));
+
+    const matchesStatus =
+      !statusFilter || statusFilter === "all"
+        ? true
+        : lead.status === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  })
+  .map(lead => (
               <tr key={lead.id} className="hover-bg-light transition">
                 <td className="px-4 fw-bold text-dark">
                   {lead.name}
@@ -295,9 +419,14 @@ await axiosInstance.get("/leads/"); // or whatever your list function is
                     <button className="btn btn-sm btn-white border-end" onClick={() => handleEdit(lead)} title="Edit Lead">
                       <i className="bi bi-pencil text-primary"></i>
                     </button>
-                    <button className="btn btn-sm btn-white" onClick={() => { if(confirm('Are you sure?')) crud.delete(lead.id); }} title="Delete Lead">
-                      <i className="bi bi-trash text-danger"></i>
-                    </button>
+                   <button
+  className="btn btn-sm btn-white"
+  onClick={() => handleDeleteClick(lead)}
+  title="Delete Lead"
+>
+  <i className="bi bi-trash text-danger"></i>
+</button>
+                      
                   </div>
                 </td>
               </tr>
@@ -443,15 +572,16 @@ await axiosInstance.get("/leads/"); // or whatever your list function is
                         <p className="text-muted smaller italic">No executives assigned yet.</p>
                       ) : (
                         <ul className="list-group list-group-flush">
-                          {assignments.map(a => {
-                            const exec = users.find(u => u.id === a.sales_exec_id);
-                            return (
-                              <li key={a.id} className="list-group-item bg-transparent px-0 py-2 border-0">
-                                <div className="fw-bold small">{exec?.name || 'Unknown'}</div>
-                                <div className="smaller text-muted">Assigned: {new Date(a.assigned_at).toLocaleDateString()}</div>
-                              </li>
-                            );
-                          })}
+                          {assignments.map(a => (
+  <li key={a.id} className="list-group-item bg-transparent px-0 py-2 border-0">
+    <div className="fw-bold small">
+      {a.sales_exec_details?.name || 'Unknown'}
+    </div>
+    <div className="smaller text-muted">
+      Assigned: {new Date(a.assigned_at).toLocaleDateString()}
+    </div>
+  </li>
+))}
                         </ul>
                       )}
                     </div>
@@ -603,6 +733,21 @@ await axiosInstance.get("/leads/"); // or whatever your list function is
         </div>
       )}
     </div>
+
+
+    {deleteModalOpen && leadToDelete && (
+  <DeleteConfirmModal
+    isOpen={deleteModalOpen}
+    title="Delete Lead"
+    message={`Are you sure you want to delete "${leadToDelete.name}"? This action cannot be undone.`}
+    onClose={() => {
+      setDeleteModalOpen(false);
+      setLeadToDelete(null);
+    }}
+    onConfirm={handleConfirmDelete}
+  />
+)}
+     </>
   );
 };
 
