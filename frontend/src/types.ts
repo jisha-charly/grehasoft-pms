@@ -114,7 +114,7 @@ export interface User {
 
   password?: string;
 
-  role: number | null;           // ✅ FK ID
+          // ✅ FK ID
   role_name?: string;            // ✅ readable name
 
   department: number | null;     // ✅ FK ID
@@ -124,6 +124,7 @@ export interface User {
 
   date_joined?: string;
   last_login?: string;
+  role: UserRole
 }
 
 

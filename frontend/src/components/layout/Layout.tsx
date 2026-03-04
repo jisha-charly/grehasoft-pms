@@ -24,11 +24,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   ];
 
   const adminItems = [
-    { label: 'Users', path: '/admin/users' },
-    { label: 'Roles', path: '/admin/roles' },
-    { label: 'Departments', path: '/admin/departments' },
-    { label: 'Task Types', path: '/admin/task-types' },
-  ];
+  { label: 'Users', path: '/admin/users', icon: 'bi-people' },
+  { label: 'Roles', path: '/admin/roles', icon: 'bi-person-badge' },
+  { label: 'Departments', path: '/admin/departments', icon: 'bi-diagram-3' },
+  { label: 'Task Types', path: '/admin/task-types', icon: 'bi-list-task' },
+];
 
   const handleLogout = () => {
     logout();
@@ -47,7 +47,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="collapse navbar-collapse" id="navbarNav">
             <ul className="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4">
               {navItems
-                .filter(item => item.roles.includes(user.role as UserRole))
+               .filter(item => user?.role && item.roles.includes(user.role as UserRole))
                 .map((item) => (
                   <li className="nav-item" key={item.path}>
                     <Link
@@ -78,9 +78,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <ul className="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3">
                     {adminItems.map(item => (
                       <li key={item.path}>
-                        <Link className="dropdown-item py-2 small fw-medium" to={item.path}>
-                          {item.label}
-                        </Link>
+                       <Link className="dropdown-item py-2 small fw-medium d-flex align-items-center" to={item.path}>
+  <i className={`bi ${item.icon} me-2`}></i>
+  {item.label}
+</Link>
                       </li>
                     ))}
                   </ul>

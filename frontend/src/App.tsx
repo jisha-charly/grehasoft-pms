@@ -17,7 +17,7 @@ import UsersPage from "./pages/admin/users/UsersPage";
 import RolesPage from "./pages/admin/roles/RolesPage";
 import DepartmentsPage from "./pages/admin/departments/DepartmentsPage";
 import TaskTypesPage from "./pages/admin/task-types/TaskTypesPage";
-
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import {
   TaskStatus,
   Task,
@@ -335,6 +335,8 @@ convert: async (
               </ProtectedRoute>
             }
           />
+
+          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

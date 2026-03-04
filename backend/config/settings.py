@@ -26,7 +26,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'django_filters',
-    
+    'django_rest_passwordreset',
     # Local apps
     'apps.users',
     'apps.projects',
@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'apps.activity',
     'apps.reports',
     'apps.seo',
+    'core.apps.CoreConfig',
 ]
 
 
@@ -142,3 +143,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOW_ALL_ORIGINS = True
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+EMAIL_HOST_USER = 'jisha.charly@gmail.com'
+EMAIL_HOST_PASSWORD = 'uogkyzlolsjarpcf'
+
+DEFAULT_FROM_EMAIL = 'Grehasoft PMS <yourgmail@gmail.com>'

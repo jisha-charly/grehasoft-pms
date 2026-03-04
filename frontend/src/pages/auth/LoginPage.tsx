@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
-
+import axiosInstance from "../../api/axiosInstance";
 const LoginPage: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -43,6 +43,20 @@ const [email, setEmail] = useState('');
     navigate(from, { replace: true });
   } catch {
     setError('Invalid username or password');
+  }
+};
+
+const sendResetLink = async () => {
+  try {
+    await axiosInstance.post("/password_reset/", {
+      email: email
+    });
+
+    alert("Reset link sent to your email");
+    setShowReset(false);
+
+  } catch {
+    alert("Email not found");
   }
 };
 
@@ -148,21 +162,21 @@ Forgot password?
           </p>
 
           <input
-            type="email"
-            className="form-control"
-            placeholder="name@company.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+  type="email"
+  className="form-control"
+  placeholder="name@company.com"
+  value={email}
+  onChange={(e) => setEmail(e.target.value)}
+/>
         </div>
 
         <div className="modal-footer">
-          <button
-            className="btn btn-primary w-100"
-            onClick={() => alert("Reset link sent")}
-          >
-            Send Reset Link
-          </button>
+         <button
+  className="btn btn-primary w-100"
+  onClick={sendResetLink}
+>
+  Send Reset Link
+</button>
         </div>
       </div>
     </div>
