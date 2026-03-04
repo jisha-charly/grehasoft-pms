@@ -9,21 +9,42 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>(UserRole.SUPER_ADMIN);
   const [error, setError] = useState('');
+  const [errors, setErrors] = useState({
+  username: '',
+  password: ''
+});
+const [showReset, setShowReset] = useState(false);
+const [email, setEmail] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = (location.state as any)?.from?.pathname || "//dashboard";
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await login(username,  password);
-      navigate(from, { replace: true });
-    } catch (err) {
-      setError('Invalid credentials');
-    }
-  };
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  let newErrors = { username: '', password: '' };
+
+  if (!username.trim()) {
+    newErrors.username = "Username is required";
+  }
+
+  if (!password.trim()) {
+    newErrors.password = "Password is required";
+  }
+
+  setErrors(newErrors);
+
+  if (newErrors.username || newErrors.password) return;
+
+  try {
+    await login(username, password);
+    navigate(from, { replace: true });
+  } catch {
+    setError('Invalid username or password');
+  }
+};
 
   return (
     <div className="d-flex align-items-center justify-content-center vh-100 bg-light">
@@ -39,35 +60,49 @@ const LoginPage: React.FC = () => {
 
           {error && <div className="alert alert-danger py-2 small border-0">{error}</div>}
 
-          <form onSubmit={handleSubmit}>
-            <div className="mb-3">
-              <label className="form-label small fw-bold text-secondary uppercase tracking-wider">Username</label>
-              <div className="input-group">
-                <span className="input-group-text bg-light border-0 text-muted"><i className="bi bi-person"></i></span>
-                <input 
-                  type="text" 
-                  className="form-control form-control-lg bg-light border-0" 
-                  placeholder="e.g. alex_admin" 
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required 
-                />
-              </div>
-            </div>
-            <div className="mb-3">
-              <label className="form-label small fw-bold text-secondary uppercase tracking-wider">Password</label>
-              <div className="input-group">
-                <span className="input-group-text bg-light border-0 text-muted"><i className="bi bi-key"></i></span>
-                <input 
-                  type="password" 
-                  className="form-control form-control-lg bg-light border-0" 
-                  placeholder="••••••••" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required 
-                />
-              </div>
-            </div>
+         <form onSubmit={handleSubmit} noValidate>
+          <div className="mb-3">
+  <label className="form-label small fw-bold text-secondary uppercase tracking-wider">Username</label>
+  <div className="input-group">
+    <span className="input-group-text bg-light border-0 text-muted">
+      <i className="bi bi-person"></i>
+    </span>
+
+    <input 
+      type="text" 
+      className="form-control form-control-lg bg-light border-0" 
+      placeholder="e.g. alex_admin" 
+      value={username}
+      onChange={(e) => setUsername(e.target.value)}
+    />
+  </div>
+
+  {errors.username && (
+    <div className="text-danger small mt-1">{errors.username}</div>
+  )}
+</div><div className="mb-3">
+  <label className="form-label small fw-bold text-secondary uppercase tracking-wider">
+    Password
+  </label>
+
+  <div className="input-group">
+    <span className="input-group-text bg-light border-0 text-muted">
+      <i className="bi bi-key"></i>
+    </span>
+
+    <input
+      type="password"
+      className="form-control form-control-lg bg-light border-0"
+      placeholder="••••••••"
+      value={password}
+      onChange={(e) => setPassword(e.target.value)}
+    />
+  </div>
+
+  {errors.password && (
+    <div className="text-danger small mt-1">{errors.password}</div>
+  )}
+</div>
             <div className="mb-4">
               <label className="form-label small fw-bold text-secondary uppercase tracking-wider">Access Tier (Simulation)</label>
               <select 
@@ -86,10 +121,53 @@ const LoginPage: React.FC = () => {
           </form>
           
           <div className="mt-4 text-center">
-            <a href="#" className="text-decoration-none small text-muted hover-primary transition">Forgot password?</a>
+           <button
+  type="button"
+  className="btn btn-link small text-muted"
+  onClick={() => setShowReset(true)}
+>
+Forgot password?
+</button>
           </div>
         </div>
       </div>
+
+
+      {showReset && (
+  <div className="modal fade show d-block">
+    <div className="modal-dialog modal-dialog-centered">
+      <div className="modal-content border-0 shadow">
+        <div className="modal-header">
+          <h5 className="modal-title">Reset Password</h5>
+          <button className="btn-close" onClick={() => setShowReset(false)}></button>
+        </div>
+
+        <div className="modal-body">
+          <p className="small text-muted">
+            Enter your email and we'll send you a reset link.
+          </p>
+
+          <input
+            type="email"
+            className="form-control"
+            placeholder="name@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+
+        <div className="modal-footer">
+          <button
+            className="btn btn-primary w-100"
+            onClick={() => alert("Reset link sent")}
+          >
+            Send Reset Link
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };

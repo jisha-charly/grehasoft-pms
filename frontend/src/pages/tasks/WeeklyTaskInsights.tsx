@@ -15,22 +15,27 @@ interface WeeklyTaskInsightsProps {
 const COLORS = ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6610f2', '#fd7e14', '#20c997'];
 
 const WeeklyTaskInsights: React.FC<WeeklyTaskInsightsProps> = ({ tasks, users, projects }) => {
-  // Helper to get current week's tasks
-  const weeklyTasks = useMemo(() => {
-    const now = new Date('2026-02-19');
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
-    startOfWeek.setHours(0, 0, 0, 0);
-    
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6); // Saturday
-    endOfWeek.setHours(23, 59, 59, 999);
+  const now = new Date();
 
-    return tasks.filter(task => {
-      const dueDate = new Date(task.dueDate);
-      return dueDate >= startOfWeek && dueDate <= endOfWeek;
-    });
-  }, [tasks]);
+const startOfWeek = new Date(now);
+startOfWeek.setDate(now.getDate() - now.getDay());
+startOfWeek.setHours(0,0,0,0);
+
+const endOfWeek = new Date(startOfWeek);
+endOfWeek.setDate(startOfWeek.getDate() + 6);
+endOfWeek.setHours(23,59,59,999);
+  // Helper to get current week's tasks
+ const weeklyTasks = useMemo(() => {
+  return tasks.filter(task => {
+    const date = task.due_date || task.dueDate;
+
+    if (!date) return false;
+
+    const due = new Date(date);
+
+    return due >= startOfWeek && due <= endOfWeek;
+  });
+}, [tasks, startOfWeek, endOfWeek]);
 
   // 1. Task Status Distribution
   const statusData = useMemo(() => {
@@ -47,7 +52,9 @@ const WeeklyTaskInsights: React.FC<WeeklyTaskInsightsProps> = ({ tasks, users, p
   // 2. Workload by User
   const workloadData = useMemo(() => {
     return users.map(user => {
-      const userTasks = weeklyTasks.filter(t => t.assignees.includes(user.id));
+    const userTasks = weeklyTasks.filter(t => 
+  (t.assignees || []).includes(user.id)
+);
       return {
         name: user.name.split(' ')[0],
         tasks: userTasks.length,
@@ -62,12 +69,19 @@ const WeeklyTaskInsights: React.FC<WeeklyTaskInsightsProps> = ({ tasks, users, p
     const data = days.map(day => ({ name: day, completed: 0, total: 0 }));
     
     weeklyTasks.forEach(t => {
-      const dayIndex = new Date(t.dueDate).getDay();
-      data[dayIndex].total++;
-      if (t.status === TaskStatus.DONE) {
-        data[dayIndex].completed++;
-      }
-    });
+  if (!t.due_date) return;   // 🔹 prevent undefined error
+
+  const date = t.due_date || t.dueDate;
+if (!date) return;
+
+const dayIndex = new Date(date).getDay();
+
+  data[dayIndex].total++;
+
+  if (t.status === TaskStatus.DONE) {
+    data[dayIndex].completed++;
+  }
+});
     return data;
   }, [weeklyTasks]);
 
@@ -83,7 +97,10 @@ const WeeklyTaskInsights: React.FC<WeeklyTaskInsightsProps> = ({ tasks, users, p
       <div className="text-center py-5 bg-white rounded-4 shadow-sm border">
         <i className="bi bi-bar-chart text-muted fs-1 mb-3 d-block"></i>
         <h4 className="fw-bold">No tasks scheduled for this week</h4>
-        <p className="text-secondary">Try adding some tasks with due dates between Feb 15 and Feb 21, 2026.</p>
+       <p className="text-secondary">
+Try adding tasks with due dates between 
+{startOfWeek.toDateString()} and {endOfWeek.toDateString()}.
+</p>
       </div>
     );
   }

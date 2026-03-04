@@ -157,18 +157,32 @@ export interface Project {
 
 export interface Task {
   id: number;
-  projectId: number;
+
+  // relation fields
+  projectId?: number;          // used when creating
+  project_id?: number;         // from backend
+  project_name?: string;       // from backend
+
   milestoneId?: number;
+
   title: string;
   description: string;
+
   priority: 'low' | 'medium' | 'high';
   status: TaskStatus;
-  boardOrder: number;
-  dueDate: string;
+
+  boardOrder?: number;
+
+  dueDate?: string;            // camelCase (if used)
+  due_date?: string;           // snake_case from backend
+
   assignees: number[];
-  taskTypeId: number;
-  createdBy: number;
-  createdAt: string;
+
+  taskTypeId?: number;
+  task_type_name?: string;
+
+  createdBy?: number;
+ created_at?: string;
   updatedAt?: string;
   deletedAt?: string;
 }

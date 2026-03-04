@@ -230,6 +230,7 @@ const TasksPage: React.FC<TasksPageProps> = ({
                     <th>Priority</th>
                     <th>Project</th>
                     <th>Due Date</th>
+                        <th className="text-start pe-4">Actions</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -242,8 +243,7 @@ const TasksPage: React.FC<TasksPageProps> = ({
                     </tr>
                   ) : (
                     filteredTasks.map(task => {
-                      const projectName =
-                        projects.find(p => p.id === task.projectId)?.name || "Unknown";
+                     const projectName = task.project_name || "Unknown";
 
                       return (
                         <tr key={task.id}>
@@ -254,7 +254,11 @@ const TasksPage: React.FC<TasksPageProps> = ({
                           <td>{getStatusBadge(task.status)}</td>
                           <td>{getPriorityBadge(task.priority)}</td>
                           <td>{projectName}</td>
-                          <td>{task.dueDate}</td>
+                         <td>
+  {task.due_date
+    ? new Date(task.due_date).toLocaleDateString()
+    : "—"}
+</td>
                           <td>
                             {hasPermission(Permission.MANAGE_TASKS) && (
                               <button
