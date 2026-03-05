@@ -18,6 +18,7 @@ import RolesPage from "./pages/admin/roles/RolesPage";
 import DepartmentsPage from "./pages/admin/departments/DepartmentsPage";
 import TaskTypesPage from "./pages/admin/task-types/TaskTypesPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
+import ProfilePage from "./pages/profile/ProfilePage";
 import {
   TaskStatus,
   Task,
@@ -225,6 +226,52 @@ convert: async (
   }
 
 };
+
+const handleUpdatePassword = async (newPassword: string, currentPassword: string) => {
+  try {
+
+    await axiosInstance.post("/users/change-password/", {
+      currentPassword: currentPassword,
+      newPassword: newPassword
+    });
+
+    // add activity log
+    const logRes = await axiosInstance.post("/activity-logs/", {
+      action: "Changed Password",
+      projectId: 0
+    });
+
+    setActivityLogs((prev) => [logRes.data, ...prev]);
+
+  } catch (error) {
+    console.error("Error updating password:", error);
+  }
+};
+
+const handleUpdateProfile = async (data: any) => {
+  try {
+
+    await axiosInstance.patch(`/users/${data.id}/`, {
+      name: data.name,
+      email: data.email,
+      username: data.username
+    });
+
+    // get updated user
+    const res = await axiosInstance.get(`/users/${data.id}/`);
+
+    const logRes = await axiosInstance.post("/activity-logs/", {
+      action: "Updated Profile",
+      project: null,
+      user: res.data.id
+    });
+  
+    setActivityLogs((prev) => [logRes.data, ...prev]);
+
+  } catch (error) {
+    console.error("Error updating profile:", error);
+  }
+};
   const roleCrud = createCrud("/roles", setRoles);
   const deptCrud = createCrud("/departments", setDepartments);
   const taskTypeCrud = createCrud("/task-types", setTaskTypes);
@@ -337,7 +384,20 @@ convert: async (
           />
 
           <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-
+         <Route
+  path="/profile"
+  element={
+    <ProtectedRoute requiredPermission={Permission.VIEW_DASHBOARD}>
+      <Layout>
+        <ProfilePage
+          activityLogs={activityLogs}
+          onUpdatePassword={handleUpdatePassword}
+          onUpdateProfile={handleUpdateProfile}
+        />
+      </Layout>
+    </ProtectedRoute>
+  }
+/>
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>

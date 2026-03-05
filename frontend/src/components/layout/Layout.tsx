@@ -21,6 +21,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { label: 'Clients', path: '/clients', icon: 'bi-people', roles: [UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.SALES_MANAGER] },
     { label: 'CRM', path: '/crm', icon: 'bi-graph-up-arrow', roles: [UserRole.SUPER_ADMIN, UserRole.SALES_MANAGER, UserRole.SALES_EXECUTIVE] },
     { label: 'SEO', path: '/seo', icon: 'bi-search', roles: [UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.TEAM_MEMBER] },
+    
   ];
 
   const adminItems = [
@@ -88,25 +89,41 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </div>
               )}
 
-              <div className="text-end me-3">
-                {/* ❌ changed from user.name to user.username */}
-                <div className="fw-bold small text-dark">{user.username}</div>
-
-                <div
-                  className="text-primary smaller fw-bold"
-                  style={{ fontSize: '0.65rem', letterSpacing: '0.02em' }}
-                >
-                  {user.role ? user.role.replace('_', ' ') : ''}
-                </div>
+                    
+              <div className="dropdown">
+                <button className="btn btn-link text-decoration-none text-dark d-flex align-items-center p-0 border-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                  <div className="text-end me-2 d-none d-sm-block">
+                    <div className="fw-bold small text-dark">{user.name}</div>
+                    <div className="text-primary smaller fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.02em' }}>{user.role.replace('_', ' ')}</div>
+                  </div>
+                  <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style={{ width: '35px', height: '35px', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                    {user.username.charAt(0)}
+                  </div>
+                </button>
+                <ul className="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3">
+                  <li className="px-3 py-2 d-sm-none border-bottom mb-2">
+                    <div className="fw-bold small">{user.name}</div>
+                    <div className="text-primary smaller" style={{ fontSize: '0.7rem', textTransform: 'uppercase' }}>{user.role.replace('_', ' ')}</div>
+                  </li>
+                  <li>
+                    <Link className="dropdown-item d-flex align-items-center py-2 small fw-medium" to="/profile">
+                      <i className="bi bi-person-circle me-2 text-primary"></i> My Profile
+                    </Link>
+                  </li>
+                  <li>
+                    <Link className="dropdown-item d-flex align-items-center py-2 small fw-medium" to="/profile">
+                      <i className="bi bi-key me-2 text-warning"></i> Change Password
+                    </Link>
+                  </li>
+                  <li><hr className="dropdown-divider" /></li>
+                  <li>
+                    <button className="dropdown-item d-flex align-items-center py-2 small fw-medium text-danger" onClick={handleLogout}>
+                      <i className="bi bi-box-arrow-right me-2"></i> Logout
+                    </button>
+                  </li>
+                </ul>
               </div>
-
-              <button
-                className="btn btn-outline-danger btn-sm rounded-circle shadow-sm"
-                onClick={handleLogout}
-                title="Logout"
-              >
-                <i className="bi bi-box-arrow-right"></i>
-              </button>
+             
             </div>
           </div>
         </div>

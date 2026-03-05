@@ -1,14 +1,14 @@
 
 from django.db import models
 from django.conf import settings
-
+from apps.projects.models import Project
 class ActivityLog(models.Model):
     user = models.ForeignKey(
     settings.AUTH_USER_MODEL,
     on_delete=models.CASCADE,
     related_name="activity_app_logs"
 )
-    project = models.ForeignKey('projects.Project', on_delete=models.CASCADE)
+    project = models.ForeignKey(Project, null=True, blank=True, on_delete=models.SET_NULL)
     task = models.ForeignKey(
         'tasks.Task', 
         on_delete=models.SET_NULL, 

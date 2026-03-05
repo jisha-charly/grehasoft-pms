@@ -1,10 +1,16 @@
 from rest_framework import viewsets, permissions,status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view
+from django.contrib.auth.password_validation import validate_password
+from rest_framework.decorators import api_view, permission_classes
+
+from rest_framework.views import APIView
 from .models import User, Role, Department
 from .serializers import (
     UserSerializer, UserCreateUpdateSerializer, 
-    RoleSerializer, DepartmentSerializer
+    RoleSerializer, DepartmentSerializer,UserProfileSerializer
 )
 from core.permissions import IsSuperAdmin
 
@@ -86,3 +92,49 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
+    
+
+
+class ProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        serializer = UserSerializer(
+            request.user,
+            data=request.data,
+            partial=True
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+
+     user = request.user
+     current_password = request.data.get("currentPassword")
+     new_password = request.data.get("newPassword")
+
+     if not user.check_password(current_password):
+        return Response(
+            {"error": "Current password is incorrect"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+     try:
+        validate_password(new_password)
+     except Exception as e:
+        return Response({"error": str(e)}, status=400)
+
+     user.set_password(new_password)
+     user.save()
+
+     return Response({"message": "Password updated successfully"})

@@ -12,6 +12,7 @@ interface AuthContextType {
   user: User | null;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
+  updateUser: (updates: Partial<User>) => void;
   isAuthenticated: boolean;
   loading: boolean;
   hasPermission: (permission: Permission) => boolean;
@@ -95,7 +96,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       throw error;
     }
   };
+ const updateUser = async (updates: Partial<User>) => {
+  if (!user) return;
 
+  try {
+    const res = await api.patch(`/users/${user.id}/`, updates);
+
+    const updatedUser = res.data;
+
+    localStorage.setItem("user", JSON.stringify(updatedUser));
+
+    setUser(updatedUser);
+
+  } catch (error) {
+    console.error("Error updating user profile:", error);
+  }
+};
   /* ================= LOGOUT ================= */
 
   const logout = () => {
@@ -122,6 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         user,
         login,
         logout,
+        updateUser,
         isAuthenticated: !!user,
         loading,
         hasPermission,

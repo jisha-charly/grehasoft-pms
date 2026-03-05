@@ -49,3 +49,18 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
             instance.set_password(password)
         instance.save()
         return instance
+class UserProfileSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "name",
+            "username",
+            "email",
+            "role",
+            "department",
+            "date_joined",
+            "last_login",
+        ]
+        read_only_fields = ["role", "department", "date_joined", "last_login"]

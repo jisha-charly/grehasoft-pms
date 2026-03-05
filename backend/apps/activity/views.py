@@ -2,7 +2,7 @@ from rest_framework import viewsets, permissions
 from .models import ActivityLog
 from .serializers import ActivityLogSerializer
 
-class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
+class ActivityLogViewSet(viewsets.ModelViewSet):
     """
     Centralized audit trail view. Read-only to preserve integrity.
     """

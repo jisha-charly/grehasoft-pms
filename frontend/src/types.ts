@@ -108,23 +108,24 @@ export interface TaskType {
 
 export interface User {
   id: number;
-  name: string;
+  name?: string;
   username: string;
   email: string;
 
-  password?: string;
+  role_name?: string;
 
-          // ✅ FK ID
-  role_name?: string;            // ✅ readable name
+  department?: number | null;
+  department_name?: string;
+  departmentId?: number;
 
-  department: number | null;     // ✅ FK ID
-  department_name?: string;      // ✅ readable name
-
-  status: 'active' | 'inactive';
+  status?: 'active' | 'inactive';
 
   date_joined?: string;
   last_login?: string;
-  role: UserRole
+
+  createdAt?: string;
+
+  role: UserRole;
 }
 
 
@@ -303,11 +304,11 @@ export interface ProjectMember {
 
 export interface ActivityLog {
   id: number;
-  user: number;
+  userId: number;
   projectId: number;
   taskId?: string;
   action: string;
-  created_at: string;
+  createdAt: string;
 }
 
 export interface SEOTask {

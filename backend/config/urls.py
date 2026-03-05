@@ -21,6 +21,9 @@ from rest_framework_simplejwt.views import (
 )
 from django.conf.urls.static import static
 from django.conf import settings
+from apps.users.views import ProfileView,change_password
+from apps.activity.views import ActivityLogViewSet as GlobalActivityLogViewSet
+from apps.projects.views import ActivityLogViewSet as ProjectActivityLogViewSet
 router = routers.DefaultRouter()
 
 # Project Management
@@ -28,8 +31,7 @@ router.register(r'projects', ProjectViewSet)
 router.register(r'clients', ClientViewSet)
 router.register(r'milestones', MilestoneViewSet)
 router.register(r'members', ProjectMemberViewSet)
-router.register(r'activity', ActivityLogViewSet)
-
+router.register(r'project-activity-logs', ProjectActivityLogViewSet, basename='project-activity-logs')
 # User Management (RBAC)
 router.register(r'users', UserViewSet)
 router.register(r'roles', RoleViewSet)
@@ -47,8 +49,8 @@ router.register(r'task-files', TaskFileViewSet)
 router.register(r'task-comments', TaskCommentViewSet)
 router.register(r'task-reviews', TaskReviewViewSet)
 
-# Activity & Audit
-#router.register(r'activity-logs', ActivityLogViewSet)
+# Global activity logs (profile, login etc.)
+router.register(r'activity-logs', GlobalActivityLogViewSet, basename='activity-logs')
 
 # SEO & Social Module
 router.register(r'seo-tasks', SEOTaskViewSet)
@@ -70,6 +72,8 @@ urlpatterns = [
     path('api/v1/dashboard/stats/', DashboardStatsView.as_view(), name='dashboard-stats'),
     path('api/v1/auth/', include('rest_framework.urls')), 
     path('api/v1/password_reset/', include('django_rest_passwordreset.urls', namespace='password_reset')),
+    path("api/v1/users/profile/", ProfileView.as_view()),
+    path("api/v1/users/change-password/", change_password),
 ] 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
