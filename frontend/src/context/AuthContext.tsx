@@ -78,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       localStorage.setItem("refresh", refresh);
 
       // Fetch user info after login
-      const userRes = await api.get("/users/me/");
+      const userRes = await api.get("api/users/me/");
       const backendUser = userRes.data;
 
       setUser({
