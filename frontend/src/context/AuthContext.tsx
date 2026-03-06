@@ -67,10 +67,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const login = async (username: string, password: string) => {
     try {
-      const res = await axios.post(
-        "http://127.0.0.1:8000/api/token/",
-        { username, password }
-      );
+     const res = await api.post("/api/token/", {
+  username,
+  password,
+});
 
       const { access, refresh } = res.data;
 
