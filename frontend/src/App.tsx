@@ -38,7 +38,7 @@ import {
 import axiosInstance from "./api/axiosInstance";
 
 const App: React.FC = () => {
-  const { isAuthenticated,loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   if (loading) return null;
 
   /* ================= STATE ================= */
@@ -257,21 +257,19 @@ const handleUpdateProfile = async (data: any) => {
       username: data.username
     });
 
-    // get updated user
-    const res = await axiosInstance.get(`/users/${data.id}/`);
-
     const logRes = await axiosInstance.post("/activity-logs/", {
       action: "Updated Profile",
-      project: null,
-      user: res.data.id
+      user: data.id
     });
-  
+
     setActivityLogs((prev) => [logRes.data, ...prev]);
 
   } catch (error) {
     console.error("Error updating profile:", error);
   }
 };
+
+    
   const roleCrud = createCrud("/roles", setRoles);
   const deptCrud = createCrud("/departments", setDepartments);
   const taskTypeCrud = createCrud("/task-types", setTaskTypes);
@@ -331,14 +329,14 @@ const handleUpdateProfile = async (data: any) => {
                   memberCrud={memberCrud}
                   taskCrud={taskCrud}
                   taskTypes={taskTypes}
-                  currentUser={users[0]}
+                 currentUser={user!}
                 />
               </Layout>
             </ProtectedRoute>
           }
         />
-      <Route path="/projects/:id/kanban" element={<ProtectedRoute requiredPermission={Permission.MANAGE_TASKS}><Layout ><ProjectKanbanPage projects={projects} tasks={tasks} setTasks={setTasks} milestones={milestones} users={users} crud={taskCrud} taskTypes={taskTypes} currentUser={users[0]} /></Layout></ProtectedRoute>} />
-          <Route path="/tasks" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout ><TasksPage tasks={tasks} setTasks={setTasks} milestones={milestones} projects={projects} taskTypes={taskTypes} users={users} crud={taskCrud} currentUser={users[0]} /></Layout></ProtectedRoute>} />
+      <Route path="/projects/:id/kanban" element={<ProtectedRoute requiredPermission={Permission.MANAGE_TASKS}><Layout ><ProjectKanbanPage projects={projects} tasks={tasks} setTasks={setTasks} milestones={milestones} users={users} crud={taskCrud} taskTypes={taskTypes} currentUser={user!} /></Layout></ProtectedRoute>} />
+          <Route path="/tasks" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout ><TasksPage tasks={tasks} setTasks={setTasks} milestones={milestones} projects={projects} taskTypes={taskTypes} users={users} crud={taskCrud} currentUser={user!}/></Layout></ProtectedRoute>} />
           <Route path="/clients" element={<ProtectedRoute requiredPermission={Permission.VIEW_CLIENTS}><Layout ><ClientsPage clients={clients} crud={clientCrud} /></Layout></ProtectedRoute>} />
           <Route path="/crm" element={<ProtectedRoute requiredPermission={Permission.VIEW_LEADS}><Layout ><LeadsPage leads={leads}
   crud={leadCrud}
