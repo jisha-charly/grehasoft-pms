@@ -10,8 +10,8 @@ import ProjectsPage from "./pages/projects/ProjectsPage";
 import ProjectDetailsPage from "./pages/projects/ProjectDetailsPage";
 import ProjectKanbanPage from "./pages/projects/ProjectKanbanPage";
 import TasksPage from "./pages/tasks/TasksPage";
-import LeadsPage from "./pages/crm/Leadspage";
-//import Leadspage from "./pages/crm/Leadspage";
+import LeadsPage from "./pages/crm/LeadsPage";
+
 import ClientsPage from "./pages/clients/ClientsPage";
 import SEOPage from "./pages/seo/SEOPage";
 import UsersPage from "./pages/admin/users/UsersPage";
