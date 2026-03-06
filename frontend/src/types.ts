@@ -308,7 +308,8 @@ export interface ActivityLog {
   projectId: number;
   taskId?: string;
   action: string;
-  createdAt: string;
+  createdBy: number
+  created_at: string;
 }
 
 export interface SEOTask {

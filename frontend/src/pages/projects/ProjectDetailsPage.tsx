@@ -548,7 +548,7 @@ try {
                     </div>
                     <div>
                       <div className="small fw-bold text-dark mb-1">
-                        {users.find(u => u.id === a.user)?.name}
+                        {users.find(u => u.id === a.createdBy)?.name}
                         <span className="fw-normal text-secondary ms-1">{a.action}</span>
                       </div>
                       <div className="smaller text-muted"><i className="bi bi-clock me-1"></i>{a.created_at}</div>

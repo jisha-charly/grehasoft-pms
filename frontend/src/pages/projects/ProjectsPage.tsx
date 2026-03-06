@@ -123,12 +123,12 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ projects, users, department
       setValues({
         name: project.name,
         clientId: project.clientId.toString(),
-        departmentId: project.departmentId.toString(),
-        projectManagerId: project.projectManagerId.toString(),
+        departmentId: project.department.toString(),
+        projectManagerId: project.project_manager.toString(),
         startDate: project.startDate,
         endDate: project.endDate,
         status: project.status,
-        progressPercentage: project.progressPercentage
+        progressPercentage: project.progress_percentage
       });
     } else {
       resetForm();
@@ -178,10 +178,10 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ projects, users, department
               <div className="mb-4">
                 <div className="d-flex justify-content-between mb-1 small fw-bold">
                   <span className="text-secondary">Progress</span>
-                  <span className="text-dark">{p.progressPercentage}%</span>
+                  <span className="text-dark">{p.progress_percentage}%</span>
                 </div>
                 <div className="progress bg-light rounded-pill" style={{height: '8px'}}>
-                  <div className={`progress-bar rounded-pill ${p.status === 'completed' ? 'bg-success' : 'bg-primary'}`} style={{width: `${p.progressPercentage}%`}}></div>
+                  <div className={`progress-bar rounded-pill ${p.status === 'completed' ? 'bg-success' : 'bg-primary'}`} style={{width: `${p.progress_percentage}%`}}></div>
                 </div>
               </div>
 

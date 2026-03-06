@@ -56,7 +56,7 @@ endOfWeek.setHours(23,59,59,999);
   (t.assignees || []).includes(user.id)
 );
       return {
-        name: user.name.split(' ')[0],
+        name: user.name ?? "".split(' ')[0],
         tasks: userTasks.length,
         completed: userTasks.filter(t => t.status === TaskStatus.DONE).length
       };
