@@ -1,6 +1,6 @@
 import os
 from django.contrib.auth import get_user_model
-from apps.users.models import UserRole
+from apps.users.models import Role
 
 def create_super_admin():
     username = os.getenv("SUPERADMIN_USERNAME")
@@ -19,7 +19,7 @@ def create_super_admin():
             password=password
         )
 
-        role, created = UserRole.objects.get_or_create(name="SUPER_ADMIN")
+        role, created = Role.objects.get_or_create(name="SUPER_ADMIN")
         user.role = role
         user.save()
 
