@@ -7,3 +7,7 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         import core.signals
+
+    def ready(self):
+        from .startup import create_super_admin
+        create_super_admin()
