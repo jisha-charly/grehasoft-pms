@@ -155,19 +155,3 @@ EMAIL_HOST_USER = 'jisha.charly@gmail.com'
 EMAIL_HOST_PASSWORD = 'uogkyzlolsjarpcf'
 
 DEFAULT_FROM_EMAIL = 'Grehasoft PMS <yourgmail@gmail.com>'
-from django.contrib.auth import get_user_model
-from apps.users.models import UserRole
-User = get_user_model()
-
-
-
-if not User.objects.filter(username="admin").exists():
-    user = User.objects.create_superuser(
-        username="admin",
-        email="admin@gmail.com",
-        password="Admin@123"
-    )
-
-    role, created = UserRole.objects.get_or_create(name="SUPER_ADMIN")
-    user.role = role
-    user.save()
