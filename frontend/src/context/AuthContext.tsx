@@ -67,7 +67,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const login = async (username: string, password: string) => {
     try {
-     const res = await api.post("api/token/", {
+    const res = await axios.post(
+  "https://grehasoft-pms.onrender.com/api/token/", {
   username,
   password,
 });
