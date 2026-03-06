@@ -38,7 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       try {
-        const res = await api.get("api/v1/users/me/");
+        const res = await api.get("/users/me/");
         const backendUser = res.data;
 
         setUser({
@@ -67,7 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const login = async (username: string, password: string) => {
     try {
-     const res = await api.post("api/token/", {
+     const res = await api.post("/token/", {
   username,
   password,
 });
@@ -78,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       localStorage.setItem("refresh", refresh);
 
       // Fetch user info after login
-      const userRes = await api.get("api/v1/users/me/");
+      const userRes = await api.get("/users/me/");
       const backendUser = userRes.data;
 
       setUser({
