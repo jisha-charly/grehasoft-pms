@@ -72,8 +72,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ activityLogs, onUpdatePasswor
       return matchesSearch && matchesFilter;
     })
     .sort((a, b) => {
-      const dateA = new Date(a.createdAt).getTime();
-      const dateB = new Date(b.createdAt).getTime();
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
       return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
     });
 
@@ -403,7 +403,7 @@ setUsername(user.username ?? "");
                               <span className="fw-medium">{log.action}</span>
                             </div>
                           </td>
-                          <td className="py-3 text-muted small">{new Date(log.createdAt).toLocaleString()}</td>
+                          <td className="py-3 text-muted small">{new Date(log.created_at).toLocaleString()}</td>
                           <td className="py-3">
                             {log.projectId > 0 && <span className="badge bg-light text-dark border me-1">Project #{log.projectId}</span>}
                             {log.taskId && <span className="badge bg-light text-dark border">Task #{log.taskId}</span>}
