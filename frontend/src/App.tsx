@@ -10,7 +10,8 @@ import ProjectsPage from "./pages/projects/ProjectsPage";
 import ProjectDetailsPage from "./pages/projects/ProjectDetailsPage";
 import ProjectKanbanPage from "./pages/projects/ProjectKanbanPage";
 import TasksPage from "./pages/tasks/TasksPage";
-import Leadspage from "./pages/crm/Leadspage";
+import LeadsPage from "./pages/crm/Leadspage";
+//import Leadspage from "./pages/crm/Leadspage";
 import ClientsPage from "./pages/clients/ClientsPage";
 import SEOPage from "./pages/seo/SEOPage";
 import UsersPage from "./pages/admin/users/UsersPage";
@@ -338,7 +339,7 @@ const handleUpdateProfile = async (data: any) => {
       <Route path="/projects/:id/kanban" element={<ProtectedRoute requiredPermission={Permission.MANAGE_TASKS}><Layout ><ProjectKanbanPage projects={projects} tasks={tasks} setTasks={setTasks} milestones={milestones} users={users} crud={taskCrud} taskTypes={taskTypes} currentUser={user!} /></Layout></ProtectedRoute>} />
           <Route path="/tasks" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout ><TasksPage tasks={tasks} setTasks={setTasks} milestones={milestones} projects={projects} taskTypes={taskTypes} users={users} crud={taskCrud} currentUser={user!}/></Layout></ProtectedRoute>} />
           <Route path="/clients" element={<ProtectedRoute requiredPermission={Permission.VIEW_CLIENTS}><Layout ><ClientsPage clients={clients} crud={clientCrud} /></Layout></ProtectedRoute>} />
-          <Route path="/crm" element={<ProtectedRoute requiredPermission={Permission.VIEW_LEADS}><Layout ><Leadspage leads={leads}
+          <Route path="/crm" element={<ProtectedRoute requiredPermission={Permission.VIEW_LEADS}><Layout ><LeadsPage leads={leads}
   crud={leadCrud}
   users={users}
   clients={clients}
