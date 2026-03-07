@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'apps.activity',
     'apps.reports',
     'apps.seo',
+    'apps.invoices',
     'core.apps.CoreConfig',
 ]
 

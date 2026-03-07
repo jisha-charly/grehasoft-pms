@@ -37,6 +37,9 @@ import {
 } from "./types";
 
 import axiosInstance from "./api/axiosInstance";
+import InvoicePreviewPage from "./pages/invoices/InvoicePreviewPage";
+import CreateInvoicePage from "./pages/invoices/CreateInvoicePage";
+import InvoicesPage from "./pages/invoices/InvoicesPage";
 
 const App: React.FC = () => {
   const { isAuthenticated, loading, user } = useAuth();
@@ -397,6 +400,10 @@ const handleUpdateProfile = async (data: any) => {
     </ProtectedRoute>
   }
 />
+
+<Route path="/invoices" element={<InvoicesPage />} />
+<Route path="/invoices/create" element={<CreateInvoicePage />} />
+<Route path="/invoices/:id" element={<InvoicePreviewPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>

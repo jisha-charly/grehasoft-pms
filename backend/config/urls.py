@@ -24,6 +24,7 @@ from django.conf import settings
 from apps.users.views import ProfileView,change_password
 from apps.activity.views import ActivityLogViewSet as GlobalActivityLogViewSet
 from apps.projects.views import ActivityLogViewSet as ProjectActivityLogViewSet
+from apps.invoices.views import InvoiceViewSet
 router = routers.DefaultRouter()
 
 # Project Management
@@ -61,7 +62,7 @@ router.register(r'seo-keywords', SEOKeywordsViewSet)
 router.register(r'gmb-profiles', GMBProfileViewSet)
 router.register(r'social-posts', SocialMediaPostViewSet)
 router.register(r'social-metrics', SocialMetricsViewSet)
-
+router.register(r'invoices', InvoiceViewSet)
 urlpatterns = [
     path('admin/', admin.site.urls),
 
