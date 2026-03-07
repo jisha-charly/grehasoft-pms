@@ -25,6 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  
 
   /* ================= VERIFY TOKEN ON APP LOAD ================= */
 
@@ -65,38 +66,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   /* ================= LOGIN ================= */
 
-  const login = async (username: string, password: string) => {
-    try {
+const login = async (username: string, password: string) => {
+  try {
     const res = await axios.post(
-  "https://grehasoft-pms.onrender.com/api/token/", {
-  username,
-  password,
-});
+      `${import.meta.env.VITE_API_BASE}/api/token/`,
+      { username, password }
+    );
 
-      const { access, refresh } = res.data;
+    const { access, refresh } = res.data;
 
-      localStorage.setItem("access", access);
-      localStorage.setItem("refresh", refresh);
+    localStorage.setItem("access", access);
+    localStorage.setItem("refresh", refresh);
 
-      // Fetch user info after login
-      const userRes = await api.get("/users/me/");
-      const backendUser = userRes.data;
+    const userRes = await api.get("/users/me/");
+    const backendUser = userRes.data;
 
-      setUser({
-        id: backendUser.id,
-        name: backendUser.name,
-        username: backendUser.username,
-        email: backendUser.email,
-        role: backendUser.role_name as UserRole, // ✅ FIXED
-        departmentId: backendUser.department,
-        status: backendUser.status,
-        createdAt: backendUser.created_at,
-      });
-    } catch (error) {
-      console.error("Login error:", error);
-      throw error;
-    }
-  };
+    setUser({
+      id: backendUser.id,
+      name: backendUser.name,
+      username: backendUser.username,
+      email: backendUser.email,
+      role: backendUser.role_name as UserRole,
+      departmentId: backendUser.department,
+      status: backendUser.status,
+      createdAt: backendUser.created_at,
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+    throw error;
+  }
+};
  const updateUser = async (updates: Partial<User>) => {
   if (!user) return;
 
