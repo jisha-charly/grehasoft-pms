@@ -1,418 +1,424 @@
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect } from "react"
 import Layout from "../../components/layout/Layout"
 import api from "../../api/axiosInstance"
-import html2canvas from "html2canvas"
-import jsPDF from "jspdf"
-
-interface Client {
+import { useNavigate } from "react-router-dom"
+import { useParams } from "react-router-dom"
+interface Client{
   id:number
   name:string
 }
 
-interface Item {
+interface Item{
   description:string
   quantity:number
   rate:number
 }
 
-const CreateInvoicePage = () => {
+const CreateInvoicePage = ()=>{
+const { id } = useParams()
+const navigate = useNavigate()
 
-  const [clients,setClients] = useState<Client[]>([])
-  const [client,setClient] = useState("")
+const [clients,setClients] = useState<Client[]>([])
+const [client,setClient] = useState<number | "">("")
 
-  const [invoiceNumber,setInvoiceNumber] = useState("GSI/2026/001")
+const [items,setItems] = useState<Item[]>([
+{description:"",quantity:1,rate:0}
+])
 
-  const [items,setItems] = useState<Item[]>([
-    {description:"",quantity:1,rate:0}
-  ])
+const [gst,setGst] = useState(0)
+const [notes,setNotes] = useState("")
+const [advance,setAdvance] = useState<number | "">("")
+const [invoiceNumber,setInvoiceNumber] = useState("")
 
-  const [gst,setGst] = useState(0)
-  const [notes,setNotes] = useState("")
+/* PREDEFINED DESCRIPTIONS */
 
-  const previewRef = useRef<HTMLDivElement>(null)
-
-  useEffect(()=>{
-
-    fetchClients()
-    generateInvoiceNumber()
-
-  },[])
-
-  const fetchClients = async()=>{
-
-    const res = await api.get("/clients/")
-    setClients(res.data)
-
+const descriptionTemplates:any={
+SEO:"SEO Services for website optimization including keyword research, on-page SEO and reporting",
+WEBSITE:"Website design and development services",
+HOSTING:"Website hosting and server maintenance",
+MARKETING:"Digital marketing and campaign management"
+}
+const fetchInvoiceNumber = async () => {
+  try {
+    const res = await api.get("/invoices/next-number/");
+    setInvoiceNumber(res.data.invoice_number);
+  } catch (error) {
+    console.error("Error fetching invoice number", error);
   }
+};
+const [selectedTemplate,setSelectedTemplate] = useState("")
 
-  const generateInvoiceNumber = async()=>{
+const fetchInvoice = async () => {
 
-    try{
+try {
 
-      const res = await api.get("/invoices/")
-      const count = res.data.length + 1
+const res = await api.get(`/invoices/${id}/`)
 
-      const year = new Date().getFullYear()
+const data = res.data
 
-      const number = `GSI/${year}/${String(count).padStart(3,"0")}`
+setInvoiceNumber(data.invoice_number)
 
-      setInvoiceNumber(number)
+setClient(data.client)
 
-    }catch{
-
-      setInvoiceNumber("GSI/2026/001")
-
-    }
-
-  }
-
-  const addItem = ()=>{
-
-    setItems([...items,{description:"",quantity:1,rate:0}])
-
-  }
-
-  const removeItem=(index:number)=>{
-
-    const updated=[...items]
-
-    updated.splice(index,1)
-
-    setItems(updated)
-
-  }
-
-  const updateItem=(index:number,field:string,value:any)=>{
-
-    const updated=[...items]
-
-    updated[index]={...updated[index],[field]:value} as Item
-
-    setItems(updated)
-
-  }
-
-  const subtotal = items.reduce(
-    (sum,item)=>sum + item.quantity * item.rate,
-    0
-  )
-
-  const gstAmount = subtotal * gst / 100
-
-  const total = subtotal + gstAmount
-const saveInvoice = async () => {
-
-  const formattedItems = items.map(item => ({
-    description: item.description,
-    quantity: item.quantity,
-    rate: item.rate,
-    amount: item.quantity * item.rate
+setItems(
+  data.items.map((item:any)=>({
+    description:item.description,
+    quantity:item.quantity,
+    rate:item.rate
   }))
+)
 
-  const payload = {
+setNotes(data.notes)
 
-    client: client,
-   
-    due_date: new Date().toISOString().split("T")[0],
+}catch(error){
 
-    items: formattedItems,
-
-    subtotal: subtotal,
-    tax: gstAmount,
-    total: total,
-
-    notes: notes
-
-  }
-
-  await api.post("/invoices/", payload)
-
-  alert("Invoice saved successfully")
+console.error("Error loading invoice", error)
 
 }
 
-  const downloadPDF = async()=>{
+}
 
-    if(!previewRef.current) return
+useEffect(() => {
 
-    const canvas = await html2canvas(previewRef.current)
+fetchClients()
 
-    const imgData = canvas.toDataURL("image/png")
+if (id) {
+  fetchInvoice()
+} else {
+  fetchInvoiceNumber()
+}
 
-    const pdf = new jsPDF()
+}, [id])
 
-    pdf.addImage(imgData,"PNG",10,10,190,0)
+const fetchClients = async()=>{
+const res = await api.get("/clients/")
+setClients(res.data)
+}
 
-    pdf.save(`${invoiceNumber}.pdf`)
+const addItem=()=>{
+setItems([...items,{description:"",quantity:1,rate:0}])
+}
 
-  }
+const removeItem=(index:number)=>{
+const updated=[...items]
+updated.splice(index,1)
+setItems(updated)
+}
 
-  return (
+const updateItem=(index:number,field:string,value:any)=>{
 
-  <Layout>
+const updated=[...items]
+updated[index]={...updated[index],[field]:value}
+setItems(updated)
 
-  <div className="container-fluid">
+}
 
-  <div className="card shadow-sm p-4">
+/* APPLY TEMPLATE */
 
-  <h3 className="mb-4">Create Invoice</h3>
+const applyTemplate=(index:number)=>{
 
-  <div className="row mb-3">
+if(!selectedTemplate) return
 
-  <div className="col-md-6">
+updateItem(index,"description",descriptionTemplates[selectedTemplate])
 
-  <label className="form-label">Invoice Number</label>
+}
 
-  <input
-  className="form-control"
+/* CALCULATIONS */
+
+const subtotal = items.reduce(
+(sum,item)=>sum + item.quantity * item.rate,
+0
+)
+
+const gstAmount = subtotal * gst / 100
+
+const total = subtotal + gstAmount
+
+const balance = total - (typeof advance === "number" ? advance : 0)
+
+/* SAVE INVOICE */
+
+const saveInvoice = async () => {
+
+const formattedItems = items.map(item => ({
+description:item.description,
+quantity:item.quantity,
+rate:item.rate
+}))
+
+const payload = {
+  client: client,
+  due_date: new Date().toISOString().split("T")[0],
+  items: formattedItems,
+  subtotal: subtotal,
+  tax: gstAmount,
+  total: total,
+  advance: typeof advance === "number" ? advance : 0,
+  notes: notes
+}
+
+try {
+
+let res
+
+if(id){
+res = await api.put(`/invoices/${id}/`, payload)
+}else{
+res = await api.post("/invoices/", payload)
+}
+
+alert("Invoice saved successfully")
+
+navigate("/invoices")
+
+}catch(error){
+
+console.error("Error saving invoice", error)
+
+}
+
+}
+
+return(
+
+<Layout>
+
+<div className="container-fluid">
+
+<div className="card shadow-sm p-4">
+
+<h3>{id ? "Edit Invoice" : "Create Invoice"}</h3>
+
+<div className="row mb-3">
+
+<div className="col-md-6">
+ <label className="form-label">Invoice Number</label>
+
+<input
+  className="form-control mb-3"
   value={invoiceNumber}
+  placeholder="Loading..."
   readOnly
-  />
+/>
 
-  </div>
+<label className="form-label">Client</label>
 
-  <div className="col-md-6">
+<select
+className="form-control"
+value={client}
+onChange={(e)=>setClient(Number(e.target.value))}
+>
 
-  <label className="form-label">Client</label>
+<option>Select Client</option>
 
-  <select
-  className="form-control"
-  value={client}
-  onChange={(e)=>setClient(e.target.value)}
-  >
+{clients.map(c=>(
 
-  <option>Select Client</option>
+<option key={c.id} value={c.id}>
+{c.name}
+</option>
 
-  {clients.map(c=>(
+))}
 
-  <option key={c.id} value={c.id}>
-  {c.name}
-  </option>
+</select>
 
-  ))}
+</div>
 
-  </select>
+</div>
 
-  </div>
+{/* DESCRIPTION TEMPLATE */}
 
-  </div>
+<div className="row mb-3">
 
-  <table className="table table-bordered">
+<div className="col-md-4">
 
-  <thead className="table-light">
+<label>Select Description Template</label>
 
-  <tr>
-  <th>Description</th>
-  <th style={{width:"120px"}}>Qty</th>
-  <th style={{width:"150px"}}>Rate</th>
-  <th style={{width:"150px"}}>Amount</th>
-  <th style={{width:"60px"}}></th>
-  </tr>
+<select
+className="form-control"
+value={selectedTemplate}
+onChange={(e)=>setSelectedTemplate(e.target.value)}
+>
 
-  </thead>
+<option value="">Select Template</option>
 
-  <tbody>
+<option value="SEO">SEO</option>
+<option value="WEBSITE">Website</option>
+<option value="HOSTING">Hosting</option>
+<option value="MARKETING">Marketing</option>
 
-  {items.map((item,index)=>{
+</select>
 
-  const amount=item.quantity * item.rate
+</div>
 
-  return(
+</div>
 
-  <tr key={index}>
+<table className="table table-bordered">
 
-  <td>
+<thead className="table-light">
 
-  <input
-  className="form-control"
-  value={item.description}
-  onChange={(e)=>updateItem(index,"description",e.target.value)}
-  />
+<tr>
 
-  </td>
+<th>Description</th>
+<th style={{width:"120px"}}>Qty</th>
+<th style={{width:"150px"}}>Rate</th>
+<th style={{width:"150px"}}>Amount</th>
+<th style={{width:"60px"}}></th>
 
-  <td>
+</tr>
 
-  <input
-  type="number"
-  className="form-control"
-  value={item.quantity}
-  onChange={(e)=>updateItem(index,"quantity",Number(e.target.value))}
-  />
+</thead>
 
-  </td>
+<tbody>
 
-  <td>
+{items.map((item,index)=>{
 
-  <input
-  type="number"
-  className="form-control"
-  value={item.rate}
-  onChange={(e)=>updateItem(index,"rate",Number(e.target.value))}
-  />
+const amount=item.quantity * item.rate
 
-  </td>
+return(
 
-  <td>
+<tr key={index}>
 
-  ₹{amount}
+<td>
 
-  </td>
+<div className="d-flex gap-2">
 
-  <td>
+<input
+className="form-control"
+value={item.description}
+onChange={(e)=>updateItem(index,"description",e.target.value)}
+/>
 
-  <button
-  className="btn btn-sm btn-danger"
-  onClick={()=>removeItem(index)}
-  >
+<button
+className="btn btn-sm btn-secondary"
+onClick={()=>applyTemplate(index)}
+>
+Use
+</button>
 
-  ×
+</div>
 
-  </button>
+</td>
 
-  </td>
+<td>
 
-  </tr>
+<input
+type="number"
+className="form-control"
+value={item.quantity}
+onChange={(e)=>updateItem(index,"quantity",Number(e.target.value))}
+/>
 
-  )
+</td>
 
-  })}
+<td>
 
-  </tbody>
+<input
+type="number"
+className="form-control"
+value={item.rate}
+onChange={(e)=>updateItem(index,"rate",Number(e.target.value))}
+/>
 
-  </table>
+</td>
 
-  <button className="btn btn-primary mb-3" onClick={addItem}>
-  Add Item
-  </button>
+<td>
 
-  <div className="row">
+₹{amount}
 
-  <div className="col-md-6">
+</td>
 
-  <textarea
-  className="form-control"
-  placeholder="Notes"
-  value={notes}
-  onChange={(e)=>setNotes(e.target.value)}
-  />
+<td>
 
-  </div>
+<button
+className="btn btn-sm btn-danger"
+onClick={()=>removeItem(index)}
+>
+×
+</button>
 
-  <div className="col-md-6">
+</td>
 
-  <div className="card p-3">
+</tr>
 
-  <p>Subtotal : ₹{subtotal}</p>
+)
 
-  <input
-  type="number"
-  className="form-control mb-2"
-  placeholder="GST %"
-  value={gst}
-  onChange={(e)=>setGst(Number(e.target.value))}
-  />
+})}
 
-  <p>GST : ₹{gstAmount.toFixed(2)}</p>
+</tbody>
 
-  <h5>Total : ₹{total.toFixed(2)}</h5>
+</table>
 
-  </div>
+<button className="btn btn-primary mb-3" onClick={addItem}>
+Add Item
+</button>
 
-  </div>
+<div className="row">
 
-  </div>
+<div className="col-md-6">
 
-  <div className="mt-4 d-flex gap-2">
+<textarea
+className="form-control"
+placeholder="Notes"
+value={notes}
+onChange={(e)=>setNotes(e.target.value)}
+/>
 
-  <button
-  className="btn btn-success"
-  onClick={saveInvoice}
-  >
+</div>
 
-  Save Invoice
+<div className="col-md-6">
 
-  </button>
+<div className="card p-3">
 
-  <button
-  className="btn btn-secondary"
-  onClick={downloadPDF}
-  >
+<p>Subtotal : ₹{subtotal}</p>
 
-  Download PDF
+<input
+type="number"
+className="form-control mb-2"
+placeholder="GST %"
+value={gst}
+onChange={(e)=>setGst(Number(e.target.value))}
+/>
 
-  </button>
+<p>GST : ₹{gstAmount.toFixed(2)}</p>
 
-  </div>
+<hr/>
 
-  </div>
+<input
+type="number"
+className="form-control mb-2"
+placeholder="Advance Received"
+value={advance}
+onChange={(e)=>setAdvance(Number(e.target.value))}
+/>
 
-  </div>
+<p>Total : ₹{total.toFixed(2)}</p>
 
-  {/* Invoice Preview */}
+<h5>Balance Due : ₹{balance.toFixed(2)}</h5>
 
-  <div style={{display:"none"}}>
+</div>
 
-  <div ref={previewRef}>
+</div>
 
-  <h2>Invoice {invoiceNumber}</h2>
+</div>
 
-  <p>Client : {client}</p>
+<div className="mt-4 d-flex gap-2">
 
-  <table className="table">
+<button
+className="btn btn-success"
+onClick={saveInvoice}
+>
+Save Invoice
+</button>
 
-  <thead>
+</div>
 
-  <tr>
-  <th>Description</th>
-  <th>Qty</th>
-  <th>Rate</th>
-  <th>Total</th>
-  </tr>
+</div>
 
-  </thead>
+</div>
 
-  <tbody>
+</Layout>
 
-  {items.map((item,index)=>{
-
-  const amount=item.quantity * item.rate
-
-  return(
-
-  <tr key={index}>
-
-  <td>{item.description}</td>
-
-  <td>{item.quantity}</td>
-
-  <td>{item.rate}</td>
-
-  <td>{amount}</td>
-
-  </tr>
-
-  )
-
-  })}
-
-  </tbody>
-
-  </table>
-
-  <p>Subtotal : ₹{subtotal}</p>
-
-  <p>GST : ₹{gstAmount}</p>
-
-  <h3>Total : ₹{total}</h3>
-
-  </div>
-
-  </div>
-
-  </Layout>
-
-  )
+)
 
 }
 

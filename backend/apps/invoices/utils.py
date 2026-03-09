@@ -1,12 +1,26 @@
-from datetime import datetime
+from django.utils import timezone
 from .models import Invoice
+
 
 def generate_invoice_number():
 
-    year = datetime.now().year
+    today = timezone.now()
 
-    prefix = f"GSI/{year}/"
+    year = today.year
 
+    # Determine financial year
+    if today.month >= 4:
+        start_year = year
+        end_year = year + 1
+    else:
+        start_year = year - 1
+        end_year = year
+
+    fiscal_year = f"{start_year}-{str(end_year)[-2:]}"
+
+    prefix = f"GSI/{fiscal_year}"
+
+    # Find last invoice of this financial year
     last_invoice = Invoice.objects.filter(
         invoice_number__startswith=prefix
     ).order_by("-invoice_number").first()
@@ -17,4 +31,6 @@ def generate_invoice_number():
     else:
         new_number = 1
 
-    return f"{prefix}{new_number:03d}"
+    invoice_number = f"{prefix}/{str(new_number).zfill(3)}"
+
+    return invoice_number

@@ -1,17 +1,25 @@
-import React, { useEffect, useState } from "react";
+import React, { ReactNode, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../../api/axiosInstance";
 import Layout from "../../components/layout/Layout";
+
 interface Invoice {
+  client_name: ReactNode;
   id: number;
   invoice_number: string;
-  client_name: string;
+  client: {
+    id: number;
+    client_name: string
+  };
   issue_date: string;
-  total_amount: number;
+  total: number;
+  total_paid: number;
+  balance: number;
   status: string;
 }
 
 const InvoicesPage = () => {
+
   const [invoices, setInvoices] = useState<Invoice[]>([]);
 
   useEffect(() => {
@@ -20,68 +28,215 @@ const InvoicesPage = () => {
 
   const fetchInvoices = async () => {
     try {
+
       const res = await api.get("/invoices/");
       setInvoices(res.data);
+
     } catch (error) {
+
       console.error("Error fetching invoices", error);
+
+    }
+  };
+ const [analytics,setAnalytics] = useState({
+total_invoices:0,
+total_revenue:0,
+total_paid:0,
+total_balance:0
+})
+
+const fetchAnalytics = async ()=>{
+const res = await api.get("/invoices/analytics/")
+setAnalytics(res.data)
+}
+
+useEffect(()=>{
+fetchInvoices()
+fetchAnalytics()
+},[])
+  const deleteInvoice = async (id: number) => {
+    if (window.confirm("Are you sure you want to delete this invoice?")) {
+      try {
+        await api.delete(`/invoices/${id}/`);
+        fetchInvoices();
+      } catch (error) {
+        console.error("Error deleting invoice", error);
+      }
     }
   };
 
+  const getStatusColor = (status: string) => {
+
+    if (status === "paid") return "success";
+    if (status === "partial") return "primary";
+
+    return "warning";
+
+  };
+const downloadInvoice = (id:number)=>{
+ window.open(`http://127.0.0.1:8000/api/v1/invoices/${id}/download/`)
+}
+
+const sendInvoice = async(id:number)=>{
+  await api.post(`/invoices/${id}/send-email/`)
+  alert("Invoice sent")
+}
   return (
     <Layout>
-    <div className="container mt-4">
+  <div className="row mb-4">
 
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h3>Invoices</h3>
+<div className="col-md-3">
+<div className="card shadow-sm p-3 text-center">
+<h6>Total Invoices</h6>
+<h4>{analytics.total_invoices}</h4>
+</div>
+</div>
 
-        <Link to="/invoices/create" className="btn btn-primary">
-          Create Invoice
-        </Link>
+<div className="col-md-3">
+<div className="card shadow-sm p-3 text-center">
+<h6>Total Revenue</h6>
+<h4>₹{analytics.total_revenue}</h4>
+</div>
+</div>
+
+<div className="col-md-3">
+<div className="card shadow-sm p-3 text-center">
+<h6>Paid Amount</h6>
+<h4 className="text-success">₹{analytics.total_paid}</h4>
+</div>
+</div>
+
+<div className="col-md-3">
+<div className="card shadow-sm p-3 text-center">
+<h6>Pending Amount</h6>
+<h4 className="text-danger">₹{analytics.total_balance}</h4>
+</div>
+</div>
+
+</div>
+      <div className="container mt-4">
+
+        <div className="d-flex justify-content-between align-items-center mb-3">
+
+          <h3>Invoices</h3>
+
+          <Link to="/invoices/create" className="btn btn-primary">
+            Create Invoice
+          </Link>
+
+        </div>
+
+        <table className="table table-bordered">
+
+          <thead>
+
+            <tr>
+
+              <th>Invoice No</th>
+              <th>Client</th>
+              <th>Date</th>
+              <th>Total</th>
+              <th>Paid</th>
+              <th>Balance</th>
+              <th>Status</th>
+              <th>Action</th>
+
+            </tr>
+
+          </thead>
+
+          <tbody>
+
+            {invoices.length === 0 && (
+
+              <tr>
+                <td colSpan={8} className="text-center">
+                  No invoices found
+                </td>
+              </tr>
+
+            )}
+
+            {invoices.map((inv) => (
+
+              <tr key={inv.id}>
+
+                <td>{inv.invoice_number}</td>
+
+              <td>{inv.client_name}</td>
+
+                <td>{inv.issue_date}</td>
+
+                <td>₹{inv.total}</td>
+
+                <td>₹{inv.total_paid}</td>
+
+                <td>₹{inv.balance}</td>
+
+                <td>
+
+                  <span className={`badge bg-${getStatusColor(inv.status)}`}>
+                    {inv.status}
+                  </span>
+
+                </td>
+
+              <td className="d-flex gap-2">
+
+<Link
+to={`/invoices/${inv.id}`}
+className="btn btn-sm btn-light"
+title="View"
+>
+<i className="bi bi-eye"></i>
+</Link>
+
+{inv.status !== "paid" && (
+<>
+<Link
+to={`/invoices/edit/${inv.id}`}
+className="btn btn-sm btn-light"
+title="Edit"
+>
+<i className="bi bi-pencil"></i>
+</Link>
+
+<button
+className="btn btn-sm btn-light text-danger"
+onClick={() => deleteInvoice(inv.id)}
+title="Delete"
+>
+<i className="bi bi-trash"></i>
+</button>
+</>
+)}
+<button
+className="btn btn-sm btn-light"
+onClick={()=>downloadInvoice(inv.id)}
+title="Download Invoice"
+>
+<i className="bi bi-file-earmark-pdf"></i>
+</button>
+
+<button
+className="btn btn-sm btn-light"
+onClick={()=>sendInvoice(inv.id)}
+title="Send Email"
+>
+<i className="bi bi-envelope"></i>
+</button>
+</td>
+
+              </tr>
+
+            ))}
+
+          </tbody>
+
+        </table>
+
       </div>
 
-      <table className="table table-bordered">
-
-        <thead>
-          <tr>
-            <th>Invoice No</th>
-            <th>Client</th>
-            <th>Date</th>
-            <th>Amount</th>
-            <th>Status</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-
-        <tbody>
-
-          {invoices.map((inv) => (
-            <tr key={inv.id}>
-              <td>{inv.invoice_number}</td>
-              <td>{inv.client_name}</td>
-              <td>{inv.issue_date}</td>
-              <td>₹{inv.total_amount}</td>
-
-              <td>
-                <span className={`badge bg-${inv.status === "paid" ? "success" : "warning"}`}>
-                  {inv.status}
-                </span>
-              </td>
-
-              <td>
-                <Link
-                  to={`/invoices/${inv.id}`}
-                  className="btn btn-sm btn-primary"
-                >
-                  View
-                </Link>
-              </td>
-            </tr>
-          ))}
-
-        </tbody>
-
-      </table>
-    </div>
     </Layout>
   );
 };
