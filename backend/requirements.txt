@@ -8,3 +8,4 @@ django-filter
 djangorestframework-simplejwt
 django-rest-passwordreset
 python-dotenv
+reportlab
