@@ -2,29 +2,44 @@ import React, { useState, useEffect } from 'react';
 import { Lead, LeadAssignment, LeadFollowup, User, UserRole, Client, Project, Department, ProjectStatus } from '../../types';
 import axiosInstance from '../../api/axiosInstance';
 import { useForm } from '../../hooks/useForm';
+import { useCrud } from '../../hooks/useCrud';
 import FormField from '../../components/FormField';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
+
 interface LeadsPageProps {
-  leads: Lead[];
-  crud: any;
   users: User[];
   clients: Client[];
-  clientCrud: any;
-  projects: Project[];
-  projectCrud: any;
   departments: Department[];
+  setProjects?: (projects: any[]) => void;
 }
 
 const LeadsPage: React.FC<LeadsPageProps> = ({
-  leads = [],
-  crud,
   users = [],
   clients = [],
-  clientCrud,
-  projects = [],
-  projectCrud,
-  departments = []
+  departments = [],
+  setProjects,
 }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const {
+    items: leadList,
+    pagination: { page, setPage, totalPages },
+    add,
+    update,
+    delete: deleteLead,
+    refetch,
+  } = useCrud<Lead>({
+    endpoint: '/leads',
+    queryParams: {
+      ...(searchTerm ? { search: searchTerm } : {}),
+      ...(statusFilter && statusFilter !== 'all' ? { status: statusFilter } : {}),
+    },
+  });
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, statusFilter]);
+
   const [isModalOpen, setModalOpen] = useState(false);
   const [isConvertModalOpen, setConvertModalOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
@@ -33,17 +48,13 @@ const LeadsPage: React.FC<LeadsPageProps> = ({
   const [assignments, setAssignments] = useState<LeadAssignment[]>([]);
   const [followups, setFollowups] = useState<LeadFollowup[]>([]);
   const [isDetailsModalOpen, setDetailsModalOpen] = useState(false);
-  const [leadList, setLeadList] = useState<Lead[]>(leads || []);
-  const [searchTerm, setSearchTerm] = useState("");
-const [statusFilter, setStatusFilter] = useState("");
-const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-const [leadToDelete, setLeadToDelete] = useState<Lead | null>(null);
-const currentUserId = users?.[0]?.id || null;
-const [page, setPage] = useState(1);
-const [totalPages, setTotalPages] = useState(1);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [leadToDelete, setLeadToDelete] = useState<Lead | null>(null);
+  const currentUserId = users?.[0]?.id || null;
 
-  const salesExecs = (users || []).filter
-  (u =>  u.role_name === UserRole.SALES_EXECUTIVE ||
+  const salesExecs = (users || []).filter(
+    (u) =>
+      u.role_name === UserRole.SALES_EXECUTIVE ||
       u.role_name === UserRole.SALES_MANAGER ||
       u.role_name === UserRole.SUPER_ADMIN
   );
@@ -54,53 +65,20 @@ const [totalPages, setTotalPages] = useState(1);
     }
   }, [selectedLead]);
 
- const fetchLeadDetails = async (leadId: number) => {
-  try {
-    const [assignRes, followRes] = await Promise.all([
-      axiosInstance.get(`/lead-assignments/?lead_id=${leadId}`),
-      axiosInstance.get(`/lead-followups/?lead_id=${leadId}`)
-    ]);
-
-    setAssignments(assignRes.data);
-    setFollowups(followRes.data);
-
-  } catch (error) {
-    console.error("Error fetching lead details:", error);
-  }
-};
-  
-useEffect(() => {
-  fetchLeads(page);
-}, [page, searchTerm, statusFilter]);
-
- const fetchLeads = async (pageNumber = 1) => {
-
-  const params: any = {
-    page: pageNumber
+  const fetchLeadDetails = async (leadId: number) => {
+    try {
+      const [assignRes, followRes] = await Promise.all([
+        axiosInstance.get(`/lead-assignments/?lead_id=${leadId}`),
+        axiosInstance.get(`/lead-followups/?lead_id=${leadId}`),
+      ]);
+      setAssignments(assignRes.data ?? []);
+      setFollowups(followRes.data ?? []);
+    } catch (error) {
+      console.error('Error fetching lead details:', error);
+    }
   };
 
-  if (searchTerm) params.search = searchTerm;
-
-  if (statusFilter && statusFilter !== "all") {
-    params.status = statusFilter;
-  }
-
-  try {
-    const res = await axiosInstance.get("/leads/", { params });
-
-    setLeadList(res.data.results);
-    setTotalPages(Math.ceil(res.data.count / 5)); // PAGE_SIZE = 5
-    setPage(pageNumber);
-
-  } catch (error) {
-    console.error("Error fetching leads:", error);
-  }
-};
-const pageNumbers = [];
-
-for (let i = 1; i <= totalPages; i++) {
-  pageNumbers.push(i);
-}
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
   const validationSchema = {
     name: {
       required: true,
@@ -138,9 +116,9 @@ for (let i = 1; i <= totalPages; i++) {
       };
 
       if (editingLead) {
-        await crud.update(editingLead.id, payload);
+        await update(editingLead.id!, payload);
       } else {
-        await crud.add(payload);
+        await add(payload);
       }
       setModalOpen(false);
       setEditingLead(null);
@@ -179,11 +157,7 @@ const handleConfirmDelete = async () => {
   if (!leadToDelete) return;
 
   try {
-    await crud.delete(leadToDelete.id);
-
-    // remove from local list
-    setLeadList(prev => prev.filter(l => l.id !== leadToDelete.id));
-
+    await deleteLead(leadToDelete.id);
   } catch (error) {
     console.error("Delete failed:", error);
   }
@@ -272,9 +246,7 @@ const handleConfirmDelete = async () => {
           createdBy: currentUserId // Mocking current user
         };
 
-        await crud.convert(convertingLead.id, clientData, projectData);
-        // ✅ refresh leads
-await axiosInstance.get("/leads/"); // or whatever your list function is
+        await handleConvertLead(convertingLead.id, clientData, projectData);
         setConvertModalOpen(false);
         setConvertingLead(null);
       } catch (error) {
@@ -283,19 +255,63 @@ await axiosInstance.get("/leads/"); // or whatever your list function is
     }
   });
 
+  const handleConvertLead = async (
+    leadId: number,
+    clientData: { name: string; companyName: string; email: string; phone: string; address: string },
+    projectData: {
+      name: string;
+      departmentId: number;
+      projectManagerId: number;
+      startDate: string;
+      endDate: string;
+      status: ProjectStatus;
+      progressPercentage: number;
+      createdBy: number | null;
+    }
+  ) => {
+    const clientRes = await axiosInstance.post('/clients/', {
+      name: clientData.name,
+      company_name: clientData.companyName,
+      email: clientData.email,
+      phone: clientData.phone,
+      address: clientData.address,
+    });
+    const clientId = clientRes.data.id ?? clientRes.data.data?.id;
+    await axiosInstance.patch(`/leads/${leadId}/`, { client: clientId });
+    const convertRes = await axiosInstance.post(`/leads/${leadId}/convert_to_project/`, {
+      name: projectData.name,
+      client: clientId,
+      department: projectData.departmentId,
+      project_manager: projectData.projectManagerId,
+      created_by: projectData.createdBy,
+      start_date: projectData.startDate,
+      end_date: projectData.endDate,
+      status: projectData.status,
+      progress_percentage: projectData.progressPercentage,
+    });
+    await refetch();
+    if (setProjects) {
+      const projectsRes = await axiosInstance.get('/projects/?limit=1000');
+      setProjects(projectsRes.data.results ?? []);
+    }
+    return convertRes.data;
+  };
+
   const handleAssignExec = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedLead) return;
     const formData = new FormData(e.currentTarget);
     const execId = Number(formData.get('sales_exec_id'));
     if (!execId) return;
-
     try {
-      await crud.assign(selectedLead.id, execId);
+      await axiosInstance.post('/lead-assignments/', {
+        lead: selectedLead.id,
+        sales_exec: execId,
+      });
       fetchLeadDetails(selectedLead.id);
       (e.target as HTMLFormElement).reset();
     } catch (error) {
-      console.error("Assignment failed:", error);
+      console.error('Assignment failed:', error);
     }
   };
 
@@ -463,7 +479,7 @@ await axiosInstance.get("/leads/"); // or whatever your list function is
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchLeads(1)}
+    onClick={() => setPage(1)}
   >
     « First
   </button>
@@ -472,7 +488,7 @@ await axiosInstance.get("/leads/"); // or whatever your list function is
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchLeads(page - 1)}
+    onClick={() => setPage(page - 1)}
   >
     ‹ Prev
   </button>
@@ -482,7 +498,7 @@ await axiosInstance.get("/leads/"); // or whatever your list function is
     <button
       key={num}
       className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
-      onClick={() => fetchLeads(num)}
+      onClick={() => setPage(num)}
     >
       {num}
     </button>
@@ -492,7 +508,7 @@ await axiosInstance.get("/leads/"); // or whatever your list function is
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchLeads(page + 1)}
+    onClick={() => setPage(page + 1)}
   >
     Next ›
   </button>
@@ -501,7 +517,7 @@ await axiosInstance.get("/leads/"); // or whatever your list function is
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchLeads(totalPages)}
+    onClick={() => setPage(totalPages)}
   >
     Last »
   </button>

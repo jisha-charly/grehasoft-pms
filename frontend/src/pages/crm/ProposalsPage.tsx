@@ -2,14 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { Proposal, Lead, ProposalItem } from '../../types';
 import { generateProposalPDF } from '../../utils/pdfGenerator';
 import { useLocation } from "react-router-dom";
-import axiosInstance from '@/api/axiosInstance';
+import axiosInstance from '../../api/axiosInstance';
+import { useCrud } from '../../hooks/useCrud';
+
 interface ProposalsPageProps {
-  proposals: Proposal[];
   leads: Lead[];
-  crud: any;
+  setProjects?: (projects: any[]) => void;
 }
 
-const ProposalsPage: React.FC<ProposalsPageProps> = ({ proposals, leads, crud }) => {
+const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects }) => {
+  const {
+    items: proposals,
+    pagination: { page, setPage, totalPages, totalCount: count },
+    add,
+    update,
+    delete: remove,
+    refetch,
+    setItems: setProposalsList,
+  } = useCrud<Proposal>({ endpoint: '/proposals' });
+
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingProposal, setEditingProposal] = useState<Proposal | null>(null);
   const [items, setItems] = useState<ProposalItem[]>([
@@ -21,29 +32,8 @@ const ProposalsPage: React.FC<ProposalsPageProps> = ({ proposals, leads, crud })
   const [phone, setPhone] = useState('');
   const [selectedLeadId, setSelectedLeadId] = useState<number | ''>('');
   const location = useLocation();
-  const [page, setPage] = useState(1);
-const [totalPages, setTotalPages] = useState(1);
-const [proposalList, setProposalList] = useState<Proposal[]>(proposals || []);
-const fetchProposals = async (pageNumber = 1) => {
-  try {
-    const res = await axiosInstance.get(`/proposals/?page=${pageNumber}`);
 
-    setProposalList(res.data.results);
-    setTotalPages(Math.ceil(res.data.count / 5)); // PAGE_SIZE = 5
-    setPage(pageNumber);
-
-  } catch (error) {
-    console.error("Error fetching proposals:", error);
-  }
-};
-useEffect(() => {
-  fetchProposals(page);
-}, [page]);
-const pageNumbers = [];
-
-for (let i = 1; i <= totalPages; i++) {
-  pageNumbers.push(i);
-}
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   const params = new URLSearchParams(location.search);
   const leadId = params.get("lead");
@@ -100,7 +90,7 @@ for (let i = 1; i <= totalPages; i++) {
     setItems(newItems);
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
@@ -121,9 +111,9 @@ for (let i = 1; i <= totalPages; i++) {
     };
 
     if (editingProposal) {
-      crud.update(editingProposal.id, payload);
+      await update(editingProposal.id!, payload);
     } else {
-      crud.add(payload);
+      await add(payload);
     }
     setModalOpen(false);
     setEditingProposal(null);
@@ -135,6 +125,21 @@ for (let i = 1; i <= totalPages; i++) {
       case 'sent': return 'bg-primary';
       case 'rejected': return 'bg-danger';
       default: return 'bg-secondary';
+    }
+  };
+
+  const handleConvert = async (id: number) => {
+    try {
+      await axiosInstance.post(`/proposals/${id}/convert/`);
+      setProposalsList((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, is_converted: true } : p))
+      );
+      if (setProjects) {
+        const res = await axiosInstance.get('/projects/?limit=1000');
+        setProjects(res.data.results ?? []);
+      }
+    } catch (err) {
+      console.error('Convert error:', err);
     }
   };
 
@@ -168,7 +173,7 @@ for (let i = 1; i <= totalPages; i++) {
                 <td colSpan={6} className="text-center py-5 text-muted">No proposals found</td>
               </tr>
             ) : (
-             proposalList.map(proposal => (
+             proposals.map(proposal => (
                 <tr key={proposal.id}>
                   <td className="px-4 fw-bold">{proposal.title}</td>
                   <td>{proposal.leadName}</td>
@@ -191,7 +196,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-success me-2 shadow-sm"
     onClick={async () => {
-      await crud.convert(proposal.id);
+      await handleConvert(proposal.id);
     }}
   >
     <i className="bi bi-rocket-takeoff me-1"></i>Convert
@@ -260,7 +265,7 @@ for (let i = 1; i <= totalPages; i++) {
   {/* Delete */}
   <button
     className="btn btn-sm btn-light text-danger border shadow-sm"
-    onClick={() => crud.delete(proposal.id)}
+    onClick={() => remove(proposal.id)}
   >
     <i className="bi bi-trash"></i>
   </button>
@@ -283,7 +288,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchProposals(1)}
+    onClick={() => setPage(1)}
   >
     « First
   </button>
@@ -292,7 +297,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchProposals(page - 1)}
+    onClick={() => setPage(page - 1)}
   >
     ‹ Prev
   </button>
@@ -302,7 +307,7 @@ for (let i = 1; i <= totalPages; i++) {
     <button
       key={num}
       className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
-      onClick={() => fetchProposals(num)}
+      onClick={() => setPage(num)}
     >
       {num}
     </button>
@@ -312,7 +317,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchProposals(page + 1)}
+    onClick={() => setPage(page + 1)}
   >
     Next ›
   </button>
@@ -321,7 +326,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchProposals(totalPages)}
+    onClick={() => setPage(totalPages)}
   >
     Last »
   </button>

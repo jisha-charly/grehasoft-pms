@@ -1,41 +1,24 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Client } from '../../types';
 import { useForm } from '../../hooks/useForm';
+import { useCrud } from '../../hooks/useCrud';
 import FormField from '../../components/FormField';
 
-interface ClientsPageProps {
-  clients: Client[];
-  setClients: (c: Client[]) => void;
-  crud: any;
-}
+const ClientsPage: React.FC = () => {
+  const {
+    items: clients,
+    pagination: { page, setPage, totalPages },
+    add,
+    update,
+    delete: deleteClient,
+  } = useCrud<Client>({ endpoint: '/clients' });
 
-const ClientsPage: React.FC<ClientsPageProps> = ({ clients = [], setClients, crud }) => {
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-const [deleteClientId, setDeleteClientId] = useState<number | null>(null);
-const [page, setPage] = useState(1);
-const [totalPages, setTotalPages] = useState(1);
-const fetchClients = async (pageNumber = 1) => {
-  try {
-    const res = await crud.getAll(`?page=${pageNumber}`);
+  const [deleteClientId, setDeleteClientId] = useState<number | null>(null);
 
-    setClients(res.results);
-    setTotalPages(Math.ceil(res.count / 5));
-    setPage(pageNumber);
-
-  } catch (err) {
-    console.error("Error fetching clients", err);
-  }
-};
-useEffect(() => {
-  fetchClients(page);
-}, [page]);
-const pageNumbers = [];
-
-for (let i = 1; i <= totalPages; i++) {
-  pageNumbers.push(i);
-}
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
   /* ================= VALIDATION ================= */
 
   const validationSchema = {
@@ -86,9 +69,9 @@ for (let i = 1; i <= totalPages; i++) {
       };
 
       if (editingClient) {
-        await crud.update(editingClient.id, payload);
+        await update(editingClient.id!, payload);
       } else {
-        await crud.add(payload);
+        await add(payload);
       }
 
       resetForm();
@@ -145,7 +128,7 @@ for (let i = 1; i <= totalPages; i++) {
 
 const confirmDelete = async () => {
   if (deleteClientId !== null) {
-    await crud.delete(deleteClientId);
+    await deleteClient(deleteClientId);
     setDeleteClientId(null);
   }
 };
@@ -193,7 +176,7 @@ const confirmDelete = async () => {
 
           <div className="col-md-8 text-end">
             <span className="text-secondary small fw-bold">
-              Total Accounts: {clients.length}
+              Total Accounts: {clients?.length ?? 0}
             </span>
           </div>
         </div>
@@ -285,7 +268,7 @@ const confirmDelete = async () => {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchClients(1)}
+    onClick={() => setPage(1)}
   >
     « First
   </button>
@@ -294,7 +277,7 @@ const confirmDelete = async () => {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchClients(page - 1)}
+    onClick={() => setPage(page - 1)}
   >
     ‹ Prev
   </button>
@@ -304,7 +287,7 @@ const confirmDelete = async () => {
     <button
       key={num}
       className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
-      onClick={() => fetchClients(num)}
+      onClick={() => setPage(num)}
     >
       {num}
     </button>
@@ -314,7 +297,7 @@ const confirmDelete = async () => {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchClients(page + 1)}
+    onClick={() => setPage(page + 1)}
   >
     Next ›
   </button>
@@ -323,7 +306,7 @@ const confirmDelete = async () => {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchClients(totalPages)}
+    onClick={() => setPage(totalPages)}
   >
     Last »
   </button>

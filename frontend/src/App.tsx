@@ -34,8 +34,6 @@ import {
   ProjectMember,
   ActivityLog,
   Permission,
-  Reminder,
-  Proposal,
 } from "./types";
 
 import axiosInstance from "./api/axiosInstance";
@@ -45,6 +43,8 @@ import InvoicesPage from "./pages/invoices/InvoicesPage";
 import InvoiceDetailsPage from "./pages/invoices/InvoiceDetailsPage";
 import ProposalsPage from "./pages/crm/ProposalsPage";
 import RemindersPage from "./pages/crm/RemindersPage";
+import HRDocumentsPage from "./pages/hr/HRDocumentsPage";
+import InfrastructurePage from "./pages/infrastructure/InfrastructurePage";
 
 const App: React.FC = () => {
   const { isAuthenticated, loading, user } = useAuth();
@@ -63,8 +63,6 @@ const App: React.FC = () => {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [proposals, setProposals] = useState<Proposal[]>([]);
 
   /* ============== SAFE DATA HANDLER ============== */
 
@@ -93,7 +91,6 @@ const App: React.FC = () => {
         clientsRes,
         tasksRes,
         leadsRes,
-        proposalsRes,
       ] = await Promise.all([
         axiosInstance.get("/users"),
         axiosInstance.get("/roles"),
@@ -103,18 +100,16 @@ const App: React.FC = () => {
         axiosInstance.get("/clients"),
         axiosInstance.get("/tasks"),
         axiosInstance.get("/leads"),
-        axiosInstance.get("/proposals")   // ✅ ADD THIS
       ]);
 
       setUsers(safeData(usersRes));
       setRoles(safeData(rolesRes));
       setDepartments(safeData(deptsRes));
       setTaskTypes(safeData(typesRes));
-     setProjects(projectsRes.data.results);
+      setProjects(projectsRes.data?.results ?? []);
       setClients(safeData(clientsRes));
       setTasks(safeData(tasksRes));
       setLeads(safeData(leadsRes));
-      setProposals(safeData(proposalsRes));
     } catch (error) {
       console.error("Error fetching master data:", error);
     }
@@ -169,93 +164,9 @@ const App: React.FC = () => {
 });
 
   const projectCrud = createCrud("/projects", setProjects);
- 
-const [projectCount, setProjectCount] = useState(0);
-const [projectPage, setProjectPage] = useState(1);
-
-const fetchProjects = async (page = 1) => {
-  const res = await axiosInstance.get(`/projects/?page=${page}`);
-
-  setProjects(res.data.results);
-  setProjectCount(res.data.count);
-};
-
-useEffect(() => {
-  fetchProjects(projectPage);
-}, [projectPage]);
   const taskCrud = createCrud("/tasks", setTasks);
-  const clientCrud = createCrud("/clients", setClients);
-const leadCrud = {
-  ...createCrud("/leads", setLeads),
 
-convert: async (
-  leadId: number,
-  clientData: any,
-  projectData: any
-) => {
-  try {
-    let clientId: number | null = null;
-
-    // 🔹 Always create client (or adjust logic if needed)
-    const clientRes = await axiosInstance.post("/clients/", {
-      name: clientData.name,
-      company_name: clientData.companyName,
-      email: clientData.email,
-      phone: clientData.phone,
-      address: clientData.address,
-    });
-
-    clientId = clientRes.data.id;
-
-    // 🔹 Update lead with new client
-    await axiosInstance.patch(`/leads/${leadId}/`, {
-      client: clientId,
-    });
-
-    // 🔹 Convert lead to project
-    const convertRes = await axiosInstance.post(
-      `/leads/${leadId}/convert_to_project/`,
-      {
-         name: projectData.name,
-    client: clientId,
-    department: projectData.departmentId,
-    project_manager: projectData.projectManagerId,
-    created_by: projectData.createdBy,
-    start_date: projectData.startDate,
-    end_date: projectData.endDate,
-    status: projectData.status,
-    progress_percentage: projectData.progressPercentage
-      }
-    );
-
-    return convertRes.data;
-
-  }
-  
-   catch (error) {
-    console.error("Conversion failed:", error);
-    throw error;
-  }
-},
-
-  // ✅ ADD THIS METHOD
-  assign: async (leadId: number, execId: number) => {
-    try {
-      const res = await axiosInstance.post("/lead-assignments/", {
-        lead: leadId,
-        sales_exec: execId,
-      });
-
-      return res.data;
-    } catch (error) {
-      console.error("Assignment failed:", error);
-      throw error;
-    }
-  }
-
-};
-
-const handleUpdatePassword = async (newPassword: string, currentPassword: string) => {
+  const handleUpdatePassword = async (newPassword: string, currentPassword: string) => {
   try {
 
     await axiosInstance.post("/users/change-password/", {
@@ -297,59 +208,8 @@ const handleUpdateProfile = async (data: any) => {
   }
 };
 
-    
-  const roleCrud = createCrud("/roles", setRoles);
-  const deptCrud = createCrud("/departments", setDepartments);
-  const taskTypeCrud = createCrud("/task-types", setTaskTypes);
-  const userCrud = createCrud("/users", setUsers);
   const milestoneCrud = createCrud("/milestones", setMilestones);
   const memberCrud = createCrud("/project-members", setProjectMembers);
-  const reminderCrud = createCrud("/reminders", setReminders);
- const proposalCrud = {
-  ...createCrud("/proposals", setProposals),
-
-  send: async (id: number) => {
-    try {
-      const res = await axiosInstance.post(`/proposals/${id}/send/`);
-
-      setProposals((prev) =>
-        prev.map((p) =>
-          p.id === id
-            ? {
-                ...p,
-                status: "sent",
-                lastSentAt: res.data.last_sent_at,
-              }
-            : p
-        )
-      );
-    } catch (error) {
-      console.error("Error sending proposal:", error);
-    }
-  },
-
-convert: async (id: number) => {
-  try {
-
-    await axiosInstance.post(`/proposals/${id}/convert/`);
-
-    // update proposal status
-    setProposals(prev =>
-      prev.map(p =>
-        p.id === id ? { ...p, is_converted: true } : p
-      )
-    );
-
-    // 🔥 reload projects list from backend
-    const projectsRes = await axiosInstance.get("/projects/?limit=1000");
-
-    setProjects(projectsRes.data.results);
-
-  } catch (error) {
-    console.error("Convert error:", error);
-  }
-},
-};
 
   /* ================= ROUTES ================= */
 
@@ -374,14 +234,9 @@ convert: async (id: number) => {
             <ProtectedRoute requiredPermission={Permission.VIEW_PROJECTS}>
               <Layout >
                <ProjectsPage
-  projects={projects}
-  totalCount={projectCount}
-  currentPage={projectPage}
-  setCurrentPage={setProjectPage}
   users={users}
   departments={departments}
   clients={clients}
-  crud={projectCrud}
 />
               </Layout>
             </ProtectedRoute>
@@ -413,28 +268,27 @@ convert: async (id: number) => {
           }
         />
       <Route path="/projects/:id/kanban" element={<ProtectedRoute requiredPermission={Permission.MANAGE_TASKS}><Layout ><ProjectKanbanPage projects={projects} tasks={tasks} setTasks={setTasks} milestones={milestones} users={users} crud={taskCrud} taskTypes={taskTypes} currentUser={user!} /></Layout></ProtectedRoute>} />
-          <Route path="/tasks" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout ><TasksPage tasks={tasks} setTasks={setTasks} milestones={milestones} projects={projects} taskTypes={taskTypes} users={users} crud={taskCrud} currentUser={user!}/></Layout></ProtectedRoute>} />
-          <Route path="/clients" element={<ProtectedRoute requiredPermission={Permission.VIEW_CLIENTS}><Layout ><ClientsPage
-  clients={clients}
-  setClients={setClients}
-  crud={clientCrud}
-/></Layout></ProtectedRoute>} />
-          <Route path="/crm" element={<ProtectedRoute requiredPermission={Permission.VIEW_LEADS}><Layout ><LeadsPage leads={leads}
-  crud={leadCrud}
-  users={users}
-  clients={clients}
-  clientCrud={clientCrud}
-  projects={projects}
-  projectCrud={projectCrud}
-  departments={departments}     /></Layout></ProtectedRoute>} />
+          <Route path="/tasks" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout ><TasksPage milestones={milestones} projects={projects} taskTypes={taskTypes} users={users} currentUser={user!}/></Layout></ProtectedRoute>} />
+          <Route path="/clients" element={<ProtectedRoute requiredPermission={Permission.VIEW_CLIENTS}><Layout ><ClientsPage /></Layout></ProtectedRoute>} />
+          <Route path="/crm" element={<ProtectedRoute requiredPermission={Permission.VIEW_LEADS}><Layout ><LeadsPage users={users} clients={clients} departments={departments} setProjects={setProjects} /></Layout></ProtectedRoute>} />
          <Route path="/seo" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout><SEOPage /></Layout></ProtectedRoute>} />
-        <Route path="/admin/users" element={<ProtectedRoute requiredPermission={Permission.MANAGE_USERS}><Layout><UsersPage users={users} roles={roles} departments={departments} crud={userCrud} /></Layout></ProtectedRoute>} />
+        <Route path="/admin/users" element={<ProtectedRoute requiredPermission={Permission.MANAGE_USERS}><Layout><UsersPage roles={roles} departments={departments} /></Layout></ProtectedRoute>} />
+        <Route
+          path="/infrastructure"
+          element={
+            <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
+              <Layout>
+                <InfrastructurePage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/admin/roles"
           element={
             <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
               <Layout >
-                <RolesPage roles={roles} crud={roleCrud} />
+                <RolesPage />
               </Layout>
             </ProtectedRoute>
           }
@@ -445,7 +299,7 @@ convert: async (id: number) => {
             element={
               <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
                 <Layout >
-                  <DepartmentsPage departments={departments} crud={deptCrud} />
+                  <DepartmentsPage />
                 </Layout>
               </ProtectedRoute>
             }
@@ -456,7 +310,7 @@ convert: async (id: number) => {
             element={
               <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
                 <Layout>
-                  <TaskTypesPage taskTypes={taskTypes} crud={taskTypeCrud} />
+                  <TaskTypesPage />
                 </Layout>
               </ProtectedRoute>
             }
@@ -482,8 +336,9 @@ convert: async (id: number) => {
 <Route path="/invoices/create" element={<CreateInvoicePage />} />
 <Route path="/invoices/edit/:id" element={<CreateInvoicePage />} />
 <Route path="/invoices/:id" element={<InvoiceDetailsPage />} />
- <Route path="/reminders" element={<ProtectedRoute requiredPermission={Permission.VIEW_REMINDERS}><Layout><RemindersPage reminders={reminders} crud={reminderCrud} /></Layout></ProtectedRoute>} />
-  <Route path="/proposals" element={<ProtectedRoute requiredPermission={Permission.VIEW_PROPOSALS}><Layout><ProposalsPage proposals={proposals} leads={leads} crud={proposalCrud} /></Layout></ProtectedRoute>} />
+ <Route path="/reminders" element={<ProtectedRoute requiredPermission={Permission.VIEW_REMINDERS}><Layout><RemindersPage /></Layout></ProtectedRoute>} />
+  <Route path="/proposals" element={<ProtectedRoute requiredPermission={Permission.VIEW_PROPOSALS}><Layout><ProposalsPage leads={leads} setProjects={setProjects} /></Layout></ProtectedRoute>} />
+  <Route path="/hr-documents" element={<ProtectedRoute requiredPermission={Permission.GENERATE_HR_DOCS}><Layout><HRDocumentsPage /></Layout></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>

@@ -41,6 +41,9 @@ INSTALLED_APPS = [
     'apps.seo',
     'apps.invoices',
     'apps.proposals',
+    'apps.reminders.apps.RemindersConfig',  # 👈 add this
+    'apps.hr_documents.apps.HrDocumentsConfig',
+    "apps.infrastructure.apps.InfrastructureConfig",
     'core.apps.CoreConfig',
 ]
 

@@ -1,48 +1,31 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { TaskType } from '../../../types';
 import { useForm } from '../../../hooks/useForm';
+import { useCrud } from '../../../hooks/useCrud';
 import FormField from '../../../components/FormField';
 
-interface TaskTypesPageProps {
-  taskTypes: TaskType[];
-  crud: any;
-}
+const TaskTypesPage: React.FC = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const {
+    items: taskTypes,
+    pagination: { page, setPage, totalPages },
+    add,
+    update,
+    delete: deleteTaskType,
+  } = useCrud<TaskType>({
+    endpoint: '/task-types',
+    queryParams: searchTerm ? { search: searchTerm } : undefined,
+  });
 
-const TaskTypesPage: React.FC<TaskTypesPageProps> = ({ taskTypes, crud }) => {
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
+
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingType, setEditingType] = useState<TaskType | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-const [typeToDelete, setTypeToDelete] = useState<any | null>(null);
-const [page, setPage] = useState(1);
-const [totalPages, setTotalPages] = useState(1);
-const [typeList, setTypeList] = useState<TaskType[]>(taskTypes || []);
-const fetchTaskTypes = async (pageNumber = 1) => {
-  try {
-    const params: any = {
-      page: pageNumber
-    };
+  const [typeToDelete, setTypeToDelete] = useState<TaskType | null>(null);
 
-    if (searchTerm) params.search = searchTerm;
-
-    const res = await crud.getAll(params);
-
-    setTypeList(res.results);
-    setTotalPages(Math.ceil(res.count / 5)); // backend PAGE_SIZE
-    setPage(pageNumber);
-
-  } catch (error) {
-    console.error("Error fetching task types:", error);
-  }
-};
-useEffect(() => {
-  fetchTaskTypes(page);
-}, [page, searchTerm]);
-const pageNumbers = [];
-
-for (let i = 1; i <= totalPages; i++) {
-  pageNumbers.push(i);
-}
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
   const filteredTypes = useMemo(() => {
     return taskTypes.filter(tt => 
       tt.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -68,9 +51,9 @@ for (let i = 1; i <= totalPages; i++) {
       };
       
       if (editingType) {
-        await crud.update(editingType.id, data);
+        await update(editingType.id!, data);
       } else {
-        await crud.add(data);
+        await add(data);
       }
       setModalOpen(false);
       setEditingType(null);
@@ -121,7 +104,7 @@ for (let i = 1; i <= totalPages; i++) {
               </div>
             </div>
             <div className="col-md-8 text-end">
-              <span className="text-secondary smaller fw-bold uppercase">System Types: {taskTypes.length}</span>
+              <span className="text-secondary smaller fw-bold uppercase">System Types: {taskTypes?.length ?? 0}</span>
             </div>
           </div>
         </div>
@@ -147,7 +130,7 @@ for (let i = 1; i <= totalPages; i++) {
                   </td>
                 </tr>
               ) : (
-             typeList.map(tt => (
+             taskTypes.map(tt => (
                   <tr key={tt.id} className="hover-bg-light transition">
                     <td className="px-4">
                       <span className="badge bg-light text-dark border px-3 py-2 font-monospace tracking-wide">
@@ -182,7 +165,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchTaskTypes(1)}
+    onClick={() => setPage(1)}
   >
     « First
   </button>
@@ -190,7 +173,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchTaskTypes(page - 1)}
+    onClick={() => setPage(page - 1)}
   >
     ‹ Prev
   </button>
@@ -199,7 +182,7 @@ for (let i = 1; i <= totalPages; i++) {
     <button
       key={num}
       className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
-      onClick={() => fetchTaskTypes(num)}
+      onClick={() => setPage(num)}
     >
       {num}
     </button>
@@ -208,7 +191,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchTaskTypes(page + 1)}
+    onClick={() => setPage(page + 1)}
   >
     Next ›
   </button>
@@ -216,7 +199,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchTaskTypes(totalPages)}
+    onClick={() => setPage(totalPages)}
   >
     Last »
   </button>
@@ -316,7 +299,7 @@ for (let i = 1; i <= totalPages; i++) {
           <button
             className="btn btn-danger"
             onClick={async () => {
-              await crud.delete(typeToDelete.id);
+              await deleteTaskType(typeToDelete.id);
               setTypeToDelete(null);
             }}
           >

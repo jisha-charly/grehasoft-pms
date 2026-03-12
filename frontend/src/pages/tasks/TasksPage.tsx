@@ -1,38 +1,36 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Task, Project, TaskType, User, TaskStatus, Milestone, Permission } from '../../types';
 import WeeklyTaskInsights from './WeeklyTaskInsights';
 import { useAuth } from '../../context/AuthContext';
 import TaskDetailsModal from '../../components/TaskDetailsModal';
 import { useForm } from '../../hooks/useForm';
+import { useCrud } from '../../hooks/useCrud';
 import FormField from '../../components/FormField';
-import axiosInstance from '@/api/axiosInstance';
 
 interface TasksPageProps {
-  tasks: Task[];
-  setTasks: (t: Task[]) => void;
   milestones: Milestone[];
   projects: Project[];
   taskTypes: TaskType[];
   users: User[];
-  crud: any;
   currentUser: User;
 }
 
 const TasksPage: React.FC<TasksPageProps> = ({
-  tasks,
-  setTasks,
   projects,
   taskTypes,
   users,
   milestones,
-  crud,
   currentUser
 }) => {
   const { hasPermission } = useAuth();
-
-  if (!Array.isArray(tasks)) {
-    return <div className="p-4">Loading tasks...</div>;
-  }
+  const {
+    items: tasks,
+    pagination: { page, setPage, totalPages },
+    add,
+    update,
+    delete: deleteTask,
+    loading: tasksLoading,
+  } = useCrud<Task>({ endpoint: '/tasks' });
 
   const [viewMode, setViewMode] = useState<'list' | 'insights'>('list');
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,8 +39,6 @@ const TasksPage: React.FC<TasksPageProps> = ({
   const [priorityFilter, setPriorityFilter] = useState<string | 'all'>('all');
   const [isModalOpen, setModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
 
   const validationSchema = {
     projectId: { required: true, message: 'Please select a project.' },
@@ -64,7 +60,7 @@ const TasksPage: React.FC<TasksPageProps> = ({
     },
     validationSchema,
     onSubmit: async (formData) => {
-      await crud.add({
+      await add({
         projectId: Number(formData.projectId),
         milestoneId: formData.milestoneId ? Number(formData.milestoneId) : undefined,
         title: formData.title,
@@ -78,26 +74,8 @@ const TasksPage: React.FC<TasksPageProps> = ({
       setModalOpen(false);
     }
   });
- const fetchTasks = async (pageNumber = 1) => {
-  try {
-    const res = await axiosInstance.get(`/tasks/?page=${pageNumber}`);
 
-    setTasks(res.data.results);
-    setTotalPages(Math.ceil(res.data.count / 5));
-    setPage(pageNumber);
-
-  } catch (err) {
-    console.error("Error fetching tasks", err);
-  }
-};
-useEffect(() => {
-  fetchTasks(page);
-}, [page]);
-const pageNumbers = [];
-
-for (let i = 1; i <= totalPages; i++) {
-  pageNumbers.push(i);
-}
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   const filteredTasks = useMemo(() => {
     return tasks
@@ -148,6 +126,10 @@ for (let i = 1; i <= totalPages; i++) {
 
   return (
     <div className="tasks-container">
+      {tasksLoading && !tasks.length ? (
+        <div className="p-4">Loading tasks...</div>
+      ) : (
+        <>
 
       {/* HEADER + VIEW MODE */}
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -287,7 +269,7 @@ for (let i = 1; i <= totalPages; i++) {
                             {hasPermission(Permission.MANAGE_TASKS) && (
                               <button
                                 className="btn btn-sm btn-light text-danger"
-                                onClick={() => crud.delete(task.id)}
+                                onClick={() => deleteTask(task.id)}
                               >
                                 <i className="bi bi-trash"></i>
                               </button>
@@ -305,7 +287,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchTasks(1)}
+    onClick={() => setPage(1)}
   >
     « First
   </button>
@@ -314,7 +296,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchTasks(page - 1)}
+    onClick={() => setPage(page - 1)}
   >
     ‹ Prev
   </button>
@@ -324,7 +306,7 @@ for (let i = 1; i <= totalPages; i++) {
     <button
       key={num}
       className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
-      onClick={() => fetchTasks(num)}
+      onClick={() => setPage(num)}
     >
       {num}
     </button>
@@ -334,7 +316,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchTasks(page + 1)}
+    onClick={() => setPage(page + 1)}
   >
     Next ›
   </button>
@@ -343,7 +325,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchTasks(totalPages)}
+    onClick={() => setPage(totalPages)}
   >
     Last »
   </button>
@@ -364,8 +346,10 @@ for (let i = 1; i <= totalPages; i++) {
           onClose={() => setSelectedTask(null)}
           users={users}
           currentUser={currentUser}
-          onUpdateStatus={crud.update}
+          onUpdateStatus={update}
         />
+      )}
+        </>
       )}
     </div>
   );

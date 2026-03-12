@@ -27,6 +27,8 @@ from apps.projects.views import ActivityLogViewSet as ProjectActivityLogViewSet
 from apps.invoices.views import InvoicePaymentViewSet, InvoiceViewSet
 from apps.invoices import views
 from apps.proposals.views import ProposalViewSet
+from apps.reminders.views import ReminderViewSet
+
 router = routers.DefaultRouter()
 
 # Project Management
@@ -45,6 +47,7 @@ router.register(r'leads', LeadViewSet)
 router.register(r'lead-followups', LeadFollowupViewSet)
 router.register(r'lead-assignments', LeadAssignmentViewSet, basename='lead-assignments')
 router.register(r'proposals', ProposalViewSet)
+router.register(r'reminders', ReminderViewSet, basename='reminders')
 # Task Management & Collaboration
 router.register(r'tasks', TaskViewSet)
 router.register(r'task-types', TaskTypeViewSet)
@@ -74,6 +77,9 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path("api/v1/invoices/analytics/", views.invoice_analytics),
     path('api/v1/', include(router.urls)),
+    path("api/v1/", include("apps.hr_documents.urls")),
+    path("api/v1/", include("apps.infrastructure.urls")),  # NEW
+   
     path('api/v1/dashboard/stats/', DashboardStatsView.as_view(), name='dashboard-stats'),
     path('api/v1/auth/', include('rest_framework.urls')), 
     path('api/v1/password_reset/', include('django_rest_passwordreset.urls', namespace='password_reset')),

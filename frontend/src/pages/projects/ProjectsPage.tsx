@@ -3,36 +3,32 @@ import { Link } from 'react-router-dom';
 import { Project, ProjectStatus, User, Department, Client, Permission } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useForm } from '../../hooks/useForm';
+import { useCrud } from '../../hooks/useCrud';
 import FormField from '../../components/FormField';
 
 interface ProjectsPageProps {
-  projects: Project[];
-  totalCount: number;
-  currentPage: number;
-  setCurrentPage: (page: number) => void;
   users: User[];
   departments: Department[];
   clients: Client[];
-  crud: any;
 }
 
-
-
 const ProjectsPage: React.FC<ProjectsPageProps> = ({
-  projects,
-  totalCount,
-  currentPage,
-  setCurrentPage,
   users,
   departments,
   clients,
-  crud
 }) => {
   const { user: currentUser, hasPermission } = useAuth();
+  const {
+    items: projects,
+    pagination: { page: currentPage, setPage, totalPages, totalCount },
+    add,
+    update,
+    delete: deleteProject,
+  } = useCrud<Project>({ endpoint: '/projects' });
+
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
- 
 
   const canManage = hasPermission(Permission.MANAGE_PROJECTS);
 
@@ -104,9 +100,9 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({
       };
 
   if (editingProject) {
-        await crud.update(editingProject.id, payload);
+        await update(editingProject.id!, payload);
       } else {
-        await crud.add(payload);
+        await add(payload);
       }
 
       resetForm();
@@ -122,10 +118,8 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({
     );
   }, [projects, searchTerm]);
 
-  // Pagination
+  // Pagination (filter is client-side on current page results)
   const paginatedProjects = filteredProjects;
-  const ITEMS_PER_PAGE = 5; // same as backend
-const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
   const handleOpenModal = (project: Project | null = null) => {
     setEditingProject(project);
@@ -164,7 +158,7 @@ const pageNumbers: number[] = Array.from(
               className="form-control ps-5 border-0 shadow-sm rounded-pill" 
               placeholder="Search projects..." 
               value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
               style={{ width: '250px' }}
             />
           </div>
@@ -202,7 +196,7 @@ const pageNumbers: number[] = Array.from(
                 {canManage && (
                   <>
                     <button className="btn btn-light btn-sm flex-grow-1 fw-bold text-secondary rounded-pill" onClick={() => handleOpenModal(p)}>Edit</button>
-                    <button className="btn btn-light btn-sm fw-bold text-danger rounded-circle p-2" onClick={() => { if(confirm('Delete project?')) crud.delete(p.id); }}><i className="bi bi-trash"></i></button>
+                    <button className="btn btn-light btn-sm fw-bold text-danger rounded-circle p-2" onClick={() => { if(confirm('Delete project?')) deleteProject(p.id); }}><i className="bi bi-trash"></i></button>
                   </>
                 )}
                 <Link to={`/projects/${p.id}/kanban`} className="btn btn-light btn-sm flex-grow-1 fw-bold text-secondary d-flex align-items-center justify-content-center text-decoration-none rounded-pill">Kanban</Link>
@@ -225,7 +219,7 @@ const pageNumbers: number[] = Array.from(
     <button
       className="btn btn-sm btn-outline-secondary"
       disabled={currentPage === 1}
-      onClick={() => setCurrentPage(1)}
+      onClick={() => setPage(1)}
     >
       « First
     </button>
@@ -233,7 +227,7 @@ const pageNumbers: number[] = Array.from(
     <button
       className="btn btn-sm btn-outline-secondary"
       disabled={currentPage === 1}
-      onClick={() => setCurrentPage(currentPage - 1)}
+      onClick={() => setPage(currentPage - 1)}
     >
       ‹ Prev
     </button>
@@ -242,7 +236,7 @@ const pageNumbers: number[] = Array.from(
       <button
         key={num}
         className={`btn btn-sm ${currentPage === num ? "btn-primary" : "btn-outline-primary"}`}
-        onClick={() => setCurrentPage(num)}
+        onClick={() => setPage(num)}
       >
         {num}
       </button>
@@ -251,7 +245,7 @@ const pageNumbers: number[] = Array.from(
     <button
       className="btn btn-sm btn-outline-secondary"
       disabled={currentPage === totalPages}
-      onClick={() => setCurrentPage(currentPage + 1)}
+      onClick={() => setPage(currentPage + 1)}
     >
       Next ›
     </button>
@@ -259,7 +253,7 @@ const pageNumbers: number[] = Array.from(
     <button
       className="btn btn-sm btn-outline-secondary"
       disabled={currentPage === totalPages}
-      onClick={() => setCurrentPage(totalPages)}
+      onClick={() => setPage(totalPages)}
     >
       Last »
     </button>

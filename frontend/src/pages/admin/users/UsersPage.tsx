@@ -1,50 +1,36 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
-import { User, Role, Department, UserRole } from '../../../types';
+import { User, Role, Department } from '../../../types';
 import { useForm, ValidationSchema } from '../../../hooks/useForm';
+import { useCrud } from '../../../hooks/useCrud';
 import FormField from '../../../components/FormField';
 
 interface UsersPageProps {
-  users: User[];
   roles: Role[];
   departments: Department[];
-  crud: any;
 }
 
-const UsersPage: React.FC<UsersPageProps> = ({ users, roles, departments, crud }) => {
+const UsersPage: React.FC<UsersPageProps> = ({ roles, departments }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const {
+    items: users,
+    pagination: { page, setPage, totalPages },
+    add,
+    update,
+    delete: deleteUser,
+  } = useCrud<User>({
+    endpoint: '/users',
+    queryParams: searchTerm ? { search: searchTerm } : undefined,
+  });
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
+
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-const [userToDelete, setUserToDelete] = useState<User | null>(null);
-const [page, setPage] = useState(1);
-const [totalPages, setTotalPages] = useState(1);
-const [userList, setUserList] = useState<User[]>(users || []);
-const fetchUsers = async (pageNumber = 1) => {
-  try {
-    const params: any = {
-      page: pageNumber
-    };
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
-    if (searchTerm) params.search = searchTerm;
-
-    const res = await crud.getAll(params);
-
-    setUserList(res.results);
-    setTotalPages(Math.ceil(res.count / 5)); // PAGE_SIZE = 5
-    setPage(pageNumber);
-
-  } catch (error) {
-    console.error("Error fetching users:", error);
-  }
-};
-useEffect(() => {
-  fetchUsers(page);
-}, [page, searchTerm]);
-const pageNumbers = [];
-
-for (let i = 1; i <= totalPages; i++) {
-  pageNumbers.push(i);
-}
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
   const validationSchema: ValidationSchema<any> = {
     name: { required: true, message: 'Full name is required.' },
     username: { 
@@ -96,9 +82,9 @@ for (let i = 1; i <= totalPages; i++) {
   }
 
   if (editingUser) {
-    await crud.update(editingUser.id, data);
+    await update(editingUser.id!, data);
   } else {
-    await crud.add(data);
+    await add(data);
   }
 
   handleCloseModal();
@@ -197,7 +183,7 @@ for (let i = 1; i <= totalPages; i++) {
                   </td>
                 </tr>
               ) : (
-                userList.map(u => (
+                users.map(u => (
                   <tr key={u.id} className="hover-bg-light transition">
                     <td className="px-4">
                       <div className="d-flex align-items-center">
@@ -244,7 +230,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchUsers(1)}
+    onClick={() => setPage(1)}
   >
     « First
   </button>
@@ -252,7 +238,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchUsers(page - 1)}
+    onClick={() => setPage(page - 1)}
   >
     ‹ Prev
   </button>
@@ -261,7 +247,7 @@ for (let i = 1; i <= totalPages; i++) {
     <button
       key={num}
       className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
-      onClick={() => fetchUsers(num)}
+      onClick={() => setPage(num)}
     >
       {num}
     </button>
@@ -270,7 +256,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchUsers(page + 1)}
+    onClick={() => setPage(page + 1)}
   >
     Next ›
   </button>
@@ -278,7 +264,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchUsers(totalPages)}
+    onClick={() => setPage(totalPages)}
   >
     Last »
   </button>
@@ -442,7 +428,7 @@ for (let i = 1; i <= totalPages; i++) {
           <button 
             className="btn btn-danger"
             onClick={async () => {
-              await crud.delete(userToDelete.id);
+              await deleteUser(userToDelete.id);
               setUserToDelete(null);
             }}
           >

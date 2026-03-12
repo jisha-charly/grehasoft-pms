@@ -1,49 +1,31 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Role } from '../../../types';
 import { useForm } from '../../../hooks/useForm';
+import { useCrud } from '../../../hooks/useCrud';
 import FormField from '../../../components/FormField';
 
-interface RolesPageProps {
-  roles: Role[];
-  crud: any;
-}
+const RolesPage: React.FC = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const {
+    items: roles,
+    pagination: { page, setPage, totalPages },
+    add,
+    update,
+    delete: deleteRole,
+  } = useCrud<Role>({
+    endpoint: '/roles',
+    queryParams: searchTerm ? { search: searchTerm } : undefined,
+  });
 
-const RolesPage: React.FC<RolesPageProps> = ({ roles, crud }) => {
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
+
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
-  const [page, setPage] = useState(1);
-const [totalPages, setTotalPages] = useState(1);
-const [roleList, setRoleList] = useState<Role[]>(roles || []);
-const fetchRoles = async (pageNumber = 1) => {
-  try {
-    const params: any = {
-      page: pageNumber
-    };
 
-    if (searchTerm) params.search = searchTerm;
-
-    const res = await crud.getAll(params);
-
-    setRoleList(res.results);
-    setTotalPages(Math.ceil(res.count / 5)); // PAGE_SIZE from backend
-    setPage(pageNumber);
-
-  } catch (error) {
-    console.error("Error fetching roles:", error);
-  }
-};
-useEffect(() => {
-  fetchRoles(page);
-}, [page, searchTerm]);
-
-const pageNumbers = [];
-
-for (let i = 1; i <= totalPages; i++) {
-  pageNumbers.push(i);
-}
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
   const validationSchema = {
     name: { 
       required: true, 
@@ -66,9 +48,9 @@ for (let i = 1; i <= totalPages; i++) {
       };
       
       if (editingRole) {
-        await crud.update(editingRole.id, data);
+        await update(editingRole.id!, data);
       } else {
-        await crud.add(data);
+        await add(data);
       }
       setModalOpen(false);
       setEditingRole(null);
@@ -164,7 +146,7 @@ for (let i = 1; i <= totalPages; i++) {
                   </td>
                 </tr>
               ) : (
-               roleList.map(role => (
+               roles.map(role => (
                   <tr key={role.id} className="hover-bg-light transition">
                     <td className="px-4">
                       <div className="d-flex align-items-center">
@@ -196,7 +178,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchRoles(1)}
+    onClick={() => setPage(1)}
   >
     « First
   </button>
@@ -204,7 +186,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchRoles(page - 1)}
+    onClick={() => setPage(page - 1)}
   >
     ‹ Prev
   </button>
@@ -213,7 +195,7 @@ for (let i = 1; i <= totalPages; i++) {
     <button
       key={num}
       className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
-      onClick={() => fetchRoles(num)}
+      onClick={() => setPage(num)}
     >
       {num}
     </button>
@@ -222,7 +204,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchRoles(page + 1)}
+    onClick={() => setPage(page + 1)}
   >
     Next ›
   </button>
@@ -230,7 +212,7 @@ for (let i = 1; i <= totalPages; i++) {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchRoles(totalPages)}
+    onClick={() => setPage(totalPages)}
   >
     Last »
   </button>
@@ -331,7 +313,7 @@ for (let i = 1; i <= totalPages; i++) {
           <button
             className="btn btn-danger"
             onClick={async () => {
-              await crud.delete(roleToDelete.id);
+              await deleteRole(roleToDelete.id);
               setRoleToDelete(null);
             }}
           >

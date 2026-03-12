@@ -1,48 +1,31 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Department } from '../../../types';
 import { useForm } from '../../../hooks/useForm';
+import { useCrud } from '../../../hooks/useCrud';
 import FormField from '../../../components/FormField';
 
-interface DepartmentsPageProps {
-  departments: Department[];
-  crud: any;
-}
+const DepartmentsPage: React.FC = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const {
+    items: departments,
+    pagination: { page, setPage, totalPages },
+    add,
+    update,
+    delete: deleteDepartment,
+  } = useCrud<Department>({
+    endpoint: '/departments',
+    queryParams: searchTerm ? { search: searchTerm } : undefined,
+  });
 
-const DepartmentsPage: React.FC<DepartmentsPageProps> = ({ departments, crud }) => {
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
+
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [page, setPage] = useState(1);
-const [totalPages, setTotalPages] = useState(1);
-const [departmentList, setDepartmentList] = useState<Department[]>(departments || []);
-const fetchDepartments = async (pageNumber = 1) => {
-  try {
-    const params: any = {
-      page: pageNumber
-    };
+  const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(null);
 
-    if (searchTerm) params.search = searchTerm;
-
-    const res = await crud.getAll(params);
-
-    setDepartmentList(res.results);
-    setTotalPages(Math.ceil(res.count / 5)); // backend PAGE_SIZE
-    setPage(pageNumber);
-
-  } catch (error) {
-    console.error("Error fetching departments:", error);
-  }
-};
-useEffect(() => {
-  fetchDepartments(page);
-}, [page, searchTerm]);
-const pageNumbers = [];
-
-for (let i = 1; i <= totalPages; i++) {
-  pageNumbers.push(i);
-}
-const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(null);
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
   const validationSchema = {
     name: { required: true, message: 'Department name is required.' }
   };
@@ -60,9 +43,9 @@ const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(
       };
       
       if (editingDept) {
-        await crud.update(editingDept.id, data);
+        await update(editingDept.id!, data);
       } else {
-        await crud.add(data);
+        await add(data);
       }
       setModalOpen(false);
       setEditingDept(null);
@@ -147,7 +130,7 @@ const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(
                   </td>
                 </tr>
               ) : (
-              departmentList.map(dept => {
+              departments.map(dept => {
                   const parentName = getParentName(dept.parentId);
                   return (
                     <tr key={dept.id} className="hover-bg-light transition">
@@ -190,7 +173,7 @@ const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchDepartments(1)}
+    onClick={() => setPage(1)}
   >
     « First
   </button>
@@ -198,7 +181,7 @@ const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchDepartments(page - 1)}
+    onClick={() => setPage(page - 1)}
   >
     ‹ Prev
   </button>
@@ -207,7 +190,7 @@ const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(
     <button
       key={num}
       className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
-      onClick={() => fetchDepartments(num)}
+      onClick={() => setPage(num)}
     >
       {num}
     </button>
@@ -216,7 +199,7 @@ const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchDepartments(page + 1)}
+    onClick={() => setPage(page + 1)}
   >
     Next ›
   </button>
@@ -224,7 +207,7 @@ const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchDepartments(totalPages)}
+    onClick={() => setPage(totalPages)}
   >
     Last »
   </button>
@@ -330,7 +313,7 @@ const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(
           <button
             className="btn btn-danger"
             onClick={async () => {
-              await crud.delete(departmentToDelete.id);
+              await deleteDepartment(departmentToDelete.id);
               setDepartmentToDelete(null);
             }}
           >

@@ -24,6 +24,7 @@ export enum Permission {
   MANAGE_REMINDERS = 'MANAGE_REMINDERS',
   VIEW_PROPOSALS = 'VIEW_PROPOSALS',
   MANAGE_PROPOSALS = 'MANAGE_PROPOSALS',
+  GENERATE_HR_DOCS = 'GENERATE_HR_DOCS',
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
@@ -43,6 +44,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.MANAGE_REMINDERS,
     Permission.VIEW_PROPOSALS,
     Permission.MANAGE_PROPOSALS,
+    Permission.GENERATE_HR_DOCS,
   ],
   [UserRole.PROJECT_MANAGER]: [
     Permission.VIEW_DASHBOARD,
@@ -145,6 +147,34 @@ export interface Client {
   phone?: string;
   gst_number?: string;
   address?: string;
+  created_at?: string;
+}
+
+export interface Employee {
+  id: number;
+  user: number;
+  address: string;
+  position: string;
+  joining_date: string;
+  salary_monthly: string | number;
+  department: number | null;
+  created_at?: string;
+}
+
+export type HRDocumentType =
+  | 'offer_letter'
+  | 'appraisal_letter'
+  | 'experience_certificate'
+  | 'salary_certificate';
+
+export interface HRDocument {
+  id: number;
+  employee: number;
+  doc_type: HRDocumentType;
+  issued_on: string;
+  payload: any;
+  created_by: number;
+  pdf_file?: string | null;
   created_at?: string;
 }
 
@@ -456,8 +486,8 @@ export interface Reminder {
   type: ReminderType;
   title: string;
   description?: string;
-  dueDate: string;
-  isCompleted: boolean;
+  due_date: string;
+  is_completed: boolean;
   relatedId?: number | string;
   userId: number;
   createdAt: string;

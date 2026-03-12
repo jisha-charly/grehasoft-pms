@@ -1,56 +1,35 @@
-
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Reminder, ReminderType } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { useCrud } from '../../hooks/useCrud';
 
-interface RemindersPageProps {
-  reminders: Reminder[];
-  crud: any;
-}
-
-const RemindersPage: React.FC<RemindersPageProps> = ({ reminders, crud }) => {
+const RemindersPage: React.FC = () => {
   const { user } = useAuth();
+  const {
+    items: reminderList,
+    pagination: { page, setPage, totalPages },
+    add,
+    update,
+    delete: deleteReminder,
+  } = useCrud<Reminder>({ endpoint: '/reminders' });
+
   const [isModalOpen, setModalOpen] = useState(false);
-  const [page, setPage] = useState(1);
-const [totalPages, setTotalPages] = useState(1);
-const [reminderList, setReminderList] = useState<Reminder[]>(reminders || []);
-const fetchReminders = async (pageNumber = 1) => {
-  try {
-    const res = await crud.getAll({
-      page: pageNumber
-    });
 
-    setReminderList(res.results);
-    setTotalPages(Math.ceil(res.count / 5)); // same PAGE_SIZE used in backend
-    setPage(pageNumber);
-
-  } catch (error) {
-    console.error("Error fetching reminders:", error);
-  }
-};
-
-const pageNumbers: number[] = [];
-
-for (let i = 1; i <= totalPages; i++) {
-  pageNumbers.push(i);
-}
-useEffect(() => {
-  fetchReminders(page);
-}, [page]);
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
 
-    crud.add({
+    add({
       type: data.type as ReminderType,
       title: data.title,
       description: data.description,
-      dueDate: data.dueDate,
-      isCompleted: false,
-      userId: user?.id
-    });
+      due_date: data.due_date,
+      is_completed:false,
+      
+    } as any);
     setModalOpen(false);
   };
 
@@ -74,8 +53,8 @@ useEffect(() => {
     }
   };
 
-  const getUrgencyBadge = (dueDate: string, isCompleted: boolean) => {
-    if (isCompleted) return null;
+  const getUrgencyBadge = (dueDate: string, is_completed: boolean) => {
+    if (is_completed) return null;
     const today = new Date().toISOString().split('T')[0];
     if (dueDate < today) return <span className="badge bg-danger ms-2">OVERDUE</span>;
     if (dueDate === today) return <span className="badge bg-warning text-dark ms-2">DUE TODAY</span>;
@@ -99,11 +78,11 @@ useEffect(() => {
           {reminderList.length === 0? (
             <div className="text-center py-5 text-muted">No reminders scheduled</div>
           ) : (
-            reminderList.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()).map(reminder => (
+            reminderList.sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()).map(reminder => (
               <div key={reminder.id} className={`list-group-item p-4 border-start border-4 ${
-                reminder.isCompleted ? 'border-light opacity-50' : 
-                new Date(reminder.dueDate).toISOString().split('T')[0] < new Date().toISOString().split('T')[0] ? 'border-danger' :
-                new Date(reminder.dueDate).toISOString().split('T')[0] === new Date().toISOString().split('T')[0] ? 'border-warning' :
+                reminder.is_completed ? 'border-light opacity-50' : 
+                new Date(reminder.due_date).toISOString().split('T')[0] < new Date().toISOString().split('T')[0] ? 'border-danger' :
+                new Date(reminder.due_date).toISOString().split('T')[0] === new Date().toISOString().split('T')[0] ? 'border-warning' :
                 'border-primary'
               }`}>
                 <div className="d-flex justify-content-between align-items-start">
@@ -113,15 +92,15 @@ useEffect(() => {
                     </div>
                     <div>
                       <div className="d-flex align-items-center mb-1">
-                        <h6 className={`fw-bold mb-0 ${reminder.isCompleted ? 'text-decoration-line-through' : ''}`}>
+                        <h6 className={`fw-bold mb-0 ${reminder.is_completed ? 'text-decoration-line-through' : ''}`}>
                           {reminder.title}
                         </h6>
-                        {getUrgencyBadge(reminder.dueDate, reminder.isCompleted)}
+                        {getUrgencyBadge(reminder.due_date, reminder.is_completed)}
                       </div>
                       <p className="text-secondary small mb-2">{reminder.description}</p>
                       <div className="d-flex align-items-center">
-                        <span className={`badge bg-light text-dark border me-2 small fw-normal ${!reminder.isCompleted && reminder.dueDate < new Date().toISOString().split('T')[0] ? 'text-danger border-danger' : ''}`}>
-                          <i className="bi bi-calendar-event me-1"></i>{reminder.dueDate}
+                        <span className={`badge bg-light text-dark border me-2 small fw-normal ${!reminder.is_completed && reminder.due_date< new Date().toISOString().split('T')[0] ? 'text-danger border-danger' : ''}`}>
+                          <i className="bi bi-calendar-event me-1"></i>{reminder.due_date}
                         </span>
                         <span className="badge bg-light text-dark border small fw-normal">
                           <i className="bi bi-tag me-1"></i>{reminder.type.toUpperCase()}
@@ -131,13 +110,13 @@ useEffect(() => {
                   </div>
                   <div className="d-flex align-items-center">
                     <button 
-                      className={`btn btn-sm me-2 ${reminder.isCompleted ? 'btn-light' : 'btn-outline-success'}`}
-                      onClick={() => crud.update(reminder.id, { isCompleted: !reminder.isCompleted })}
+                      className={`btn btn-sm me-2 ${reminder.is_completed ? 'btn-light' : 'btn-outline-success'}`}
+                      onClick={() => update(reminder.id!, { is_completed: !reminder.is_completed })}
                     >
-                      <i className={`bi ${reminder.isCompleted ? 'bi-arrow-counterclockwise' : 'bi-check-lg'}`}></i>
-                      {reminder.isCompleted ? ' Reopen' : ' Complete'}
+                      <i className={`bi ${reminder.is_completed ? 'bi-arrow-counterclockwise' : 'bi-check-lg'}`}></i>
+                      {reminder.is_completed ? ' Reopen' : ' Complete'}
                     </button>
-                    <button className="btn btn-sm btn-outline-danger" onClick={() => crud.delete(reminder.id)}>
+                    <button className="btn btn-sm btn-outline-danger" onClick={() => deleteReminder(reminder.id!)}>
                       <i className="bi bi-trash"></i>
                     </button>
                   </div>
@@ -147,7 +126,7 @@ useEffect(() => {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchReminders(1)}
+    onClick={() => setPage(1)}
   >
     « First
   </button>
@@ -155,7 +134,7 @@ useEffect(() => {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === 1}
-    onClick={() => fetchReminders(page - 1)}
+    onClick={() => setPage(page - 1)}
   >
     ‹ Prev
   </button>
@@ -164,7 +143,7 @@ useEffect(() => {
     <button
       key={num}
       className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
-      onClick={() => fetchReminders(num)}
+      onClick={() => setPage(num)}
     >
       {num}
     </button>
@@ -173,7 +152,7 @@ useEffect(() => {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchReminders(page + 1)}
+    onClick={() => setPage(page + 1)}
   >
     Next ›
   </button>
@@ -181,7 +160,7 @@ useEffect(() => {
   <button
     className="btn btn-sm btn-outline-secondary"
     disabled={page === totalPages}
-    onClick={() => fetchReminders(totalPages)}
+    onClick={() => setPage(totalPages)}
   >
     Last »
   </button>
@@ -219,7 +198,7 @@ useEffect(() => {
                   </div>
                   <div className="mb-3">
                     <label className="form-label small fw-bold">Due Date</label>
-                    <input name="dueDate" type="date" className="form-control" required />
+                    <input name="due_date" type="date" className="form-control" required />
                   </div>
                   <div className="mb-3">
                     <label className="form-label small fw-bold">Description</label>
