@@ -39,6 +39,9 @@ const [statusFilter, setStatusFilter] = useState("");
 const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 const [leadToDelete, setLeadToDelete] = useState<Lead | null>(null);
 const currentUserId = users?.[0]?.id || null;
+const [page, setPage] = useState(1);
+const [totalPages, setTotalPages] = useState(1);
+
   const salesExecs = (users || []).filter
   (u =>  u.role_name === UserRole.SALES_EXECUTIVE ||
       u.role_name === UserRole.SALES_MANAGER ||
@@ -67,22 +70,37 @@ const currentUserId = users?.[0]?.id || null;
 };
   
 useEffect(() => {
-  fetchLeads();
-}, [searchTerm, statusFilter]);
+  fetchLeads(page);
+}, [page, searchTerm, statusFilter]);
 
-  const fetchLeads = async () => {
-  const params: any = {};
+ const fetchLeads = async (pageNumber = 1) => {
+
+  const params: any = {
+    page: pageNumber
+  };
 
   if (searchTerm) params.search = searchTerm;
 
-  // ✅ do NOT send status if it's "all"
   if (statusFilter && statusFilter !== "all") {
     params.status = statusFilter;
   }
 
-  const res = await axiosInstance.get("/leads/", { params });
-  setLeadList(res.data);
+  try {
+    const res = await axiosInstance.get("/leads/", { params });
+
+    setLeadList(res.data.results);
+    setTotalPages(Math.ceil(res.data.count / 5)); // PAGE_SIZE = 5
+    setPage(pageNumber);
+
+  } catch (error) {
+    console.error("Error fetching leads:", error);
+  }
 };
+const pageNumbers = [];
+
+for (let i = 1; i <= totalPages; i++) {
+  pageNumbers.push(i);
+}
   const validationSchema = {
     name: {
       required: true,
@@ -208,7 +226,9 @@ const handleConfirmDelete = async () => {
     });
     setConvertModalOpen(true);
   };
-
+ const handleCreateProposal = (lead: Lead) => {
+  window.location.href = `#/proposals?lead=${lead.id}`;
+};
   const convertForm = useForm({
     initialValues: {
       clientName: '',
@@ -409,10 +429,14 @@ await axiosInstance.get("/leads/"); // or whatever your list function is
                 <td className="text-end px-4">
                   <div className="btn-group shadow-sm rounded-3 overflow-hidden">
                     {lead.status !== 'converted' && (
-                      <button className="btn btn-sm btn-white border-end" onClick={() => handleOpenConvert(lead)} title="Convert to Project">
-                        <i className="bi bi-arrow-repeat text-success"></i>
-                      </button>
-                    )}
+  <button
+    className="btn btn-sm btn-white border-end"
+    onClick={() => handleCreateProposal(lead)}
+    title="Create Proposal"
+  >
+    <i className="bi bi-file-earmark-text text-primary"></i>
+  </button>
+)}
                     <button className="btn btn-sm btn-white border-end" onClick={() => handleViewDetails(lead)} title="View Details">
                       <i className="bi bi-eye text-info"></i>
                     </button>
@@ -433,6 +457,56 @@ await axiosInstance.get("/leads/"); // or whatever your list function is
             ))}
           </tbody>
         </table>
+        <div className="d-flex justify-content-end align-items-center gap-1 p-3">
+
+  {/* FIRST */}
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === 1}
+    onClick={() => fetchLeads(1)}
+  >
+    « First
+  </button>
+
+  {/* PREV */}
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === 1}
+    onClick={() => fetchLeads(page - 1)}
+  >
+    ‹ Prev
+  </button>
+
+  {/* PAGE NUMBERS */}
+  {pageNumbers.map(num => (
+    <button
+      key={num}
+      className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
+      onClick={() => fetchLeads(num)}
+    >
+      {num}
+    </button>
+  ))}
+
+  {/* NEXT */}
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === totalPages}
+    onClick={() => fetchLeads(page + 1)}
+  >
+    Next ›
+  </button>
+
+  {/* LAST */}
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === totalPages}
+    onClick={() => fetchLeads(totalPages)}
+  >
+    Last »
+  </button>
+
+</div>
       </div>
 
       {/* Add/Edit Lead Modal */}

@@ -14,6 +14,36 @@ const RolesPage: React.FC<RolesPageProps> = ({ roles, crud }) => {
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
+  const [page, setPage] = useState(1);
+const [totalPages, setTotalPages] = useState(1);
+const [roleList, setRoleList] = useState<Role[]>(roles || []);
+const fetchRoles = async (pageNumber = 1) => {
+  try {
+    const params: any = {
+      page: pageNumber
+    };
+
+    if (searchTerm) params.search = searchTerm;
+
+    const res = await crud.getAll(params);
+
+    setRoleList(res.results);
+    setTotalPages(Math.ceil(res.count / 5)); // PAGE_SIZE from backend
+    setPage(pageNumber);
+
+  } catch (error) {
+    console.error("Error fetching roles:", error);
+  }
+};
+useEffect(() => {
+  fetchRoles(page);
+}, [page, searchTerm]);
+
+const pageNumbers = [];
+
+for (let i = 1; i <= totalPages; i++) {
+  pageNumbers.push(i);
+}
   const validationSchema = {
     name: { 
       required: true, 
@@ -134,7 +164,7 @@ const RolesPage: React.FC<RolesPageProps> = ({ roles, crud }) => {
                   </td>
                 </tr>
               ) : (
-                filteredRoles.map(role => (
+               roleList.map(role => (
                   <tr key={role.id} className="hover-bg-light transition">
                     <td className="px-4">
                       <div className="d-flex align-items-center">
@@ -161,6 +191,51 @@ const RolesPage: React.FC<RolesPageProps> = ({ roles, crud }) => {
               )}
             </tbody>
           </table>
+          <div className="d-flex justify-content-end align-items-center gap-1 p-3">
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === 1}
+    onClick={() => fetchRoles(1)}
+  >
+    « First
+  </button>
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === 1}
+    onClick={() => fetchRoles(page - 1)}
+  >
+    ‹ Prev
+  </button>
+
+  {pageNumbers.map(num => (
+    <button
+      key={num}
+      className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
+      onClick={() => fetchRoles(num)}
+    >
+      {num}
+    </button>
+  ))}
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === totalPages}
+    onClick={() => fetchRoles(page + 1)}
+  >
+    Next ›
+  </button>
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === totalPages}
+    onClick={() => fetchRoles(totalPages)}
+  >
+    Last »
+  </button>
+
+</div>
         </div>
       </div>
 

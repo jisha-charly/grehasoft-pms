@@ -9,7 +9,7 @@ class Invoice(models.Model):
 
     client = models.ForeignKey(Client, on_delete=models.CASCADE)
 
-    issue_date = models.DateField(default=timezone.now)
+    issue_date = models.DateField(default=timezone.localdate)
 
     due_date = models.DateField()
     advance = models.DecimalField(max_digits=10, decimal_places=2, default=0)

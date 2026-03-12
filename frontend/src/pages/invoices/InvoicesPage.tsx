@@ -2,6 +2,7 @@ import React, { ReactNode, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../../api/axiosInstance";
 import Layout from "../../components/layout/Layout";
+import axiosInstance from "../../api/axiosInstance";
 
 interface Invoice {
   client_name: ReactNode;
@@ -21,23 +22,28 @@ interface Invoice {
 const InvoicesPage = () => {
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+ 
+  
 
   useEffect(() => {
-    fetchInvoices();
-  }, []);
+  fetchInvoices();
+}, [page, search]);
 
   const fetchInvoices = async () => {
-    try {
+  try {
+    const res = await axiosInstance.get(`/invoices/?page=${page}&search=${search}`);
 
-      const res = await api.get("/invoices/");
-      setInvoices(res.data);
+    setInvoices(res.data.results); // paginated results
+    setTotalPages(Math.ceil(res.data.count / 5)); // total pages
 
-    } catch (error) {
-
-      console.error("Error fetching invoices", error);
-
-    }
-  };
+  } catch (error) {
+    console.error("Error fetching invoices", error);
+  }
+};
  const [analytics,setAnalytics] = useState({
 total_invoices:0,
 total_revenue:0,
@@ -81,6 +87,10 @@ const sendInvoice = async(id:number)=>{
   await api.post(`/invoices/${id}/send-email/`)
   alert("Invoice sent")
 }
+const pageNumbers: number[] = Array.from(
+  { length: totalPages },
+  (_, i) => i + 1
+);
   return (
     <Layout>
   <div className="row mb-4">
@@ -117,6 +127,19 @@ const sendInvoice = async(id:number)=>{
       <div className="container mt-4">
 
         <div className="d-flex justify-content-between align-items-center mb-3">
+        <div className="d-flex justify-content-between mb-3">
+ <input
+  type="text"
+  className="form-control"
+  style={{ width: "250px" }}
+  placeholder="Search invoice..."
+  value={search}
+  onChange={(e) => {
+    setSearch(e.target.value);
+    setPage(1);
+  }}
+/>
+</div>
 
           <h3>Invoices</h3>
 
@@ -234,6 +257,51 @@ title="Send Email"
           </tbody>
 
         </table>
+<div className="d-flex justify-content-end align-items-center gap-1 p-3">
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === 1}
+    onClick={() => setPage(1)}
+  >
+    « First
+  </button>
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === 1}
+    onClick={() => setPage(page - 1)}
+  >
+    ‹ Prev
+  </button>
+
+  {pageNumbers.map(num => (
+    <button
+      key={num}
+      className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
+      onClick={() => setPage(num)}
+    >
+      {num}
+    </button>
+  ))}
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === totalPages}
+    onClick={() => setPage(page + 1)}
+  >
+    Next ›
+  </button>
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === totalPages}
+    onClick={() => setPage(totalPages)}
+  >
+    Last »
+  </button>
+
+</div>
 
       </div>
 

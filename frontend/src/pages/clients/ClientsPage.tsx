@@ -1,18 +1,41 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Client } from '../../types';
 import { useForm } from '../../hooks/useForm';
 import FormField from '../../components/FormField';
 
 interface ClientsPageProps {
   clients: Client[];
+  setClients: (c: Client[]) => void;
   crud: any;
 }
 
-const ClientsPage: React.FC<ClientsPageProps> = ({ clients = [], crud }) => {
+const ClientsPage: React.FC<ClientsPageProps> = ({ clients = [], setClients, crud }) => {
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 const [deleteClientId, setDeleteClientId] = useState<number | null>(null);
+const [page, setPage] = useState(1);
+const [totalPages, setTotalPages] = useState(1);
+const fetchClients = async (pageNumber = 1) => {
+  try {
+    const res = await crud.getAll(`?page=${pageNumber}`);
+
+    setClients(res.results);
+    setTotalPages(Math.ceil(res.count / 5));
+    setPage(pageNumber);
+
+  } catch (err) {
+    console.error("Error fetching clients", err);
+  }
+};
+useEffect(() => {
+  fetchClients(page);
+}, [page]);
+const pageNumbers = [];
+
+for (let i = 1; i <= totalPages; i++) {
+  pageNumbers.push(i);
+}
   /* ================= VALIDATION ================= */
 
   const validationSchema = {
@@ -256,6 +279,56 @@ const confirmDelete = async () => {
               )}
             </tbody>
           </table>
+          <div className="d-flex justify-content-end align-items-center gap-1 p-3">
+
+  {/* FIRST */}
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === 1}
+    onClick={() => fetchClients(1)}
+  >
+    « First
+  </button>
+
+  {/* PREVIOUS */}
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === 1}
+    onClick={() => fetchClients(page - 1)}
+  >
+    ‹ Prev
+  </button>
+
+  {/* PAGE NUMBERS */}
+  {pageNumbers.map(num => (
+    <button
+      key={num}
+      className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
+      onClick={() => fetchClients(num)}
+    >
+      {num}
+    </button>
+  ))}
+
+  {/* NEXT */}
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === totalPages}
+    onClick={() => fetchClients(page + 1)}
+  >
+    Next ›
+  </button>
+
+  {/* LAST */}
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === totalPages}
+    onClick={() => fetchClients(totalPages)}
+  >
+    Last »
+  </button>
+
+</div>
         </div>
       </div>
 

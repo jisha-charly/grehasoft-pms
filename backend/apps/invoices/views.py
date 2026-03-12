@@ -1,5 +1,6 @@
 import os
 
+from rest_framework import viewsets, filters
 from django.conf import settings
 from rest_framework import viewsets
 from django.db.models import Sum
@@ -9,7 +10,7 @@ from rest_framework.response import Response
 from .models import Invoice, InvoicePayment
 from .serializers import InvoiceSerializer, InvoicePaymentSerializer
 from .utils import generate_invoice_number
-from reportlab.pdfgen import canvas
+
 from django.http import HttpResponse
 from rest_framework.response import Response
 from django.core.mail import send_mail
@@ -25,13 +26,19 @@ from reportlab.lib import colors
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 from num2words import num2words
-
+from django_filters.rest_framework import DjangoFilterBackend
 
 class InvoiceViewSet(viewsets.ModelViewSet):
 
-    queryset = Invoice.objects.all()
+    queryset = Invoice.objects.all().order_by("-id")
 
     serializer_class = InvoiceSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+
+    search_fields = [
+    "invoice_number",
+    "client__name"
+]
     @action(detail=False, methods=["get"], url_path="next-number")
     def next_number(self, request):
         number = generate_invoice_number()
@@ -167,14 +174,12 @@ def generate_invoice_pdf(invoice):
     # -----------------------------
     # TAX CALCULATION
     # -----------------------------
-    gst = subtotal * 0.18
-    grand_total = subtotal + gst
-    
+    gst = invoice.tax
+    grand_total = invoice.total
 
     data.append(["", "", "", "Sub Total", f"Rs {subtotal:.2f}"])
-    data.append(["", "", "", "GST (18%)", f"Rs {gst:.2f}"])
+    data.append(["", "", "", "GST", f"Rs {gst:.2f}"])
     data.append(["", "", "", "Grand Total", f"Rs {grand_total:.2f}"])
-
    
     
     

@@ -13,6 +13,35 @@ const DepartmentsPage: React.FC<DepartmentsPageProps> = ({ departments, crud }) 
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+const [totalPages, setTotalPages] = useState(1);
+const [departmentList, setDepartmentList] = useState<Department[]>(departments || []);
+const fetchDepartments = async (pageNumber = 1) => {
+  try {
+    const params: any = {
+      page: pageNumber
+    };
+
+    if (searchTerm) params.search = searchTerm;
+
+    const res = await crud.getAll(params);
+
+    setDepartmentList(res.results);
+    setTotalPages(Math.ceil(res.count / 5)); // backend PAGE_SIZE
+    setPage(pageNumber);
+
+  } catch (error) {
+    console.error("Error fetching departments:", error);
+  }
+};
+useEffect(() => {
+  fetchDepartments(page);
+}, [page, searchTerm]);
+const pageNumbers = [];
+
+for (let i = 1; i <= totalPages; i++) {
+  pageNumbers.push(i);
+}
 const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(null);
   const validationSchema = {
     name: { required: true, message: 'Department name is required.' }
@@ -118,7 +147,7 @@ const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(
                   </td>
                 </tr>
               ) : (
-                filteredDepartments.map(dept => {
+              departmentList.map(dept => {
                   const parentName = getParentName(dept.parentId);
                   return (
                     <tr key={dept.id} className="hover-bg-light transition">
@@ -156,6 +185,51 @@ const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(
               )}
             </tbody>
           </table>
+          <div className="d-flex justify-content-end align-items-center gap-1 p-3">
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === 1}
+    onClick={() => fetchDepartments(1)}
+  >
+    « First
+  </button>
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === 1}
+    onClick={() => fetchDepartments(page - 1)}
+  >
+    ‹ Prev
+  </button>
+
+  {pageNumbers.map(num => (
+    <button
+      key={num}
+      className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
+      onClick={() => fetchDepartments(num)}
+    >
+      {num}
+    </button>
+  ))}
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === totalPages}
+    onClick={() => fetchDepartments(page + 1)}
+  >
+    Next ›
+  </button>
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === totalPages}
+    onClick={() => fetchDepartments(totalPages)}
+  >
+    Last »
+  </button>
+
+</div>
         </div>
       </div>
 

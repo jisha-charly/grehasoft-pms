@@ -14,6 +14,35 @@ const TaskTypesPage: React.FC<TaskTypesPageProps> = ({ taskTypes, crud }) => {
   const [editingType, setEditingType] = useState<TaskType | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 const [typeToDelete, setTypeToDelete] = useState<any | null>(null);
+const [page, setPage] = useState(1);
+const [totalPages, setTotalPages] = useState(1);
+const [typeList, setTypeList] = useState<TaskType[]>(taskTypes || []);
+const fetchTaskTypes = async (pageNumber = 1) => {
+  try {
+    const params: any = {
+      page: pageNumber
+    };
+
+    if (searchTerm) params.search = searchTerm;
+
+    const res = await crud.getAll(params);
+
+    setTypeList(res.results);
+    setTotalPages(Math.ceil(res.count / 5)); // backend PAGE_SIZE
+    setPage(pageNumber);
+
+  } catch (error) {
+    console.error("Error fetching task types:", error);
+  }
+};
+useEffect(() => {
+  fetchTaskTypes(page);
+}, [page, searchTerm]);
+const pageNumbers = [];
+
+for (let i = 1; i <= totalPages; i++) {
+  pageNumbers.push(i);
+}
   const filteredTypes = useMemo(() => {
     return taskTypes.filter(tt => 
       tt.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -118,7 +147,7 @@ const [typeToDelete, setTypeToDelete] = useState<any | null>(null);
                   </td>
                 </tr>
               ) : (
-                filteredTypes.map(tt => (
+             typeList.map(tt => (
                   <tr key={tt.id} className="hover-bg-light transition">
                     <td className="px-4">
                       <span className="badge bg-light text-dark border px-3 py-2 font-monospace tracking-wide">
@@ -148,6 +177,51 @@ const [typeToDelete, setTypeToDelete] = useState<any | null>(null);
               )}
             </tbody>
           </table>
+          <div className="d-flex justify-content-end align-items-center gap-1 p-3">
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === 1}
+    onClick={() => fetchTaskTypes(1)}
+  >
+    « First
+  </button>
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === 1}
+    onClick={() => fetchTaskTypes(page - 1)}
+  >
+    ‹ Prev
+  </button>
+
+  {pageNumbers.map(num => (
+    <button
+      key={num}
+      className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
+      onClick={() => fetchTaskTypes(num)}
+    >
+      {num}
+    </button>
+  ))}
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === totalPages}
+    onClick={() => fetchTaskTypes(page + 1)}
+  >
+    Next ›
+  </button>
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === totalPages}
+    onClick={() => fetchTaskTypes(totalPages)}
+  >
+    Last »
+  </button>
+
+</div>
         </div>
       </div>
 

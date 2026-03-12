@@ -26,6 +26,7 @@ from apps.activity.views import ActivityLogViewSet as GlobalActivityLogViewSet
 from apps.projects.views import ActivityLogViewSet as ProjectActivityLogViewSet
 from apps.invoices.views import InvoicePaymentViewSet, InvoiceViewSet
 from apps.invoices import views
+from apps.proposals.views import ProposalViewSet
 router = routers.DefaultRouter()
 
 # Project Management
@@ -43,7 +44,7 @@ router.register(r'departments', DepartmentViewSet)
 router.register(r'leads', LeadViewSet)
 router.register(r'lead-followups', LeadFollowupViewSet)
 router.register(r'lead-assignments', LeadAssignmentViewSet, basename='lead-assignments')
-
+router.register(r'proposals', ProposalViewSet)
 # Task Management & Collaboration
 router.register(r'tasks', TaskViewSet)
 router.register(r'task-types', TaskTypeViewSet)

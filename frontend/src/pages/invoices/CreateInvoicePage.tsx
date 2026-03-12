@@ -3,6 +3,7 @@ import Layout from "../../components/layout/Layout"
 import api from "../../api/axiosInstance"
 import { useNavigate } from "react-router-dom"
 import { useParams } from "react-router-dom"
+import { getResults } from "@/utils/apiHelper"
 interface Client{
   id:number
   name:string
@@ -50,34 +51,35 @@ const [selectedTemplate,setSelectedTemplate] = useState("")
 
 const fetchInvoice = async () => {
 
-try {
+  try {
 
-const res = await api.get(`/invoices/${id}/`)
+    const res = await api.get(`/invoices/${id}/`)
+    const data = res.data
 
-const data = res.data
+    setInvoiceNumber(data.invoice_number)
+    setClient(data.client)
 
-setInvoiceNumber(data.invoice_number)
+    setItems(
+      data.items.map((item:any)=>({
+        description:item.description,
+        quantity:item.quantity,
+        rate:item.rate
+      }))
+    )
 
-setClient(data.client)
+    setNotes(data.notes)
 
-setItems(
-  data.items.map((item:any)=>({
-    description:item.description,
-    quantity:item.quantity,
-    rate:item.rate
-  }))
-)
+    // ⭐ ADD THESE
+    setAdvance(data.advance)
+    setGst(data.subtotal ? (data.tax / data.subtotal) * 100 : 0)
 
-setNotes(data.notes)
+  } catch(error){
 
-}catch(error){
+    console.error("Error loading invoice", error)
 
-console.error("Error loading invoice", error)
+  }
 
 }
-
-}
-
 useEffect(() => {
 
 fetchClients()
@@ -92,7 +94,7 @@ if (id) {
 
 const fetchClients = async()=>{
 const res = await api.get("/clients/")
-setClients(res.data)
+ setClients(getResults(res));
 }
 
 const addItem=()=>{
@@ -134,7 +136,10 @@ const gstAmount = subtotal * gst / 100
 
 const total = subtotal + gstAmount
 
-const balance = total - (typeof advance === "number" ? advance : 0)
+const balance = Math.max(
+  total - (typeof advance === "number" ? advance : 0),
+  0
+)
 
 /* SAVE INVOICE */
 

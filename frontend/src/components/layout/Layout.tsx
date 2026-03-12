@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { UserRole } from '../../types';
+import { Permission, UserRole } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 
 interface LayoutProps {
@@ -20,8 +20,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { label: 'Tasks', path: '/tasks', icon: 'bi-check2-square', roles: [UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.TEAM_MEMBER] },
     { label: 'Clients', path: '/clients', icon: 'bi-people', roles: [UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.SALES_MANAGER] },
     { label: 'CRM', path: '/crm', icon: 'bi-graph-up-arrow', roles: [UserRole.SUPER_ADMIN, UserRole.SALES_MANAGER, UserRole.SALES_EXECUTIVE] },
-    { label: 'SEO', path: '/seo', icon: 'bi-search', roles: [UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.TEAM_MEMBER] },
+
+    { label: 'Proposals', path: '/proposals', icon: 'bi-file-earmark-text', roles: [UserRole.SUPER_ADMIN, UserRole.SALES_MANAGER, UserRole.SALES_EXECUTIVE] },
     { label: 'Invoices', path: '/invoices', icon: 'bi-receipt', roles: [UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.TEAM_MEMBER] },
+    { label: 'Reminders', path: '/reminders', icon: 'bi-bell', roles: [UserRole.SUPER_ADMIN, UserRole.SALES_MANAGER, UserRole.SALES_EXECUTIVE] },
+    { label: 'SEO', path: '/seo', icon: 'bi-search', roles: [UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.TEAM_MEMBER] },
   ];
 
   const adminItems = [

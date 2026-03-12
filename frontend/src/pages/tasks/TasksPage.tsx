@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Task, Project, TaskType, User, TaskStatus, Milestone, Permission } from '../../types';
 import WeeklyTaskInsights from './WeeklyTaskInsights';
 import { useAuth } from '../../context/AuthContext';
 import TaskDetailsModal from '../../components/TaskDetailsModal';
 import { useForm } from '../../hooks/useForm';
 import FormField from '../../components/FormField';
+import axiosInstance from '@/api/axiosInstance';
 
 interface TasksPageProps {
   tasks: Task[];
@@ -19,6 +20,7 @@ interface TasksPageProps {
 
 const TasksPage: React.FC<TasksPageProps> = ({
   tasks,
+  setTasks,
   projects,
   taskTypes,
   users,
@@ -39,6 +41,8 @@ const TasksPage: React.FC<TasksPageProps> = ({
   const [priorityFilter, setPriorityFilter] = useState<string | 'all'>('all');
   const [isModalOpen, setModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const validationSchema = {
     projectId: { required: true, message: 'Please select a project.' },
@@ -74,6 +78,26 @@ const TasksPage: React.FC<TasksPageProps> = ({
       setModalOpen(false);
     }
   });
+ const fetchTasks = async (pageNumber = 1) => {
+  try {
+    const res = await axiosInstance.get(`/tasks/?page=${pageNumber}`);
+
+    setTasks(res.data.results);
+    setTotalPages(Math.ceil(res.data.count / 5));
+    setPage(pageNumber);
+
+  } catch (err) {
+    console.error("Error fetching tasks", err);
+  }
+};
+useEffect(() => {
+  fetchTasks(page);
+}, [page]);
+const pageNumbers = [];
+
+for (let i = 1; i <= totalPages; i++) {
+  pageNumbers.push(i);
+}
 
   const filteredTasks = useMemo(() => {
     return tasks
@@ -275,6 +299,56 @@ const TasksPage: React.FC<TasksPageProps> = ({
                   )}
                 </tbody>
               </table>
+             <div className="d-flex justify-content-end align-items-center gap-1 p-3">
+
+  {/* FIRST PAGE */}
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === 1}
+    onClick={() => fetchTasks(1)}
+  >
+    « First
+  </button>
+
+  {/* PREVIOUS */}
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === 1}
+    onClick={() => fetchTasks(page - 1)}
+  >
+    ‹ Prev
+  </button>
+
+  {/* PAGE NUMBERS */}
+  {pageNumbers.map(num => (
+    <button
+      key={num}
+      className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
+      onClick={() => fetchTasks(num)}
+    >
+      {num}
+    </button>
+  ))}
+
+  {/* NEXT */}
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === totalPages}
+    onClick={() => fetchTasks(page + 1)}
+  >
+    Next ›
+  </button>
+
+  {/* LAST PAGE */}
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === totalPages}
+    onClick={() => fetchTasks(totalPages)}
+  >
+    Last »
+  </button>
+
+</div>
             </div>
           </div>
         </>

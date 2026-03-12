@@ -20,6 +20,10 @@ export enum Permission {
   VIEW_LEADS = 'VIEW_LEADS',
   MANAGE_USERS = 'MANAGE_USERS',
   MANAGE_SETTINGS = 'MANAGE_SETTINGS',
+  VIEW_REMINDERS = 'VIEW_REMINDERS',
+  MANAGE_REMINDERS = 'MANAGE_REMINDERS',
+  VIEW_PROPOSALS = 'VIEW_PROPOSALS',
+  MANAGE_PROPOSALS = 'MANAGE_PROPOSALS',
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
@@ -35,6 +39,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.VIEW_LEADS,
     Permission.MANAGE_USERS,
     Permission.MANAGE_SETTINGS,
+     Permission.VIEW_REMINDERS,
+    Permission.MANAGE_REMINDERS,
+    Permission.VIEW_PROPOSALS,
+    Permission.MANAGE_PROPOSALS,
   ],
   [UserRole.PROJECT_MANAGER]: [
     Permission.VIEW_DASHBOARD,
@@ -410,3 +418,48 @@ export interface SocialMetric {
   updatedAt?: string;
   deletedAt?: string;
 }
+export interface ProposalItem {
+  service: string;
+  description: string;
+  cost: number;
+}
+
+export interface Proposal {
+  id: number;
+  leadId: number;
+  leadName?: string;
+  title: string;
+  description: string;
+  projectOverview?: string;
+   project?: number | null;
+  items?: ProposalItem[];
+  subtotal?: number;
+  discount?: number;
+  amount: number;
+  status: 'draft' | 'sent' | 'accepted' | 'rejected';
+  lastSentAt?: string;
+  created_at: string;
+  is_converted?: boolean; 
+  updatedAt?: string;
+}
+
+export enum ReminderType {
+  INVOICE = 'invoice',
+  PAYMENT = 'payment',
+  PROPOSAL = 'proposal',
+  FOLLOWUP = 'followup',
+  GENERAL = 'general'
+}
+
+export interface Reminder {
+  id: number;
+  type: ReminderType;
+  title: string;
+  description?: string;
+  dueDate: string;
+  isCompleted: boolean;
+  relatedId?: number | string;
+  userId: number;
+  createdAt: string;
+}
+

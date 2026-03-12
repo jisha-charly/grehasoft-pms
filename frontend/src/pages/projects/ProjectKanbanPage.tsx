@@ -5,6 +5,7 @@ import KanbanBoard from '../../components/KanbanBoard';
 import TaskDetailsModal from '../../components/TaskDetailsModal';
 import { Task, Project, TaskType, User, TaskStatus, Milestone, TaskFile, TaskReview } from '../../types';
 import axiosInstance from '../../api/axiosInstance';
+import { getResults } from '@/utils/apiHelper';
 
 interface ProjectKanbanPageProps {
   projects: Project[];
@@ -40,7 +41,7 @@ const ProjectKanbanPage: React.FC<ProjectKanbanPageProps> = ({
   axiosInstance.get(`/milestones/?project=${id}`), // correct endpoint
 ]);
         setProject(projRes.data);
-       const normalized = tasksRes.data.map((t: any) => ({
+       const normalized = getResults(tasksRes).map((t: any) => ({
   ...t,
   dueDate: t.due_date,
   milestoneId: t.milestone,
@@ -49,7 +50,7 @@ const ProjectKanbanPage: React.FC<ProjectKanbanPageProps> = ({
 }));
 
 setProjectTasks(normalized);
-        setProjectMilestones(milestonesRes.data);
+       setProjectMilestones(milestonesRes.data.results);
       } catch (error) {
         console.error("Error fetching kanban data:", error);
       } finally {

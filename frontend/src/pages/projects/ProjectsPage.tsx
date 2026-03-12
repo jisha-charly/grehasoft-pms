@@ -7,20 +7,32 @@ import FormField from '../../components/FormField';
 
 interface ProjectsPageProps {
   projects: Project[];
+  totalCount: number;
+  currentPage: number;
+  setCurrentPage: (page: number) => void;
   users: User[];
   departments: Department[];
   clients: Client[];
   crud: any;
 }
 
-const ITEMS_PER_PAGE = 6;
 
-const ProjectsPage: React.FC<ProjectsPageProps> = ({ projects, users, departments, clients, crud }) => {
+
+const ProjectsPage: React.FC<ProjectsPageProps> = ({
+  projects,
+  totalCount,
+  currentPage,
+  setCurrentPage,
+  users,
+  departments,
+  clients,
+  crud
+}) => {
   const { user: currentUser, hasPermission } = useAuth();
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+ 
 
   const canManage = hasPermission(Permission.MANAGE_PROJECTS);
 
@@ -111,11 +123,9 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ projects, users, department
   }, [projects, searchTerm]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredProjects.length / ITEMS_PER_PAGE);
-  const paginatedProjects = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredProjects.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredProjects, currentPage]);
+  const paginatedProjects = filteredProjects;
+  const ITEMS_PER_PAGE = 5; // same as backend
+const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
   const handleOpenModal = (project: Project | null = null) => {
     setEditingProject(project);
@@ -135,7 +145,10 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ projects, users, department
     }
     setModalOpen(true);
   };
-
+const pageNumbers: number[] = Array.from(
+  { length: totalPages },
+  (_, i) => i + 1
+);
   return (
     <div className="container-fluid p-0">
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
@@ -206,23 +219,53 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ projects, users, department
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <nav className="mt-5">
-          <ul className="pagination justify-content-center">
-            <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-              <button className="page-link border-0 shadow-sm rounded-circle me-2" onClick={() => setCurrentPage(prev => prev - 1)}><i className="bi bi-chevron-left"></i></button>
-            </li>
-            {[...Array(totalPages)].map((_, i) => (
-              <li key={i} className={`page-item ${currentPage === i + 1 ? 'active' : ''}`}>
-                <button className={`page-link border-0 shadow-sm rounded-circle me-2 ${currentPage === i + 1 ? 'bg-primary text-white' : 'bg-white text-dark'}`} onClick={() => setCurrentPage(i + 1)}>{i + 1}</button>
-              </li>
-            ))}
-            <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-              <button className="page-link border-0 shadow-sm rounded-circle" onClick={() => setCurrentPage(prev => prev + 1)}><i className="bi bi-chevron-right"></i></button>
-            </li>
-          </ul>
-        </nav>
-      )}
+     {totalPages > 1 && (
+  <div className="d-flex justify-content-end align-items-center gap-1 mt-4">
+
+    <button
+      className="btn btn-sm btn-outline-secondary"
+      disabled={currentPage === 1}
+      onClick={() => setCurrentPage(1)}
+    >
+      « First
+    </button>
+
+    <button
+      className="btn btn-sm btn-outline-secondary"
+      disabled={currentPage === 1}
+      onClick={() => setCurrentPage(currentPage - 1)}
+    >
+      ‹ Prev
+    </button>
+
+    {pageNumbers.map(num => (
+      <button
+        key={num}
+        className={`btn btn-sm ${currentPage === num ? "btn-primary" : "btn-outline-primary"}`}
+        onClick={() => setCurrentPage(num)}
+      >
+        {num}
+      </button>
+    ))}
+
+    <button
+      className="btn btn-sm btn-outline-secondary"
+      disabled={currentPage === totalPages}
+      onClick={() => setCurrentPage(currentPage + 1)}
+    >
+      Next ›
+    </button>
+
+    <button
+      className="btn btn-sm btn-outline-secondary"
+      disabled={currentPage === totalPages}
+      onClick={() => setCurrentPage(totalPages)}
+    >
+      Last »
+    </button>
+
+  </div>
+)}
 
     {isModalOpen && (
   <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>

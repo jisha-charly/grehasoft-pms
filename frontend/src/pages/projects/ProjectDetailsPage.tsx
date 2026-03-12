@@ -5,6 +5,7 @@ import { Project, Task, User, Department, Milestone, ProjectMember, ActivityLog,
 import TaskDetailsModal from '../../components/TaskDetailsModal';
 import axiosInstance from '../../api/axiosInstance';
 import DeleteConfirmModal from "../../components/DeleteConfirmModal";
+import { getResults } from '@/utils/apiHelper';
 interface ProjectDetailsPageProps {
   projects: Project[];
   tasks: Task[];
@@ -69,11 +70,11 @@ useEffect(() => {
           axiosInstance.get(`/tasks/?project=${id}`),
           axiosInstance.get(`/milestones/`),
           axiosInstance.get(`/members/`),
-          axiosInstance.get(`/activity/`),
+          axiosInstance.get(`/project-activity-logs/`),
         ]);
 
        if (tasksRes.status === "fulfilled") {
-  const normalizedTasks = tasksRes.value.data.map((t: any) => ({
+  const normalizedTasks = getResults(tasksRes.value).map((t: any) => ({
     ...t,
     dueDate: t.due_date,
     milestoneId: t.milestone,
@@ -82,26 +83,26 @@ useEffect(() => {
   setProjectTasks(normalizedTasks);
 }
 
-      if (milestonesRes.status === "fulfilled")
-        setProjectMilestones(
-          milestonesRes.value.data.filter(
-            (m: any) => m.project=== Number(id)
-          )
-        );
+     if (milestonesRes.status === "fulfilled")
+ setProjectMilestones(
+  getResults(milestonesRes.value).filter(
+    (m: any) => m.project === Number(id)
+  )
+);
 
-      if (membersRes.status === "fulfilled")
-        setProjectMembers(
-          membersRes.value.data.filter(
-            (m: any) => m.project === Number(id)
-          )
-        );
+if (membersRes.status === "fulfilled")
+  setProjectMembers(
+  getResults(membersRes.value).filter(
+    (m: any) => m.project === Number(id)
+  )
+);
 
-      if (activityRes.status === "fulfilled")
-        setProjectActivity(
-          activityRes.value.data.filter(
-            (a: any) => a.project=== Number(id)
-          )
-        );
+if (activityRes.status === "fulfilled")
+ setProjectActivity(
+  getResults(activityRes.value).filter(
+    (a: any) => a.project === Number(id)
+  )
+);
 
     } catch (error) {
       console.error("Error fetching project:", error);
@@ -183,7 +184,7 @@ try {
 
     // 🔥 Always reload from backend
     const res = await axiosInstance.get(`/tasks/?project=${project.id}`);
-    setProjectTasks(res.data);
+   setProjectTasks(getResults(res));
 
   } catch (error) {
     console.error("Error deleting task:", error);
@@ -217,7 +218,7 @@ try {
   const handleMilestoneToggle = async (milestone: Milestone) => {
     try {
       const newStatus = milestone.status === 'completed' ? 'pending' : 'completed';
-      const res = await axiosInstance.patch(`/milestones/${milestone.id}`, { status: newStatus });
+      const res = await axiosInstance.patch(`/milestones/${milestone.id}/`, { status: newStatus });
       setProjectMilestones(prev => prev.map(m => m.id === milestone.id ? res.data : m));
     } catch (error) {
       console.error("Error toggling milestone status:", error);
@@ -337,7 +338,16 @@ try {
           <ul className="nav nav-pills gap-2 pb-2">
             {['overview', 'tasks', 'milestones', 'team', 'activity'].map(tab => (
               <li className="nav-item" key={tab}>
-                <button className={`nav-link text-capitalize px-4 py-2 small fw-bold ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>{tab}</button>
+               <button
+  className={`nav-link px-4 py-2 fw-semibold rounded-pill ${
+    activeTab === tab
+      ? 'bg-primary text-white shadow-sm'
+      : 'bg-light text-dark'
+  }`}
+  onClick={() => setActiveTab(tab)}
+>
+  {tab}
+</button>
               </li>
             ))}
           </ul>
@@ -665,7 +675,7 @@ try {
           onUpdateStatus={async (id, updates) => {
             const res = await axiosInstance.get(`/tasks/?project=${project.id}`);
 
-const normalized = res.data.map((task: any) => ({
+const normalized = getResults(res).map((task: any) => ({
   ...task,
   id: Number(task.id),
 }));

@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-grehasoft-dev-key")
 
-DEBUG = False
+DEBUG =True
 
 ALLOWED_HOSTS = ["*"]
 
@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'apps.reports',
     'apps.seo',
     'apps.invoices',
+    'apps.proposals',
     'core.apps.CoreConfig',
 ]
 
@@ -105,7 +106,9 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend'
-    ]
+    ],
+   'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 5
 }
 
 # ==============================

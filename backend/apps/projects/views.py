@@ -13,7 +13,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = [IsProjectManager]
-
+   
     def get_queryset(self):
         user = self.request.user
         if user.role.name == 'SUPER_ADMIN':

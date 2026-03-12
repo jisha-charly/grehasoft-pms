@@ -16,6 +16,35 @@ const UsersPage: React.FC<UsersPageProps> = ({ users, roles, departments, crud }
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 const [userToDelete, setUserToDelete] = useState<User | null>(null);
+const [page, setPage] = useState(1);
+const [totalPages, setTotalPages] = useState(1);
+const [userList, setUserList] = useState<User[]>(users || []);
+const fetchUsers = async (pageNumber = 1) => {
+  try {
+    const params: any = {
+      page: pageNumber
+    };
+
+    if (searchTerm) params.search = searchTerm;
+
+    const res = await crud.getAll(params);
+
+    setUserList(res.results);
+    setTotalPages(Math.ceil(res.count / 5)); // PAGE_SIZE = 5
+    setPage(pageNumber);
+
+  } catch (error) {
+    console.error("Error fetching users:", error);
+  }
+};
+useEffect(() => {
+  fetchUsers(page);
+}, [page, searchTerm]);
+const pageNumbers = [];
+
+for (let i = 1; i <= totalPages; i++) {
+  pageNumbers.push(i);
+}
   const validationSchema: ValidationSchema<any> = {
     name: { required: true, message: 'Full name is required.' },
     username: { 
@@ -168,7 +197,7 @@ const [userToDelete, setUserToDelete] = useState<User | null>(null);
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map(u => (
+                userList.map(u => (
                   <tr key={u.id} className="hover-bg-light transition">
                     <td className="px-4">
                       <div className="d-flex align-items-center">
@@ -210,6 +239,51 @@ const [userToDelete, setUserToDelete] = useState<User | null>(null);
               )}
             </tbody>
           </table>
+          <div className="d-flex justify-content-end align-items-center gap-1 p-3">
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === 1}
+    onClick={() => fetchUsers(1)}
+  >
+    « First
+  </button>
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === 1}
+    onClick={() => fetchUsers(page - 1)}
+  >
+    ‹ Prev
+  </button>
+
+  {pageNumbers.map(num => (
+    <button
+      key={num}
+      className={`btn btn-sm ${page === num ? "btn-primary" : "btn-outline-primary"}`}
+      onClick={() => fetchUsers(num)}
+    >
+      {num}
+    </button>
+  ))}
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === totalPages}
+    onClick={() => fetchUsers(page + 1)}
+  >
+    Next ›
+  </button>
+
+  <button
+    className="btn btn-sm btn-outline-secondary"
+    disabled={page === totalPages}
+    onClick={() => fetchUsers(totalPages)}
+  >
+    Last »
+  </button>
+
+</div>
         </div>
       </div>
 
