@@ -77,49 +77,49 @@ const App: React.FC = () => {
   /* ============== FETCH MASTER DATA (AUTH SAFE) ============== */
 
   useEffect(() => {
-  // ✅ wait until auth finishes checking token
-  if (loading) return;
+    // ✅ wait until auth finishes checking token
+    if (loading) return;
 
-  // ✅ only fetch when logged in
-  if (!isAuthenticated) return;
+    // ✅ only fetch when logged in
+    if (!isAuthenticated) return;
 
-  const fetchMasterData = async () => {
-    try {
-      const [
-        usersRes,
-        rolesRes,
-        deptsRes,
-        typesRes,
-        projectsRes,
-        clientsRes,
-        tasksRes,
-        leadsRes,
-      ] = await Promise.all([
-        axiosInstance.get("/users"),
-        axiosInstance.get("/roles"),
-        axiosInstance.get("/departments"),
-        axiosInstance.get("/task-types"),
-        axiosInstance.get("/projects"),
-        axiosInstance.get("/clients"),
-        axiosInstance.get("/tasks"),
-        axiosInstance.get("/leads"),
-      ]);
+    const fetchMasterData = async () => {
+      try {
+        const [
+          usersRes,
+          rolesRes,
+          deptsRes,
+          typesRes,
+          projectsRes,
+          clientsRes,
+          tasksRes,
+          leadsRes,
+        ] = await Promise.all([
+          axiosInstance.get("/users"),
+          axiosInstance.get("/roles"),
+          axiosInstance.get("/departments"),
+          axiosInstance.get("/task-types"),
+          axiosInstance.get("/projects"),
+          axiosInstance.get("/clients"),
+          axiosInstance.get("/tasks"),
+          axiosInstance.get("/leads"),
+        ]);
 
-      setUsers(safeData(usersRes));
-      setRoles(safeData(rolesRes));
-      setDepartments(safeData(deptsRes));
-      setTaskTypes(safeData(typesRes));
-      setProjects(projectsRes.data?.results ?? []);
-      setClients(safeData(clientsRes));
-      setTasks(safeData(tasksRes));
-      setLeads(safeData(leadsRes));
-    } catch (error) {
-      console.error("Error fetching master data:", error);
-    }
-  };
+        setUsers(safeData(usersRes));
+        setRoles(safeData(rolesRes));
+        setDepartments(safeData(deptsRes));
+        setTaskTypes(safeData(typesRes));
+        setProjects(projectsRes.data?.results ?? []);
+        setClients(safeData(clientsRes));
+        setTasks(safeData(tasksRes));
+        setLeads(safeData(leadsRes));
+      } catch (error) {
+        console.error("Error fetching master data:", error);
+      }
+    };
 
-  fetchMasterData();
-}, [isAuthenticated, loading]);
+    fetchMasterData();
+  }, [isAuthenticated, loading]);
 
   /* ================= AUTO PROGRESS ================= */
 
@@ -143,73 +143,73 @@ const App: React.FC = () => {
 
   /* ================= CRUD HELPERS ================= */
 
- const createCrud = (endpoint: string, setter: any) => ({
-  add: async (item: any) => {
-    const res = await axiosInstance.post(`${endpoint}/`, item);
+  const createCrud = (endpoint: string, setter: any) => ({
+    add: async (item: any) => {
+      const res = await axiosInstance.post(`${endpoint}/`, item);
 
-    const newItem = res.data.data || res.data;   // ✅ FIX
-    setter((prev: any[]) => [...prev, newItem]);
-  },
+      const newItem = res.data.data || res.data;   // ✅ FIX
+      setter((prev: any[]) => [...prev, newItem]);
+    },
 
-  update: async (id: number | string, updates: any) => {
-    const res = await axiosInstance.patch(`${endpoint}/${id}/`, updates);
+    update: async (id: number | string, updates: any) => {
+      const res = await axiosInstance.patch(`${endpoint}/${id}/`, updates);
 
-    const updatedItem = res.data.data || res.data;  // ✅ FIX
-    setter((prev: any[]) =>
-      prev.map((i) => (i.id === id ? updatedItem : i))
-    );
-  },
+      const updatedItem = res.data.data || res.data;  // ✅ FIX
+      setter((prev: any[]) =>
+        prev.map((i) => (i.id === id ? updatedItem : i))
+      );
+    },
 
-  delete: async (id: number | string) => {
-    await axiosInstance.delete(`${endpoint}/${id}/`);
-    setter((prev: any[]) => prev.filter((i) => i.id !== id));
-  },
-});
+    delete: async (id: number | string) => {
+      await axiosInstance.delete(`${endpoint}/${id}/`);
+      setter((prev: any[]) => prev.filter((i) => i.id !== id));
+    },
+  });
 
   const projectCrud = createCrud("/projects", setProjects);
   const taskCrud = createCrud("/tasks", setTasks);
 
   const handleUpdatePassword = async (newPassword: string, currentPassword: string) => {
-  try {
+    try {
 
-    await axiosInstance.post("/users/change-password/", {
-      currentPassword: currentPassword,
-      newPassword: newPassword
-    });
+      await axiosInstance.post("/users/change-password/", {
+        currentPassword: currentPassword,
+        newPassword: newPassword
+      });
 
-    // add activity log
-    const logRes = await axiosInstance.post("/activity-logs/", {
-      action: "Changed Password",
-      projectId: 0
-    });
+      // add activity log
+      const logRes = await axiosInstance.post("/activity-logs/", {
+        action: "Changed Password",
+        projectId: 0
+      });
 
-    setActivityLogs((prev) => [logRes.data, ...prev]);
+      setActivityLogs((prev) => [logRes.data, ...prev]);
 
-  } catch (error) {
-    console.error("Error updating password:", error);
-  }
-};
+    } catch (error) {
+      console.error("Error updating password:", error);
+    }
+  };
 
-const handleUpdateProfile = async (data: any) => {
-  try {
+  const handleUpdateProfile = async (data: any) => {
+    try {
 
-    await axiosInstance.patch(`/users/${data.id}/`, {
-      name: data.name,
-      email: data.email,
-      username: data.username
-    });
+      await axiosInstance.patch(`/users/${data.id}/`, {
+        name: data.name,
+        email: data.email,
+        username: data.username
+      });
 
-    const logRes = await axiosInstance.post("/activity-logs/", {
-      action: "Updated Profile",
-      user: data.id
-    });
+      const logRes = await axiosInstance.post("/activity-logs/", {
+        action: "Updated Profile",
+        user: data.id
+      });
 
-    setActivityLogs((prev) => [logRes.data, ...prev]);
+      setActivityLogs((prev) => [logRes.data, ...prev]);
 
-  } catch (error) {
-    console.error("Error updating profile:", error);
-  }
-};
+    } catch (error) {
+      console.error("Error updating profile:", error);
+    }
+  };
 
   const milestoneCrud = createCrud("/milestones", setMilestones);
   const memberCrud = createCrud("/project-members", setProjectMembers);
@@ -221,26 +221,26 @@ const handleUpdateProfile = async (data: any) => {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
 
-      <Route
-  path="/"
-  element={
-    <ProtectedRoute requiredPermission={Permission.VIEW_DASHBOARD}>
-      <Layout >
-        <Dashboard projects={projects} tasks={tasks} />
-      </Layout>
-    </ProtectedRoute>
-  }
-/>
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute requiredPermission={Permission.VIEW_DASHBOARD}>
+              <Layout >
+                <Dashboard projects={projects} tasks={tasks} />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/projects"
           element={
             <ProtectedRoute requiredPermission={Permission.VIEW_PROJECTS}>
               <Layout >
-               <ProjectsPage
-  users={users}
-  departments={departments}
-  clients={clients}
-/>
+                <ProjectsPage
+                  users={users}
+                  departments={departments}
+                  clients={clients}
+                />
               </Layout>
             </ProtectedRoute>
           }
@@ -264,17 +264,17 @@ const handleUpdateProfile = async (data: any) => {
                   memberCrud={memberCrud}
                   taskCrud={taskCrud}
                   taskTypes={taskTypes}
-                 currentUser={user!}
+                  currentUser={user!}
                 />
               </Layout>
             </ProtectedRoute>
           }
         />
-      <Route path="/projects/:id/kanban" element={<ProtectedRoute requiredPermission={Permission.MANAGE_TASKS}><Layout ><ProjectKanbanPage projects={projects} tasks={tasks} setTasks={setTasks} milestones={milestones} users={users} crud={taskCrud} taskTypes={taskTypes} currentUser={user!} /></Layout></ProtectedRoute>} />
-          <Route path="/tasks" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout ><TasksPage milestones={milestones} projects={projects} taskTypes={taskTypes} users={users} currentUser={user!}/></Layout></ProtectedRoute>} />
-          <Route path="/clients" element={<ProtectedRoute requiredPermission={Permission.VIEW_CLIENTS}><Layout ><ClientsPage /></Layout></ProtectedRoute>} />
-          <Route path="/crm" element={<ProtectedRoute requiredPermission={Permission.VIEW_LEADS}><Layout ><LeadsPage users={users} clients={clients} departments={departments} setProjects={setProjects} /></Layout></ProtectedRoute>} />
-         <Route path="/seo" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout><SEOPage /></Layout></ProtectedRoute>} />
+        <Route path="/projects/:id/kanban" element={<ProtectedRoute requiredPermission={Permission.MANAGE_TASKS}><Layout ><ProjectKanbanPage projects={projects} tasks={tasks} setTasks={setTasks} milestones={milestones} users={users} crud={taskCrud} taskTypes={taskTypes} currentUser={user!} /></Layout></ProtectedRoute>} />
+        <Route path="/tasks" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout ><TasksPage milestones={milestones} projects={projects} taskTypes={taskTypes} users={users} currentUser={user!} /></Layout></ProtectedRoute>} />
+        <Route path="/clients" element={<ProtectedRoute requiredPermission={Permission.VIEW_CLIENTS}><Layout ><ClientsPage /></Layout></ProtectedRoute>} />
+        <Route path="/crm" element={<ProtectedRoute requiredPermission={Permission.VIEW_LEADS}><Layout ><LeadsPage users={users} clients={clients} departments={departments} setProjects={setProjects} /></Layout></ProtectedRoute>} />
+        <Route path="/seo" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout><SEOPage /></Layout></ProtectedRoute>} />
         <Route path="/admin/users" element={<ProtectedRoute requiredPermission={Permission.MANAGE_USERS}><Layout><UsersPage roles={roles} departments={departments} /></Layout></ProtectedRoute>} />
         <Route
           path="/infrastructure"
@@ -297,60 +297,89 @@ const handleUpdateProfile = async (data: any) => {
           }
         />
 
-          <Route
-            path="/admin/departments"
-            element={
-              <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
-                <Layout >
-                  <DepartmentsPage />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/admin/task-types"
-            element={
-              <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
-                <Layout>
-                  <TaskTypesPage />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-
-          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-         <Route
-  path="/profile"
-  element={
-    <ProtectedRoute requiredPermission={Permission.VIEW_DASHBOARD}>
-      <Layout>
-        <ProfilePage
-          activityLogs={activityLogs}
-          onUpdatePassword={handleUpdatePassword}
-          onUpdateProfile={handleUpdateProfile}
+        <Route
+          path="/admin/departments"
+          element={
+            <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
+              <Layout >
+                <DepartmentsPage />
+              </Layout>
+            </ProtectedRoute>
+          }
         />
-      </Layout>
-    </ProtectedRoute>
-  }
-/>
 
-<Route path="/invoices" element={<InvoicesPage />} />
-<Route path="/invoices/create" element={<CreateInvoicePage />} />
-<Route path="/invoices/edit/:id" element={<CreateInvoicePage />} />
-<Route path="/invoices/:id" element={<InvoiceDetailsPage />} />
- <Route path="/reminders" element={<ProtectedRoute requiredPermission={Permission.VIEW_REMINDERS}><Layout><RemindersPage /></Layout></ProtectedRoute>} />
-  <Route path="/proposals" element={<ProtectedRoute requiredPermission={Permission.VIEW_PROPOSALS}><Layout><ProposalsPage leads={leads} setProjects={setProjects} /></Layout></ProtectedRoute>} />
-  <Route path="/hr-documents" element={<ProtectedRoute requiredPermission={Permission.GENERATE_HR_DOCS}><Layout><HRDocumentsPage /></Layout></ProtectedRoute>} />
-    <Route path="/admin/servers" element={<ServersPage />} />
-<Route path="/infrastructure/domains" element={<DomainsPage />} />
-<Route path="/infrastructure/credentials" element={<CredentialsPage />} />     
-          
-          
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </Router>
-   
+        <Route
+          path="/admin/task-types"
+          element={
+            <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
+              <Layout>
+                <TaskTypesPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute requiredPermission={Permission.VIEW_DASHBOARD}>
+              <Layout>
+                <ProfilePage
+                  activityLogs={activityLogs}
+                  onUpdatePassword={handleUpdatePassword}
+                  onUpdateProfile={handleUpdateProfile}
+                />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="/invoices" element={<InvoicesPage />} />
+        <Route path="/invoices/create" element={<CreateInvoicePage />} />
+        <Route path="/invoices/edit/:id" element={<CreateInvoicePage />} />
+        <Route path="/invoices/:id" element={<InvoiceDetailsPage />} />
+        <Route path="/reminders" element={<ProtectedRoute requiredPermission={Permission.VIEW_REMINDERS}><Layout><RemindersPage /></Layout></ProtectedRoute>} />
+        <Route path="/proposals" element={<ProtectedRoute requiredPermission={Permission.VIEW_PROPOSALS}><Layout><ProposalsPage leads={leads} setProjects={setProjects} /></Layout></ProtectedRoute>} />
+        <Route path="/hr-documents" element={<ProtectedRoute requiredPermission={Permission.GENERATE_HR_DOCS}><Layout><HRDocumentsPage /></Layout></ProtectedRoute>} />
+        <Route
+          path="/admin/servers"
+          element={
+            <ProtectedRoute requiredPermission={Permission.MANAGE_INFRASTRUCTURE}>
+              <Layout>
+                <ServersPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/infrastructure/domains"
+          element={
+            <ProtectedRoute requiredPermission={Permission.MANAGE_INFRASTRUCTURE}>
+
+              <DomainsPage />
+
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/infrastructure/credentials"
+          element={
+            <ProtectedRoute requiredPermission={Permission.MANAGE_INFRASTRUCTURE}>
+              <Layout>
+                <CredentialsPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </Router>
+
   );
 };
 

@@ -11,3 +11,4 @@ python-dotenv
 reportlab
 num2words
 Pillow
+cryptography

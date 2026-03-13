@@ -25,6 +25,7 @@ export enum Permission {
   VIEW_PROPOSALS = 'VIEW_PROPOSALS',
   MANAGE_PROPOSALS = 'MANAGE_PROPOSALS',
   GENERATE_HR_DOCS = 'GENERATE_HR_DOCS',
+  MANAGE_INFRASTRUCTURE = 'MANAGE_INFRASTRUCTURE',
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
@@ -45,6 +46,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.VIEW_PROPOSALS,
     Permission.MANAGE_PROPOSALS,
     Permission.GENERATE_HR_DOCS,
+    Permission.MANAGE_INFRASTRUCTURE,
   ],
   [UserRole.PROJECT_MANAGER]: [
     Permission.VIEW_DASHBOARD,

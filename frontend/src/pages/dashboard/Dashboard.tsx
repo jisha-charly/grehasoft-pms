@@ -1,5 +1,5 @@
-import  { useMemo, useState } from 'react';
-import React from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import axiosInstance from '../../api/axiosInstance';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell 
@@ -24,6 +24,68 @@ const Dashboard: React.FC<{ projects: Project[]; tasks: Task[] }> = ({ projects,
     { name: 'Completed', value: Math.round((statusCounts.completed / totalProjects) * 100), color: '#198754' },
     { name: 'Pending', value: Math.round((statusCounts.delayed / totalProjects) * 100), color: '#ffc107' },
   ];
+
+  const [expiringDomains, setExpiringDomains] = useState<any[]>([]);
+  const [loadingDomains, setLoadingDomains] = useState(true);
+  
+  const [infrastructureStats, setInfrastructureStats] = useState({
+    totalServers: 0,
+    totalDomains: 0,
+    expiringDomainsCount: 0,
+    totalCredentials: 0
+  });
+
+  useEffect(() => {
+    const fetchInfrastructureData = async () => {
+      try {
+        const [serversRes, domainsRes, credentialsRes] = await Promise.all([
+          axiosInstance.get('/infrastructure/servers/'),
+          axiosInstance.get('/infrastructure/domains/'),
+          axiosInstance.get('/infrastructure/credentials/')
+        ]);
+
+        const servers = serversRes.data.results || serversRes.data || [];
+        const domains = domainsRes.data.results || domainsRes.data || [];
+        const credentials = credentialsRes.data.results || credentialsRes.data || [];
+        
+        const now = new Date();
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(now.getDate() + 30);
+
+        const expiring = domains
+          .map((domain: any) => {
+            if (!domain.expiry_date) return null;
+            
+            const expiryDate = new Date(domain.expiry_date);
+            const timeDiff = expiryDate.getTime() - now.getTime();
+            const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
+            
+            return {
+              ...domain,
+              daysRemaining,
+              expiryDateObj: expiryDate
+            };
+          })
+          .filter((domain: any) => domain && domain.daysRemaining >= 0 && domain.daysRemaining <= 30)
+          .sort((a: any, b: any) => a.daysRemaining - b.daysRemaining);
+
+        setExpiringDomains(expiring);
+        setInfrastructureStats({
+          totalServers: servers.length,
+          totalDomains: domains.length,
+          expiringDomainsCount: expiring.length,
+          totalCredentials: credentials.length
+        });
+
+      } catch (error) {
+        console.error("Error fetching infrastructure data:", error);
+      } finally {
+        setLoadingDomains(false);
+      }
+    };
+
+    fetchInfrastructureData();
+  }, []);
 
   // Mock activity data for now, but could be derived from tasks' createdAt/updatedAt
 const activityData = useMemo(() => {
@@ -249,6 +311,89 @@ const activityData = useMemo(() => {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="row g-4 mb-4">
+        <div className="col-12">
+          <h5 className="fw-bold mb-3 text-dark">Infrastructure Overview</h5>
+          <div className="row g-4">
+            {[
+              { label: 'Servers', value: infrastructureStats.totalServers, icon: 'bi-hdd-network', color: 'primary' },
+              { label: 'Domains', value: infrastructureStats.totalDomains, icon: 'bi-globe', color: 'info' },
+              { label: 'Expiring Soon', value: infrastructureStats.expiringDomainsCount, icon: 'bi-exclamation-triangle', color: 'warning' },
+              { label: 'Credentials', value: infrastructureStats.totalCredentials, icon: 'bi-shield-lock', color: 'success' },
+            ].map((stat, i) => (
+              <div className="col-md-3" key={i}>
+                <div className="card p-4 h-100 border-0 shadow-sm">
+                  <div className="d-flex justify-content-between align-items-start mb-3">
+                    <div className={`p-2 rounded-3 bg-${stat.color}-subtle text-${stat.color}`}>
+                      <i className={`bi ${stat.icon} fs-4`}></i>
+                    </div>
+                  </div>
+                  <h3 className="fw-bold mb-1 text-dark">{stat.value}</h3>
+                  <p className="text-secondary small fw-bold mb-0 text-uppercase tracking-wider">{stat.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Domain Renewal Alerts Widget */}
+      <div className="row g-4">
+        <div className="col-12">
+          <div className="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div className="card-header bg-white border-bottom p-4">
+              <h5 className="fw-bold mb-0 text-dark d-flex align-items-center">
+                <i className="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+                Domain Renewal Alerts
+              </h5>
+            </div>
+            <div className="card-body p-0">
+              {loadingDomains ? (
+                <div className="text-center p-4">
+                  <span className="spinner-border spinner-border-sm text-secondary me-2"></span>
+                  Loading domain alerts...
+                </div>
+              ) : expiringDomains.length === 0 ? (
+                <div className="text-center p-4 text-muted">
+                  No domains expiring soon.
+                </div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-hover align-middle mb-0">
+                    <thead className="bg-light">
+                      <tr>
+                        <th className="px-4 py-3">Domain Name</th>
+                        <th className="py-3">Project</th>
+                        <th className="py-3">Expiry Date</th>
+                        <th className="py-3 text-end pe-4">Days Left</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {expiringDomains.map((domain, idx) => (
+                        <tr key={idx}>
+                          <td className="px-4 py-3 fw-medium text-dark">{domain.domain_name}</td>
+                          <td className="py-3 text-secondary">{domain.project_name || '-'}</td>
+                          <td className="py-3 text-secondary">{domain.expiry_date}</td>
+                          <td className="py-3 text-end pe-4">
+                            <span className={`badge px-3 py-2 rounded-pill ${
+                              domain.daysRemaining <= 7 
+                                ? 'bg-danger text-white' 
+                                : 'bg-warning text-dark'
+                            }`}>
+                              {domain.daysRemaining} days left
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
