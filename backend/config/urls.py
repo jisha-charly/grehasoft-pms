@@ -78,7 +78,7 @@ urlpatterns = [
     path("api/v1/invoices/analytics/", views.invoice_analytics),
     path('api/v1/', include(router.urls)),
     path("api/v1/", include("apps.hr_documents.urls")),
-    path("api/v1/", include("apps.infrastructure.urls")),  # NEW
+    path("api/v1/infrastructure/", include("apps.infrastructure.urls")),
    
     path('api/v1/dashboard/stats/', DashboardStatsView.as_view(), name='dashboard-stats'),
     path('api/v1/auth/', include('rest_framework.urls')), 

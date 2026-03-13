@@ -103,12 +103,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       roles: [UserRole.SUPER_ADMIN],
     },
     {
-      label: "Infrastructure",
-      path: "/infrastructure",
-      icon: "bi-hdd-network",
+     label: "Infrastructure",
+     icon: "bi-hdd-network",
       roles: [UserRole.SUPER_ADMIN],
-    },
-  ];
+     children: [
+    { label: "Servers", path: "/admin/servers" },
+    { label: "Domains", path: "/infrastructure/domains" },
+    { label: "Credentials", path: "/infrastructure/credentials" }
+  ]
+  },
+   ];
 
   const hasAccess = (roles: UserRole[]) => {
     return !!(user?.role && roles.includes(user.role as UserRole));
@@ -141,6 +145,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   { label: 'Roles', path: '/admin/roles', icon: 'bi-person-badge' },
   { label: 'Departments', path: '/admin/departments', icon: 'bi-diagram-3' },
   { label: 'Task Types', path: '/admin/task-types', icon: 'bi-list-task' },
+  { label: "Servers", path: "/admin/servers", icon: "bi-hdd-network" }
 ];
 
   const handleLogout = () => {

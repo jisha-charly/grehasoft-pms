@@ -45,6 +45,9 @@ import ProposalsPage from "./pages/crm/ProposalsPage";
 import RemindersPage from "./pages/crm/RemindersPage";
 import HRDocumentsPage from "./pages/hr/HRDocumentsPage";
 import InfrastructurePage from "./pages/infrastructure/InfrastructurePage";
+import ServersPage from "./pages/infrastructure/ServersPage";
+import CredentialsPage from "./pages/infrastructure/CredentialsPage";
+import DomainsPage from "./pages/infrastructure/DomainsPage";
 
 const App: React.FC = () => {
   const { isAuthenticated, loading, user } = useAuth();
@@ -339,6 +342,11 @@ const handleUpdateProfile = async (data: any) => {
  <Route path="/reminders" element={<ProtectedRoute requiredPermission={Permission.VIEW_REMINDERS}><Layout><RemindersPage /></Layout></ProtectedRoute>} />
   <Route path="/proposals" element={<ProtectedRoute requiredPermission={Permission.VIEW_PROPOSALS}><Layout><ProposalsPage leads={leads} setProjects={setProjects} /></Layout></ProtectedRoute>} />
   <Route path="/hr-documents" element={<ProtectedRoute requiredPermission={Permission.GENERATE_HR_DOCS}><Layout><HRDocumentsPage /></Layout></ProtectedRoute>} />
+    <Route path="/admin/servers" element={<ServersPage />} />
+<Route path="/infrastructure/domains" element={<DomainsPage />} />
+<Route path="/infrastructure/credentials" element={<CredentialsPage />} />     
+          
+          
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>

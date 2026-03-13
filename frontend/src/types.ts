@@ -493,3 +493,45 @@ export interface Reminder {
   createdAt: string;
 }
 
+export interface Server {
+  id: number
+  name: string
+  provider: string
+  owner: string
+  server_ip: string
+  ip_address: string
+  notes: string
+}
+
+export interface Domain {
+  id: number
+  project: number
+  project_name?: string
+  domain_name: string
+  provider: string
+  purchase_date: string
+  expiry_date: string
+  renewal_cost: number
+  server: number
+  server_name?: string
+  notes: string
+}
+
+export interface WebsiteCredential {
+  id: number
+  project: number
+  domain: number
+  domain_name?: string
+  admin_url: string
+  admin_username: string
+  admin_password: string
+  cpanel_url: string
+  cpanel_username: string
+  cpanel_password: string
+  ftp_host: string
+  ftp_username: string
+  ftp_password: string
+  client_email: string
+  client_email_password: string
+  notes: string
+}
