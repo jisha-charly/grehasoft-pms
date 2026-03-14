@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from "react"
-import Layout from "../../components/layout/Layout"
 import api from "../../api/axiosInstance"
-import { useNavigate } from "react-router-dom"
-import { useParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import { getResults } from "@/utils/apiHelper"
-interface Client{
+
+interface Client {
   id:number
   name:string
+  address?:string
+}
+
+interface Service {
+  id:number
+  name:string
+  price:number
 }
 
 interface Item{
@@ -16,22 +22,35 @@ interface Item{
 }
 
 const CreateInvoicePage = ()=>{
+
 const { id } = useParams()
 const navigate = useNavigate()
 
 const [clients,setClients] = useState<Client[]>([])
 const [client,setClient] = useState<number | "">("")
+const [clientAddress,setClientAddress] = useState("")
+
+const [services,setServices] = useState<Service[]>([])
 
 const [items,setItems] = useState<Item[]>([
 {description:"",quantity:1,rate:0}
 ])
 
+const [invoiceNumber,setInvoiceNumber] = useState("")
+const [project,setProject] = useState("")
+const [issueDate,setIssueDate] = useState(
+new Date().toISOString().split("T")[0]
+)
+const [dueDate,setDueDate] = useState("")
+
 const [gst,setGst] = useState(0)
 const [notes,setNotes] = useState("")
 const [advance,setAdvance] = useState<number | "">("")
-const [invoiceNumber,setInvoiceNumber] = useState("")
 
-/* PREDEFINED DESCRIPTIONS */
+const [selectedTemplate,setSelectedTemplate] = useState("")
+const [pdfPreview,setPdfPreview] = useState("")
+
+/* PREDEFINED DESCRIPTION TEMPLATES */
 
 const descriptionTemplates:any={
 SEO:"SEO Services for website optimization including keyword research, on-page SEO and reporting",
@@ -39,89 +58,90 @@ WEBSITE:"Website design and development services",
 HOSTING:"Website hosting and server maintenance",
 MARKETING:"Digital marketing and campaign management"
 }
+
+/* FETCH INVOICE NUMBER */
+
 const fetchInvoiceNumber = async () => {
-  try {
-    const res = await api.get("/invoices/next-number/");
-    setInvoiceNumber(res.data.invoice_number);
-  } catch (error) {
-    console.error("Error fetching invoice number", error);
-  }
-};
-const [selectedTemplate,setSelectedTemplate] = useState("")
-
-const fetchInvoice = async () => {
-
-  try {
-
-    const res = await api.get(`/invoices/${id}/`)
-    const data = res.data
-
-    setInvoiceNumber(data.invoice_number)
-    setClient(data.client)
-
-    setItems(
-      data.items.map((item:any)=>({
-        description:item.description,
-        quantity:item.quantity,
-        rate:item.rate
-      }))
-    )
-
-    setNotes(data.notes)
-
-    // ⭐ ADD THESE
-    setAdvance(data.advance)
-    setGst(data.subtotal ? (data.tax / data.subtotal) * 100 : 0)
-
-  } catch(error){
-
-    console.error("Error loading invoice", error)
-
-  }
-
+try{
+const res = await api.get("/invoices/next-number/")
+setInvoiceNumber(res.data.invoice_number)
+}catch(err){
+console.error(err)
 }
-useEffect(() => {
-
-fetchClients()
-
-if (id) {
-  fetchInvoice()
-} else {
-  fetchInvoiceNumber()
 }
 
-}, [id])
+/* FETCH CLIENTS */
 
-const fetchClients = async()=>{
+const fetchClients = async ()=>{
 const res = await api.get("/clients/")
- setClients(getResults(res));
+setClients(getResults(res))
 }
 
-const addItem=()=>{
+/* FETCH SERVICES (for autocomplete) */
+
+const fetchServices = async ()=>{
+try{
+const res = await api.get("/services/")
+setServices(getResults(res))
+}catch(err){
+console.error(err)
+}
+}
+
+/* CLIENT CHANGE → AUTO ADDRESS */
+
+const handleClientChange = (id:number)=>{
+
+setClient(id)
+
+const selected = clients.find(c=>c.id===id)
+
+if(selected){
+setClientAddress(selected.address || "")
+}
+
+}
+
+/* ITEM MANAGEMENT */
+
+const addItem = ()=>{
 setItems([...items,{description:"",quantity:1,rate:0}])
 }
 
-const removeItem=(index:number)=>{
+const removeItem = (index:number)=>{
 const updated=[...items]
 updated.splice(index,1)
 setItems(updated)
 }
 
-const updateItem=(index:number,field:string,value:any)=>{
-
+const updateItem = (index:number,field:string,value:any)=>{
 const updated=[...items]
 updated[index]={...updated[index],[field]:value}
 setItems(updated)
-
 }
 
 /* APPLY TEMPLATE */
 
-const applyTemplate=(index:number)=>{
+const applyTemplate = (index:number)=>{
 
 if(!selectedTemplate) return
 
 updateItem(index,"description",descriptionTemplates[selectedTemplate])
+
+}
+
+/* SERVICE AUTOCOMPLETE */
+
+const handleServiceSelect = (index:number,serviceName:string)=>{
+
+const service = services.find(s=>s.name===serviceName)
+
+if(service){
+
+updateItem(index,"description",service.name)
+updateItem(index,"rate",service.price)
+
+}
 
 }
 
@@ -137,115 +157,211 @@ const gstAmount = subtotal * gst / 100
 const total = subtotal + gstAmount
 
 const balance = Math.max(
-  total - (typeof advance === "number" ? advance : 0),
-  0
+total - (typeof advance === "number" ? advance : 0),
+0
 )
+
+/* PDF PREVIEW */
+
+const previewInvoice = async ()=>{
+
+try{
+
+const payload = {
+client,
+items,
+subtotal,
+tax:gstAmount,
+total
+}
+
+const res = await api.post(
+"/invoices/preview/",
+payload,
+{ responseType:"blob" }
+)
+
+const url = URL.createObjectURL(res.data)
+
+setPdfPreview(url)
+
+}catch(err){
+
+console.error("Preview failed",err)
+
+}
+
+}
 
 /* SAVE INVOICE */
 
-const saveInvoice = async () => {
+const saveInvoice = async ()=>{
 
-const formattedItems = items.map(item => ({
+const formattedItems = items.map(item=>({
 description:item.description,
 quantity:item.quantity,
 rate:item.rate
 }))
 
 const payload = {
-  client: client,
-  due_date: new Date().toISOString().split("T")[0],
-  items: formattedItems,
-  subtotal: subtotal,
-  tax: gstAmount,
-  total: total,
-  advance: typeof advance === "number" ? advance : 0,
-  notes: notes
+client,
+issue_date:issueDate,
+due_date:dueDate,
+items:formattedItems,
+subtotal,
+tax:gstAmount,
+total,
+advance: typeof advance==="number"?advance:0,
+notes
 }
 
-try {
-
-let res
+try{
 
 if(id){
-res = await api.put(`/invoices/${id}/`, payload)
+
+await api.put(`/invoices/${id}/`,payload)
+
 }else{
-res = await api.post("/invoices/", payload)
+
+await api.post("/invoices/",payload)
+
 }
 
 alert("Invoice saved successfully")
 
 navigate("/invoices")
 
-}catch(error){
+}catch(err){
 
-console.error("Error saving invoice", error)
+console.error("Error saving invoice",err)
+
+}
 
 }
 
+useEffect(()=>{
+fetchClients()
+fetchServices()
+
+if(!id){
+fetchInvoiceNumber()
 }
+
+},[])
 
 return(
-
-<Layout>
 
 <div className="container-fluid">
 
 <div className="card shadow-sm p-4">
 
-<h3>{id ? "Edit Invoice" : "Create Invoice"}</h3>
+<h4 className="mb-4">
+{id ? "Edit Invoice" : "Create Invoice"}
+</h4>
 
-<div className="row mb-3">
+{/* TOP FIELDS */}
+
+<div className="row g-3 mb-4">
 
 <div className="col-md-6">
- <label className="form-label">Invoice Number</label>
-
+<label>Invoice Number</label>
 <input
-  className="form-control mb-3"
-  value={invoiceNumber}
-  placeholder="Loading..."
-  readOnly
+className="form-control"
+value={invoiceNumber}
+readOnly
 />
+</div>
 
-<label className="form-label">Client</label>
+<div className="col-md-6">
+<label>Tax Rate (%)</label>
+<input
+type="number"
+className="form-control"
+value={gst}
+onChange={(e)=>setGst(Number(e.target.value))}
+/>
+</div>
 
+<div className="col-md-6">
+<label>Client</label>
 <select
 className="form-control"
 value={client}
-onChange={(e)=>setClient(Number(e.target.value))}
+onChange={(e)=>handleClientChange(Number(e.target.value))}
 >
-
 <option>Select Client</option>
 
 {clients.map(c=>(
-
 <option key={c.id} value={c.id}>
 {c.name}
 </option>
-
 ))}
 
 </select>
+</div>
 
+<div className="col-md-6">
+<label>Project (Optional)</label>
+<input
+className="form-control"
+value={project}
+onChange={(e)=>setProject(e.target.value)}
+/>
+</div>
+
+<div className="col-md-6">
+<label>Issue Date</label>
+<input
+type="date"
+className="form-control"
+value={issueDate}
+onChange={(e)=>setIssueDate(e.target.value)}
+/>
+</div>
+
+<div className="col-md-6">
+<label>Due Date</label>
+<input
+type="date"
+className="form-control"
+value={dueDate}
+onChange={(e)=>setDueDate(e.target.value)}
+/>
 </div>
 
 </div>
 
-{/* DESCRIPTION TEMPLATE */}
+{/* CLIENT ADDRESS */}
 
-<div className="row mb-3">
+{clientAddress && (
 
-<div className="col-md-4">
+<div className="mb-3">
+
+<label>Client Address</label>
+
+<textarea
+className="form-control"
+value={clientAddress}
+readOnly
+/>
+
+</div>
+
+)}
+
+{/* TEMPLATE */}
+
+<div className="mb-3">
 
 <label>Select Description Template</label>
 
 <select
-className="form-control"
+className="form-control w-50"
 value={selectedTemplate}
 onChange={(e)=>setSelectedTemplate(e.target.value)}
 >
 
 <option value="">Select Template</option>
-
 <option value="SEO">SEO</option>
 <option value="WEBSITE">Website</option>
 <option value="HOSTING">Hosting</option>
@@ -255,20 +371,18 @@ onChange={(e)=>setSelectedTemplate(e.target.value)}
 
 </div>
 
-</div>
+{/* ITEMS TABLE */}
 
 <table className="table table-bordered">
 
 <thead className="table-light">
 
 <tr>
-
 <th>Description</th>
-<th style={{width:"120px"}}>Qty</th>
-<th style={{width:"150px"}}>Rate</th>
-<th style={{width:"150px"}}>Amount</th>
-<th style={{width:"60px"}}></th>
-
+<th style={{ width: "120px" }}>Qty</th>
+<th style={{ width: "150px" }}>Rate</th>
+<th style={{ width: "150px" }}>Amount</th>
+<th style={{ width: "60px" }}></th>
 </tr>
 
 </thead>
@@ -288,10 +402,20 @@ return(
 <div className="d-flex gap-2">
 
 <input
+list="services"
 className="form-control"
 value={item.description}
-onChange={(e)=>updateItem(index,"description",e.target.value)}
+onChange={(e)=>{
+updateItem(index,"description",e.target.value)
+handleServiceSelect(index,e.target.value)
+}}
 />
+
+<datalist id="services">
+{services.map(s=>(
+<option key={s.id} value={s.name}/>
+))}
+</datalist>
 
 <button
 className="btn btn-sm btn-secondary"
@@ -326,11 +450,7 @@ onChange={(e)=>updateItem(index,"rate",Number(e.target.value))}
 
 </td>
 
-<td>
-
-₹{amount}
-
-</td>
+<td>₹{amount}</td>
 
 <td>
 
@@ -353,9 +473,14 @@ onClick={()=>removeItem(index)}
 
 </table>
 
-<button className="btn btn-primary mb-3" onClick={addItem}>
+<button
+className="btn btn-primary mb-3"
+onClick={addItem}
+>
 Add Item
 </button>
+
+{/* NOTES + TOTALS */}
 
 <div className="row">
 
@@ -375,15 +500,6 @@ onChange={(e)=>setNotes(e.target.value)}
 <div className="card p-3">
 
 <p>Subtotal : ₹{subtotal}</p>
-
-<input
-type="number"
-className="form-control mb-2"
-placeholder="GST %"
-value={gst}
-onChange={(e)=>setGst(Number(e.target.value))}
-/>
-
 <p>GST : ₹{gstAmount.toFixed(2)}</p>
 
 <hr/>
@@ -406,7 +522,16 @@ onChange={(e)=>setAdvance(Number(e.target.value))}
 
 </div>
 
+{/* BUTTONS */}
+
 <div className="mt-4 d-flex gap-2">
+
+<button
+className="btn btn-secondary"
+onClick={previewInvoice}
+>
+Preview PDF
+</button>
 
 <button
 className="btn btn-success"
@@ -417,11 +542,26 @@ Save Invoice
 
 </div>
 
-</div>
+{/* PDF PREVIEW */}
+
+{pdfPreview && (
+
+<div className="mt-4">
+
+<iframe
+src={pdfPreview}
+width="100%"
+height="600px"
+title="Invoice Preview"
+/>
 
 </div>
 
-</Layout>
+)}
+
+</div>
+
+</div>
 
 )
 

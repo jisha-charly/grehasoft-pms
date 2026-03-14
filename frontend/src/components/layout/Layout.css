@@ -24,3 +24,21 @@
   transform: translateX(0);
 }
 
+.app-navbar{
+  height:64px;
+  display:flex;
+  align-items:center;
+}
+
+
+.app-navbar .nav-link{
+  display:flex;
+  align-items:center;
+  height:64px;
+  white-space:nowrap;
+  padding:0 10px;
+  font-size:14px;
+}
+.app-navbar .navbar-nav{
+  gap:4px;
+}

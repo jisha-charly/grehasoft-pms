@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react"
-import { useParams } from "react-router-dom"
+import { useParams, useNavigate } from "react-router-dom"
 import Layout from "../../components/layout/Layout"
 import api from "../../api/axiosInstance"
 
@@ -21,10 +21,8 @@ interface Payment{
 interface Invoice{
   id:number
   invoice_number:string
-  client:{
-    id:number
-    name:string
-  }
+  client:number
+  client_name:string
   issue_date:string
   total:number
   total_paid:number
@@ -37,8 +35,11 @@ interface Invoice{
 const InvoiceDetailsPage = ()=>{
 
 const { id } = useParams()
+const navigate = useNavigate()
 
 const [invoice,setInvoice] = useState<Invoice | null>(null)
+
+const [showPaymentModal,setShowPaymentModal] = useState(false)
 
 const [paymentAmount,setPaymentAmount] = useState("")
 const [paymentMode,setPaymentMode] = useState("cash")
@@ -79,12 +80,34 @@ notes: paymentNotes
 
 setPaymentAmount("")
 setPaymentNotes("")
+setShowPaymentModal(false)
 
 fetchInvoice()
 
 } catch (error) {
 
 console.error("Error adding payment", error)
+
+}
+
+}
+
+const downloadInvoice = ()=>{
+
+window.open(`http://127.0.0.1:8000/api/v1/invoices/${id}/download/`)
+
+}
+
+const sendInvoice = async()=>{
+
+try{
+
+await api.post(`/invoices/${id}/send-email/`)
+alert("Invoice sent to client")
+
+}catch(error){
+
+console.error("Error sending email",error)
 
 }
 
@@ -98,15 +121,60 @@ return(
 
 <div className="container mt-4">
 
+{/* HEADER */}
+
+<div className="d-flex justify-content-between align-items-center mb-3">
+
+<div>
+
+<button
+className="btn btn-outline-secondary btn-sm mb-2"
+onClick={()=>navigate("/invoices")}
+>
+← Back to Invoices
+</button>
+
 <h3>Invoice {invoice.invoice_number}</h3>
+
+</div>
+
+<div className="d-flex gap-2">
+
+<button
+className="btn btn-success"
+onClick={()=>setShowPaymentModal(true)}
+>
++ Add Payment
+</button>
+
+<button
+className="btn btn-outline-primary"
+onClick={downloadInvoice}
+>
+Download PDF
+</button>
+
+<button
+className="btn btn-outline-secondary"
+onClick={sendInvoice}
+>
+Send Email
+</button>
+
+</div>
+
+</div>
+
+{/* INFO */}
 
 <div className="card p-3 mb-4">
 
-<p><strong>Client:</strong> {invoice.client?.name}</p>
+<p><strong>Client:</strong> {invoice.client_name}</p>
 
 <p><strong>Date:</strong> {invoice.issue_date}</p>
 
 <p><strong>Status:</strong>
+
 <span className={`badge ms-2 bg-${
 invoice.status==="paid"
 ? "success"
@@ -114,8 +182,11 @@ invoice.status==="paid"
 ? "primary"
 : "warning"
 }`}>
+
 {invoice.status}
+
 </span>
+
 </p>
 
 </div>
@@ -160,7 +231,7 @@ invoice.status==="paid"
 
 </div>
 
-{/* TOTALS */}
+{/* SUMMARY */}
 
 <div className="card p-3 mb-4">
 
@@ -204,12 +275,16 @@ No payments recorded
 )}
 
 {invoice.payments?.map((pay)=>(
+
 <tr key={pay.id}>
+
 <td>{pay.payment_date}</td>
 <td>₹{pay.amount}</td>
 <td>{pay.payment_mode}</td>
 <td>{pay.notes}</td>
+
 </tr>
+
 ))}
 
 </tbody>
@@ -218,30 +293,38 @@ No payments recorded
 
 </div>
 
-{/* ADD PAYMENT */}
+</div>
 
-<div className="card p-3">
+{/* PAYMENT MODAL */}
 
+{showPaymentModal && (
+<>
+<div className="modal fade show d-block">
+<div className="modal-dialog">
+<div className="modal-content">
+
+<div className="modal-header">
 <h5>Add Payment</h5>
 
-<div className="row">
+<button
+className="btn-close"
+onClick={()=>setShowPaymentModal(false)}
+></button>
 
-<div className="col-md-3">
+</div>
+
+<div className="modal-body">
 
 <input
 type="number"
-className="form-control"
+className="form-control mb-3"
 placeholder="Amount"
 value={paymentAmount}
 onChange={(e)=>setPaymentAmount(e.target.value)}
 />
 
-</div>
-
-<div className="col-md-3">
-
 <select
-className="form-control"
+className="form-control mb-3"
 value={paymentMode}
 onChange={(e)=>setPaymentMode(e.target.value)}
 >
@@ -253,10 +336,6 @@ onChange={(e)=>setPaymentMode(e.target.value)}
 
 </select>
 
-</div>
-
-<div className="col-md-4">
-
 <input
 className="form-control"
 placeholder="Notes"
@@ -266,10 +345,17 @@ onChange={(e)=>setPaymentNotes(e.target.value)}
 
 </div>
 
-<div className="col-md-2">
+<div className="modal-footer">
 
 <button
-className="btn btn-success w-100"
+className="btn btn-secondary"
+onClick={()=>setShowPaymentModal(false)}
+>
+Cancel
+</button>
+
+<button
+className="btn btn-success"
 onClick={addPayment}
 >
 Add Payment
@@ -278,10 +364,12 @@ Add Payment
 </div>
 
 </div>
-
+</div>
 </div>
 
-</div>
+<div className="modal-backdrop fade show"></div>
+</>
+)}
 
 </Layout>
 

@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import api from "../../api/axiosInstance";
 import Layout from "../../components/layout/Layout";
 import axiosInstance from "../../api/axiosInstance";
-
+import CreateInvoicePage from "./CreateInvoicePage";
+import DeleteConfirmModal from "../../components/DeleteConfirmModal";
 interface Invoice {
   client_name: ReactNode;
   id: number;
@@ -26,7 +27,9 @@ const InvoicesPage = () => {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
- 
+  const [showModal, setShowModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+const [invoiceToDelete, setInvoiceToDelete] = useState<number | null>(null);
   
 
   useEffect(() => {
@@ -60,16 +63,23 @@ useEffect(()=>{
 fetchInvoices()
 fetchAnalytics()
 },[])
-  const deleteInvoice = async (id: number) => {
-    if (window.confirm("Are you sure you want to delete this invoice?")) {
-      try {
-        await api.delete(`/invoices/${id}/`);
-        fetchInvoices();
-      } catch (error) {
-        console.error("Error deleting invoice", error);
-      }
-    }
-  };
+  const confirmDeleteInvoice = async () => {
+
+if (!invoiceToDelete) return;
+
+try {
+
+await api.delete(`/invoices/${invoiceToDelete}/`);
+
+fetchInvoices();
+
+} catch (error) {
+
+console.error("Error deleting invoice", error);
+
+}
+
+};
 
   const getStatusColor = (status: string) => {
 
@@ -92,6 +102,32 @@ const pageNumbers: number[] = Array.from(
   (_, i) => i + 1
 );
   return (
+<>
+   {showModal && (
+  <>
+    <div className="modal fade show d-block">
+     <div className="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+        <div className="modal-content">
+
+          <div className="modal-header">
+            <h5 className="modal-title">Create New Invoice</h5>
+            <button
+              className="btn-close"
+              onClick={() => setShowModal(false)}
+            ></button>
+          </div>
+
+          <div className="modal-body">
+            <CreateInvoicePage />
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div className="modal-backdrop fade show"></div>
+  </>
+)}
     <Layout>
   <div className="row mb-4">
 
@@ -142,10 +178,12 @@ const pageNumbers: number[] = Array.from(
 </div>
 
           <h3>Invoices</h3>
-
-          <Link to="/invoices/create" className="btn btn-primary">
-            Create Invoice
-          </Link>
+<button
+  className="btn btn-primary"
+  onClick={() => setShowModal(true)}
+>
+  Create Invoice
+</button>
 
         </div>
 
@@ -226,7 +264,10 @@ title="Edit"
 
 <button
 className="btn btn-sm btn-light text-danger"
-onClick={() => deleteInvoice(inv.id)}
+onClick={() => {
+  setInvoiceToDelete(inv.id);
+  setShowDeleteModal(true);
+}}
 title="Delete"
 >
 <i className="bi bi-trash"></i>
@@ -304,8 +345,16 @@ title="Send Email"
 </div>
 
       </div>
-
+<DeleteConfirmModal
+  isOpen={showDeleteModal}
+  onClose={() => setShowDeleteModal(false)}
+  onConfirm={confirmDeleteInvoice}
+  title="Delete Invoice"
+  message="Are you sure you want to delete this invoice?"
+  confirmText="Delete"
+/>
     </Layout>
+     </>
   );
 };
 

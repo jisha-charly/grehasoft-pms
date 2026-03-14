@@ -163,7 +163,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <>
-      <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top py-3 shadow-sm">
+      <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top shadow-sm app-navbar">
         <div className="container-fluid px-4">
           <Link className="navbar-brand text-primary d-flex align-items-center fw-bold" to="/">
             <i className="bi bi-stack me-2"></i>
@@ -171,8 +171,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </Link>
 
           {/* Desktop nav (>=992px) */}
-          <div className="d-none d-lg-flex flex-grow-1 align-items-center">
-            <ul className="navbar-nav me-auto mb-0 ms-lg-4">
+         <div className="d-none d-lg-flex align-items-center flex-grow-1 justify-content-between">
+           <ul className="navbar-nav mb-0 ms-lg-4 flex-nowrap">
               {navigationConfig
                 .filter((item) => hasAccess(item.roles))
                 .map((item) => {
