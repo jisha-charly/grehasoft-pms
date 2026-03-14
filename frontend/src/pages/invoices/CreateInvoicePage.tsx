@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react"
 import api from "../../api/axiosInstance"
 import { useNavigate, useParams } from "react-router-dom"
 import { getResults } from "@/utils/apiHelper"
-
+import axiosInstance from "../../api/axiosInstance";
 interface Client {
   id:number
   name:string
@@ -20,8 +20,11 @@ interface Item{
   quantity:number
   rate:number
 }
-
-const CreateInvoicePage = ()=>{
+interface Props {
+invoiceId?: number | null
+isEdit?: boolean
+}
+const CreateInvoicePage:React.FC<Props> = ({invoiceId,isEdit}) => {
 
 const { id } = useParams()
 const navigate = useNavigate()
@@ -49,6 +52,37 @@ const [advance,setAdvance] = useState<number | "">("")
 
 const [selectedTemplate,setSelectedTemplate] = useState("")
 const [pdfPreview,setPdfPreview] = useState("")
+
+useEffect(()=>{
+
+if(isEdit && invoiceId){
+
+axiosInstance.get(`/invoices/${invoiceId}/`)
+.then(res=>{
+
+const data = res.data
+
+setInvoiceNumber(data.invoice_number)
+
+setClient(data.client)
+
+setIssueDate(data.issue_date)
+
+setDueDate(data.due_date)
+
+setGst(data.tax_rate || 0)
+
+setItems(data.items || [])
+
+setNotes(data.notes || "")
+
+setAdvance(data.advance || "")
+
+})
+
+}
+
+},[invoiceId,isEdit])
 
 /* PREDEFINED DESCRIPTION TEMPLATES */
 
@@ -256,7 +290,7 @@ return(
 <div className="card shadow-sm p-4">
 
 <h4 className="mb-4">
-{id ? "Edit Invoice" : "Create Invoice"}
+{isEdit ? "Edit Invoice" : "Create Invoice"}
 </h4>
 
 {/* TOP FIELDS */}

@@ -30,6 +30,8 @@ const InvoicesPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 const [invoiceToDelete, setInvoiceToDelete] = useState<number | null>(null);
+const [showEditModal, setShowEditModal] = useState(false);
+const [editInvoiceId, setEditInvoiceId] = useState<number | null>(null);
   
 
   useEffect(() => {
@@ -127,6 +129,36 @@ const pageNumbers: number[] = Array.from(
 
     <div className="modal-backdrop fade show"></div>
   </>
+)}
+{showEditModal && (
+<>
+<div className="modal fade show d-block">
+<div className="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+<div className="modal-content">
+
+<div className="modal-header">
+
+<button
+className="btn-close"
+onClick={() => setShowEditModal(false)}
+></button>
+</div>
+
+<div className="modal-body">
+
+<CreateInvoicePage
+invoiceId={editInvoiceId}
+isEdit={true}
+/>
+
+</div>
+
+</div>
+</div>
+</div>
+
+<div className="modal-backdrop fade show"></div>
+</>
 )}
     <Layout>
   <div className="row mb-4">
@@ -254,14 +286,16 @@ title="View"
 
 {inv.status !== "paid" && (
 <>
-<Link
-to={`/invoices/edit/${inv.id}`}
+<button
 className="btn btn-sm btn-light"
 title="Edit"
+onClick={()=>{
+setEditInvoiceId(inv.id)
+setShowEditModal(true)
+}}
 >
 <i className="bi bi-pencil"></i>
-</Link>
-
+</button>
 <button
 className="btn btn-sm btn-light text-danger"
 onClick={() => {
@@ -274,6 +308,7 @@ title="Delete"
 </button>
 </>
 )}
+{/*
 <button
 className="btn btn-sm btn-light"
 onClick={()=>downloadInvoice(inv.id)}
@@ -289,7 +324,9 @@ title="Send Email"
 >
 <i className="bi bi-envelope"></i>
 </button>
+*/}
 </td>
+
 
               </tr>
 
