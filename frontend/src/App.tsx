@@ -48,6 +48,7 @@ import InfrastructurePage from "./pages/infrastructure/InfrastructurePage";
 import ServersPage from "./pages/infrastructure/ServersPage";
 import CredentialsPage from "./pages/infrastructure/CredentialsPage";
 import DomainsPage from "./pages/infrastructure/DomainsPage";
+import SEOWebsitesPage from "./pages/seo/SEOWebsitesPage";
 
 const App: React.FC = () => {
   const { isAuthenticated, loading, user } = useAuth();
@@ -275,6 +276,7 @@ const App: React.FC = () => {
         <Route path="/clients" element={<ProtectedRoute requiredPermission={Permission.VIEW_CLIENTS}><Layout ><ClientsPage /></Layout></ProtectedRoute>} />
         <Route path="/crm" element={<ProtectedRoute requiredPermission={Permission.VIEW_LEADS}><Layout ><LeadsPage users={users} clients={clients} departments={departments} setProjects={setProjects} /></Layout></ProtectedRoute>} />
         <Route path="/seo" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout><SEOPage /></Layout></ProtectedRoute>} />
+       <Route path="/seo/websites" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout><SEOWebsitesPage /></Layout></ProtectedRoute>} />
         <Route path="/admin/users" element={<ProtectedRoute requiredPermission={Permission.MANAGE_USERS}><Layout><UsersPage roles={roles} departments={departments} /></Layout></ProtectedRoute>} />
         <Route
           path="/infrastructure"

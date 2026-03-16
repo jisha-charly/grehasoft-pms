@@ -1,68 +1,86 @@
 from rest_framework import viewsets, permissions
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
 from .models import (
-    SEOTask, SEOOnPage, SEOOffPage, SEOTechnical, 
-    SEOKeywords, GMBProfile, SocialMediaPost, SocialMetrics
+    SEOTask, Website, Keyword, Backlink, TechnicalSEO, SEOAnalytics, SocialMedia
 )
 from .serializers import (
-    SEOTaskSerializer, SEOOnPageSerializer, SEOOffPageSerializer,
-    SEOTechnicalSerializer, SEOKeywordsSerializer, GMBProfileSerializer,
-    SocialMediaPostSerializer, SocialMetricsSerializer
+    SEOAnalyticsSerializer, SEOTaskSerializer,  WebsiteSerializer, KeywordSerializer, BacklinkSerializer, TechnicalSEOSerializer,SocialMediaSerializer
 )
 
+class WebsiteViewSet(viewsets.ModelViewSet):
+
+    queryset = Website.objects.all().order_by("-created_at")
+
+    serializer_class = WebsiteSerializer
+
 class SEOTaskViewSet(viewsets.ModelViewSet):
-    queryset = SEOTask.objects.all()
+
+    queryset = SEOTask.objects.all().order_by("-created_at")
     serializer_class = SEOTaskSerializer
-    permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
-        project_id = self.request.query_params.get('project_id')
-        if project_id:
-            return self.queryset.filter(task__project_id=project_id)
-        return self.queryset
 
-class SEOOnPageViewSet(viewsets.ModelViewSet):
-    queryset = SEOOnPage.objects.all()
-    serializer_class = SEOOnPageSerializer
-    permission_classes = [permissions.IsAuthenticated]
+class KeywordViewSet(viewsets.ModelViewSet):
 
-class SEOOffPageViewSet(viewsets.ModelViewSet):
-    queryset = SEOOffPage.objects.all()
-    serializer_class = SEOOffPageSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    queryset = Keyword.objects.all()
+    serializer_class = KeywordSerializer
 
-class SEOTechnicalViewSet(viewsets.ModelViewSet):
-    queryset = SEOTechnical.objects.all()
-    serializer_class = SEOTechnicalSerializer
-    permission_classes = [permissions.IsAuthenticated]
 
-class SEOKeywordsViewSet(viewsets.ModelViewSet):
-    queryset = SEOKeywords.objects.all()
-    serializer_class = SEOKeywordsSerializer
-    permission_classes = [permissions.IsAuthenticated]
+class BacklinkViewSet(viewsets.ModelViewSet):
 
-class GMBProfileViewSet(viewsets.ModelViewSet):
-    queryset = GMBProfile.objects.all()
-    serializer_class = GMBProfileSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    queryset = Backlink.objects.all()
+    serializer_class = BacklinkSerializer
 
-    def get_queryset(self):
-        project_id = self.request.query_params.get('project_id')
-        if project_id:
-            return self.queryset.filter(project_id=project_id)
-        return self.queryset
 
-class SocialMediaPostViewSet(viewsets.ModelViewSet):
-    queryset = SocialMediaPost.objects.all()
-    serializer_class = SocialMediaPostSerializer
-    permission_classes = [permissions.IsAuthenticated]
+class TechnicalSEOViewSet(viewsets.ModelViewSet):
 
-    def get_queryset(self):
-        project_id = self.request.query_params.get('project_id')
-        if project_id:
-            return self.queryset.filter(project_id=project_id)
-        return self.queryset
+    queryset = TechnicalSEO.objects.all()
+    serializer_class = TechnicalSEOSerializer
 
-class SocialMetricsViewSet(viewsets.ModelViewSet):
-    queryset = SocialMetrics.objects.all()
-    serializer_class = SocialMetricsSerializer
-    permission_classes = [permissions.IsAuthenticated]
+
+class SEOAnalyticsViewSet(viewsets.ModelViewSet):
+
+    queryset = SEOAnalytics.objects.all()
+    serializer_class = SEOAnalyticsSerializer
+
+
+class SocialMediaViewSet(viewsets.ModelViewSet):
+
+    queryset = SocialMedia.objects.all()
+    serializer_class = SocialMediaSerializer
+
+@api_view(["GET"])
+def seo_dashboard(request):
+
+    website_id = request.GET.get("website")
+
+    tasks = SEOTask.objects.filter(website_id=website_id)
+
+    analytics = SEOAnalytics.objects.filter(website_id=website_id)
+
+    backlinks = Backlink.objects.filter(website_id=website_id)
+
+    keywords = Keyword.objects.filter(website_id=website_id)
+
+    social = SocialMedia.objects.filter(website_id=website_id)
+
+    technical = TechnicalSEO.objects.filter(website_id=website_id).first()
+
+    metrics = {
+        "on_page_score": 82,
+        "avg_lcp": technical.lcp if technical else 0,
+        "rankings_up": tasks.count(),
+        "spam_score": 0.5
+    }
+
+    data = {
+        "metrics": metrics,
+        "tasks": SEOTaskSerializer(tasks, many=True).data,
+        "analytics": SEOAnalyticsSerializer(analytics, many=True).data,
+        "backlinks": BacklinkSerializer(backlinks, many=True).data,
+        "keywords": KeywordSerializer(keywords, many=True).data,
+        "social": SocialMediaSerializer(social, many=True).data,
+        "technical": TechnicalSEOSerializer(technical).data if technical else None
+    }
+
+    return Response(data)

@@ -169,3 +169,10 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 
 
 DEFAULT_FROM_EMAIL = 'Grehasoft PMS <noreply@grehasoft.com>'
+
+# ==============================
+# Celery Configuration
+# ==============================
+CELERY_BROKER_URL = "redis://localhost:6379/0"
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"

@@ -1,72 +1,147 @@
 from django.db import models
 from core.models import SoftDeleteModel
 
-class SEOTask(SoftDeleteModel):
-    TYPE_CHOICES = [
-        ('on_page','On Page'), 
-        ('off_page','Off Page'), 
-        ('technical','Technical'), 
-        ('content','Content'), 
-        ('keyword','Keyword')
-    ]
-    task = models.ForeignKey('tasks.Task', on_delete=models.CASCADE, related_name='seo_details')
-    seo_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+
+from apps.projects.models import Client
+
+
+class Website(models.Model):
+
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        related_name="seo_websites"
+    )
+
+    domain = models.CharField(max_length=255)
+
+    google_search_console_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
+
+    google_analytics_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
+
+    sitemap_url = models.URLField(
+        blank=True,
+        null=True
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.seo_type} - {self.task.title}"
+        return self.domain
 
-class SEOOnPage(SoftDeleteModel):
-    seo_task = models.ForeignKey(SEOTask, on_delete=models.CASCADE, related_name='onpage_metrics')
-    page_url = models.URLField(max_length=255)
-    title_optimized = models.BooleanField(default=False)
-    meta_optimized = models.BooleanField(default=False)
-    keyword_density = models.DecimalField(max_digits=5, decimal_places=2)
-    mobile_friendly = models.BooleanField(default=True)
-    page_speed_status = models.CharField(max_length=50)
 
-class SEOOffPage(SoftDeleteModel):
-    seo_task = models.ForeignKey(SEOTask, on_delete=models.CASCADE, related_name='offpage_activities')
-    activity_type = models.CharField(max_length=100)
-    submission_url = models.URLField(max_length=255)
-    anchor_text = models.CharField(max_length=150)
-    da = models.IntegerField() # Domain Authority
-    spam_score = models.DecimalField(max_digits=4, decimal_places=2)
-    live_status = models.CharField(max_length=10, choices=[('live','Live'), ('pending','Pending'), ('rejected','Rejected')])
+class SEOTask(models.Model):
 
-class SEOTechnical(SoftDeleteModel):
-    STATUS_CHOICES = [('updated', 'Updated'), ('submitted', 'Submitted')]
-    seo_task = models.ForeignKey(SEOTask, on_delete=models.CASCADE, related_name='technical_audits')
-    broken_links = models.IntegerField(default=0)
-    sitemap_status = models.CharField(max_length=20, choices=STATUS_CHOICES)
-    core_web_vitals_lcp = models.DecimalField(max_digits=5, decimal_places=2)
-    core_web_vitals_cls = models.DecimalField(max_digits=5, decimal_places=2)
+    TASK_TYPES = [
+        ("ON_PAGE", "On Page"),
+        ("KEYWORD", "Keyword"),
+        ("TECHNICAL", "Technical"),
+        ("BACKLINK", "Backlink"),
+    ]
 
-class SEOKeywords(SoftDeleteModel):
-    seo_task = models.ForeignKey(SEOTask, on_delete=models.CASCADE, related_name='keyword_tracking')
-    keyword = models.CharField(max_length=200)
+    STATUS = [
+        ("ACTIVE", "Active"),
+        ("COMPLETED", "Completed"),
+    ]
+
+    client = models.ForeignKey(Client, on_delete=models.CASCADE)
+
+    website = models.ForeignKey(
+        Website,
+        on_delete=models.CASCADE,
+        related_name="seo_tasks"
+    )
+
+    task_type = models.CharField(max_length=50, choices=TASK_TYPES)
+
+    description = models.TextField()
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS,
+        default="ACTIVE"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.client.company_name} - {self.task_type}"
+class Keyword(models.Model):
+
+    website = models.ForeignKey(Website, on_delete=models.CASCADE)
+
+    keyword = models.CharField(max_length=255)
     search_volume = models.IntegerField()
-    difficulty = models.IntegerField()
-    current_rank = models.IntegerField()
-    target_rank = models.IntegerField()
+    difficulty = models.FloatField()
 
-class GMBProfile(SoftDeleteModel):
-    project = models.ForeignKey('projects.Project', on_delete=models.CASCADE, related_name='gmb_profiles')
-    business_name = models.CharField(max_length=200)
-    category = models.CharField(max_length=150)
-    rating = models.DecimalField(max_digits=2, decimal_places=1)
-    total_reviews = models.IntegerField(default=0)
+    rank = models.IntegerField()
 
-class SocialMediaPost(SoftDeleteModel):
-    project = models.ForeignKey('projects.Project', on_delete=models.CASCADE, related_name='social_posts')
-    platform = models.CharField(max_length=50)
-    post_type = models.CharField(max_length=50)
-    language = models.CharField(max_length=50, blank=True)
-    post_url = models.URLField(max_length=255)
-    posting_date = models.DateField()
+    def __str__(self):
+        return self.keyword
+class Backlink(models.Model):
 
-class SocialMetrics(SoftDeleteModel):
-    post = models.ForeignKey(SocialMediaPost, on_delete=models.CASCADE, related_name='metrics')
-    likes = models.IntegerField(default=0)
-    comments = models.IntegerField(default=0)
-    shares = models.IntegerField(default=0)
-    reach = models.IntegerField(default=0)
+    website = models.ForeignKey(Website, on_delete=models.CASCADE)
+
+    link_type = models.CharField(max_length=100)
+    url = models.URLField()
+
+    domain_authority = models.IntegerField()
+
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("LIVE", "Live"),
+            ("REMOVED", "Removed")
+        ]
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.url
+class TechnicalSEO(models.Model):
+
+    website = models.OneToOneField(Website, on_delete=models.CASCADE)
+
+    broken_links = models.IntegerField(default=0)
+
+    sitemap_updated = models.BooleanField(default=True)
+
+    lcp = models.FloatField()
+
+    cls = models.FloatField()
+
+    def __str__(self):
+        return self.website.url
+class SEOAnalytics(models.Model):
+
+    website = models.ForeignKey(Website, on_delete=models.CASCADE)
+
+    month = models.CharField(max_length=20)
+
+    traffic = models.IntegerField()
+
+    def __str__(self):
+        return f"{self.month} - {self.website.url}"
+class SocialMedia(models.Model):
+
+    website = models.ForeignKey(Website, on_delete=models.CASCADE)
+
+    platform = models.CharField(max_length=100)
+
+    likes = models.IntegerField()
+
+    reach = models.IntegerField()
+
+    last_update = models.DateField()
+
+    def __str__(self):
+        return self.platform

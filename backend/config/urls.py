@@ -11,9 +11,8 @@ from apps.tasks.views import (
 #from apps.activity.views import ActivityLogViewSet
 from apps.reports.views import DashboardStatsView
 from apps.seo.views import (
-    SEOTaskViewSet, SEOOnPageViewSet, SEOOffPageViewSet,
-    SEOTechnicalViewSet, SEOKeywordsViewSet, GMBProfileViewSet,
-    SocialMediaPostViewSet, SocialMetricsViewSet
+    SEOAnalyticsViewSet, SEOTaskViewSet, KeywordViewSet, BacklinkViewSet,
+    SocialMediaViewSet,  TechnicalSEOViewSet, WebsiteViewSet, seo_dashboard
 )
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -59,14 +58,20 @@ router.register(r'task-reviews', TaskReviewViewSet)
 router.register(r'activity-logs', GlobalActivityLogViewSet, basename='activity-logs')
 
 # SEO & Social Module
-router.register(r'seo-tasks', SEOTaskViewSet)
-router.register(r'seo-onpage', SEOOnPageViewSet)
-router.register(r'seo-offpage', SEOOffPageViewSet)
-router.register(r'seo-technical', SEOTechnicalViewSet)
-router.register(r'seo-keywords', SEOKeywordsViewSet)
-router.register(r'gmb-profiles', GMBProfileViewSet)
-router.register(r'social-posts', SocialMediaPostViewSet)
-router.register(r'social-metrics', SocialMetricsViewSet)
+router.register("websites", WebsiteViewSet)
+router.register("seo-tasks", SEOTaskViewSet)
+router.register("keywords", KeywordViewSet)
+router.register("backlinks", BacklinkViewSet)
+router.register("technical-seo", TechnicalSEOViewSet)
+router.register("seo-analytics", SEOAnalyticsViewSet)
+router.register("social-media", SocialMediaViewSet)
+
+
+urlpatterns = [
+    path('api/v1/seo-dashboard/', seo_dashboard),
+]
+
+
 router.register(r'invoices', InvoiceViewSet)
 router.register(r"invoice-payments", InvoicePaymentViewSet)
 urlpatterns = [
@@ -89,6 +94,9 @@ urlpatterns = [
     path("api/v1/invoices/<int:pk>/send-email/", views.send_invoice_email_view,),
   
    
+] 
+urlpatterns += [
+    path('api/v1/seo-dashboard/', seo_dashboard),
 ] 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

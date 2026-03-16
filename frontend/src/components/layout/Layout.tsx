@@ -94,6 +94,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       children: [
         { label: "Reminders", path: "/reminders" },
         { label: "SEO", path: "/seo" },
+        { label: "SEO Websites", path: "/seo/websites" }
       ],
     },
     {
