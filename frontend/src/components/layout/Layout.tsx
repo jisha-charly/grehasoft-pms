@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Permission, UserRole } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import './Layout.css';
+import { useNotifications } from "../../context/NotificationContext";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -13,7 +14,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
+ 
   if (!user) return null;
 
   type NavChild = { label: string; path: string };
@@ -162,6 +163,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [sidebarOpen]);
 
+
+  const { notifications } = useNotifications();
+const [showDropdown, setShowDropdown] = useState(false);
+
+useEffect(() => {
+  const handleClick = () => setShowDropdown(false);
+  document.addEventListener("click", handleClick);
+  return () => document.removeEventListener("click", handleClick);
+}, []);
+
   return (
     <>
       <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top shadow-sm app-navbar">
@@ -240,7 +251,72 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   return null;
                 })}
             </ul>
+<div className="position-relative me-3">
+  <button
+    className="btn btn-light position-relative"
+    onClick={(e) => {
+      e.stopPropagation();
+      setShowDropdown(!showDropdown);
+    }}
+  >
+    <i className="bi bi-bell"></i>
 
+    {notifications.length > 0 && (
+     <span
+  className={`position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger ${
+    notifications.some(n => n.type === "domain") ? "blink-alert" : ""
+  }`}
+>
+  {notifications.length}
+</span>
+    )}
+  </button>
+
+  {showDropdown && (
+    <div
+      className="position-absolute end-0 mt-2 bg-white shadow rounded-3 p-3"
+      style={{ width: "300px", zIndex: 1000 }}
+    >
+      <h6 className="fw-bold mb-2">Notifications</h6>
+
+      {notifications.length === 0 ? (
+        <div className="text-muted small">No alerts</div>
+      ) : (
+        notifications.slice(0, 5).map((n, i) => (
+          <div key={i} className="border-bottom py-2 small">
+            <div
+              className={`fw-semibold ${
+                n.type === "domain" ? "text-danger" : "text-warning"
+              }`}
+            >
+              {n.message}
+            </div>
+            <div className="text-muted small">{n.date}</div>
+          </div>
+        ))
+      )}
+
+      <div className="text-center mt-2">
+        <button
+          className="btn btn-sm btn-primary w-100"
+       onClick={() => {
+  const hasDomain = notifications.some(n => n.type === "domain");
+
+  if (hasDomain) {
+    navigate("/admin/domains");
+  } else {
+    navigate("/reminders");
+  }
+
+  setShowDropdown(false);
+}}
+        >
+          View All
+        </button>
+      </div>
+    </div>
+  )}
+</div>
             <div className="d-flex align-items-center">
               {user.role === UserRole.SUPER_ADMIN && (
                 <div className="dropdown me-3">

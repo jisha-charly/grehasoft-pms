@@ -229,7 +229,7 @@ const [infrastructureStats, setInfrastructureStats] = useState({
             />
           </div>
           <button
-            className="btn btn-dark fw-bold px-4 shadow-sm rounded-pill d-flex align-items-center"
+            className="btn btn-primary fw-bold px-4 shadow-sm rounded-pill d-flex align-items-center"
             onClick={() => setShowModal(true)}
           >
             <Plus size={16} className="me-2" /> New Server

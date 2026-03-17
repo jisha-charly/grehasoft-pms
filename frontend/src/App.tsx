@@ -20,6 +20,7 @@ import DepartmentsPage from "./pages/admin/departments/DepartmentsPage";
 import TaskTypesPage from "./pages/admin/task-types/TaskTypesPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import ProfilePage from "./pages/profile/ProfilePage";
+import { NotificationProvider } from "./context/NotificationContext";
 import {
   TaskStatus,
   Task,
@@ -218,6 +219,7 @@ const App: React.FC = () => {
   /* ================= ROUTES ================= */
 
   return (
+     <NotificationProvider>
     <Router>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -381,6 +383,7 @@ const App: React.FC = () => {
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
+    </NotificationProvider>
 
   );
 };
