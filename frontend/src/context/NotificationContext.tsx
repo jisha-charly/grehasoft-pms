@@ -36,13 +36,18 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const now = new Date();
 
       // 🔔 Reminder alerts
-      const reminderAlerts = reminders
-        .filter((r: any) => r.status !== "completed")
-        .map((r: any) => ({
-          type: "reminder",
-          message: `Reminder: ${r.title}`,
-          date: r.reminder_date
-        }));
+    
+
+const reminderAlerts = reminders
+  .filter((r: any) => !r.is_completed) // ✅ CORRECT FIELD
+  .map((r: any) => ({
+    type: "reminder",
+    message:
+      new Date(r.due_date) < now
+        ? `⚠ Overdue: ${r.title}`
+        : `Reminder: ${r.title}`,
+    date: r.due_date
+  }));
 
       // 🌐 Domain alerts
       const domainAlerts = domains
@@ -51,7 +56,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           const days =
             (new Date(d.expiry_date).getTime() - now.getTime()) /
             (1000 * 3600 * 24);
-          return days <= 7 && days >= 0;
+         return days <= 7;
         })
         .map((d: any) => ({
           type: "domain",

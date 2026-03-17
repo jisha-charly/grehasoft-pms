@@ -343,10 +343,10 @@ useEffect(() => {
                     
               <div className="dropdown">
                 <button className="btn btn-link text-decoration-none text-dark d-flex align-items-center p-0 border-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                  <div className="text-end me-2 d-none d-sm-block">
+                  {/*<div className="text-end me-2 d-none d-sm-block">
                     <div className="fw-bold small text-dark">{user.name}</div>
                     <div className="text-primary smaller fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.02em' }}>{user.role.replace('_', ' ')}</div>
-                  </div>
+                  </div>*/}
                   <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style={{ width: '35px', height: '35px', fontSize: '0.9rem', fontWeight: 'bold' }}>
                     {user.username.charAt(0)}
                   </div>
