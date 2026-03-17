@@ -282,11 +282,26 @@ useEffect(() => {
       {notifications.length === 0 ? (
         <div className="text-muted small">No alerts</div>
       ) : (
-        notifications.slice(0, 5).map((n, i) => (
-          <div key={i} className="border-bottom py-2 small">
+       notifications.slice(0, 5).map((n, i) => (
+  <div
+    key={i}
+    className="border-bottom py-2 small cursor-pointer"
+    style={{ cursor: "pointer" }}
+    onClick={(e) => {
+      e.stopPropagation();
+
+      if (n.type === "reminder") {
+        navigate("/reminders");
+      } else if (n.type === "domain") {
+        navigate("/infrastructure/domains");
+      }
+
+      setShowDropdown(false);
+    }}
+  >
             <div
               className={`fw-semibold ${
-                n.type === "domain" ? "text-danger" : "text-warning"
+                n.type === "domain" ? "text-danger" : "text-primary"
               }`}
             >
               {n.message}
@@ -296,24 +311,26 @@ useEffect(() => {
         ))
       )}
 
-      <div className="text-center mt-2">
-        <button
-          className="btn btn-sm btn-primary w-100"
-       onClick={() => {
-  const hasDomain = notifications.some(n => n.type === "domain");
+   {/*  <div className="text-center mt-2">
+  <button
+    className="btn btn-sm btn-primary w-100"
+    onClick={(e) => {
+      e.stopPropagation(); // 🔥 IMPORTANT
 
-  if (hasDomain) {
-    navigate("/admin/domains");
-  } else {
-    navigate("/reminders");
-  }
+      const hasDomain = notifications.some(n => n.type === "domain");
 
-  setShowDropdown(false);
-}}
-        >
-          View All
-        </button>
-      </div>
+      if (hasDomain) {
+        navigate("/infrastructure/domains"); // ✅ FIXED
+      } else {
+        navigate("/reminders");
+      }
+
+      setShowDropdown(false);
+    }}
+  >
+    View All
+  </button>
+</div>*/}
     </div>
   )}
 </div>
