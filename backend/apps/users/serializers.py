@@ -23,14 +23,14 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'username', 'email', 'role', 'role_name', 
             'department', 'department_name', 'status', 'is_active', 
-            'date_joined', 'last_login'
+            'date_joined', 'last_login','position', 'joining_date', 'salary_monthly','address'
         ]
         read_only_fields = ['last_login', 'date_joined']
 
 class UserCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['name', 'username', 'email', 'password', 'role', 'department', 'status']
+        fields = ['name', 'username', 'email', 'password', 'role', 'department', 'status','position', 'joining_date', 'salary_monthly','address']
         extra_kwargs = {'password': {'write_only': True}}
 
     def create(self, validated_data):

@@ -29,8 +29,12 @@ class User(AbstractUser, SoftDeleteModel):
     # Extended fields from DB Design 3.1
     name = models.CharField(max_length=100)
     email = models.EmailField(unique=True, max_length=150) # Enforced uniqueness per design
+    address = models.TextField(blank=True, null=True)
     role = models.ForeignKey(Role, on_delete=models.PROTECT, related_name='users', null=True)
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, related_name='users')
+    position = models.CharField(max_length=100, blank=True, null=True)
+    joining_date = models.DateField(blank=True, null=True)
+    salary_monthly = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     status = models.CharField(
         max_length=10, 
         choices=[('active', 'Active'), ('inactive', 'Inactive')], 

@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Server } from "../../types";
 import { useCrud } from "../../hooks/useCrud";
 import { Pencil, Trash, Search, Plus } from "lucide-react";
+import axiosInstance from "@/api/axiosInstance";
 
 const ServersPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -136,14 +137,84 @@ const ServersPage: React.FC = () => {
     { length: totalPages },
     (_, i) => i + 1
   );
+const [infrastructureStats, setInfrastructureStats] = useState({
+    totalServers: 0,
+    totalDomains: 0,
+    expiringDomainsCount: 0,
+    totalCredentials: 0
+  });
 
+  useEffect(() => {
+  const fetchStats = async () => {
+    try {
+      const [serversRes, domainsRes, credentialsRes] = await Promise.all([
+        axiosInstance.get("/infrastructure/servers/"),
+        axiosInstance.get("/infrastructure/domains/"),
+        axiosInstance.get("/infrastructure/credentials/")
+      ]);
+
+      const servers = serversRes.data.results || serversRes.data || [];
+      const domains = domainsRes.data.results || domainsRes.data || [];
+      const credentials = credentialsRes.data.results || credentialsRes.data || [];
+
+      const now = new Date();
+
+      const expiring = domains.filter((d: any) => {
+        if (!d.expiry_date) return false;
+
+        const expiry = new Date(d.expiry_date);
+        const days = (expiry.getTime() - now.getTime()) / (1000 * 3600 * 24);
+
+        return days >= 0 && days <= 30;
+      });
+
+      setInfrastructureStats({
+        totalServers: servers.length,
+        totalDomains: domains.length,
+        expiringDomainsCount: expiring.length,
+        totalCredentials: credentials.length
+      });
+
+    } catch (error) {
+      console.error("Error fetching infrastructure stats", error);
+    }
+  };
+
+  fetchStats();
+}, []);
   return (
     <div className="container-fluid p-0">
+         <div className="row g-4 mb-4">
+        <div className="col-12">
+          <h5 className="fw-bold mb-3 text-dark">Infrastructure Overview</h5>
+          <div className="row g-4">
+            {[
+              { label: 'Servers', value: infrastructureStats.totalServers, icon: 'bi-hdd-network', color: 'primary' },
+              { label: 'Domains', value: infrastructureStats.totalDomains, icon: 'bi-globe', color: 'info' },
+              { label: 'Expiring Soon', value: infrastructureStats.expiringDomainsCount, icon: 'bi-exclamation-triangle', color: 'warning' },
+              { label: 'Credentials', value: infrastructureStats.totalCredentials, icon: 'bi-shield-lock', color: 'success' },
+            ].map((stat, i) => (
+              <div className="col-md-3" key={i}>
+                <div className="card p-4 h-100 border-0 shadow-sm">
+                  <div className="d-flex justify-content-between align-items-start mb-3">
+                    <div className={`p-2 rounded-3 bg-${stat.color}-subtle text-${stat.color}`}>
+                      <i className={`bi ${stat.icon} fs-4`}></i>
+                    </div>
+                  </div>
+                  <h3 className="fw-bold mb-1 text-dark">{stat.value}</h3>
+                  <p className="text-secondary small fw-bold mb-0 text-uppercase tracking-wider">{stat.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
         <div>
           <h3 className="fw-bold mb-1">Servers</h3>
           <p className="text-secondary small mb-0">Manage hosting servers and infrastructure assets</p>
         </div>
+   
 
         <div className="d-flex gap-2 align-items-center">
           <div className="position-relative">

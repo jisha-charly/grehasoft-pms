@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../../api/axiosInstance';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -7,10 +8,46 @@ import {
 import { Project, Task, TaskStatus, ProjectStatus } from '../../types';
 
 const Dashboard: React.FC<{ projects: Project[]; tasks: Task[] }> = ({ projects, tasks }) => {
+  const navigate = useNavigate();
   const activeCount = projects.filter(p => p.status === ProjectStatus.IN_PROGRESS).length;
   const completedTasksCount = tasks.filter(t => t.status === TaskStatus.DONE).length;
   const pendingTasksCount = tasks.filter(t => t.status === TaskStatus.TODO || t.status === TaskStatus.IN_PROGRESS).length;
   const [isReportModalOpen, setReportModalOpen] = useState(false);
+  const [reminders, setReminders] = useState<any[]>([]);
+  const [loadingReminders, setLoadingReminders] = useState(true);
+  const pendingRemindersCount = useMemo(() => {
+  return reminders.filter(r => r.status !== "completed").length;
+}, [reminders]);
+useEffect(() => {
+  let interval: any;
+  const fetchReminders = async () => {
+    try {
+      const res = await axiosInstance.get("/reminders/");
+      const data = res.data.results || res.data;
+      setReminders(data);
+    } catch (err) {
+      console.error("Error fetching reminders", err);
+    } finally {
+      setLoadingReminders(false);
+    }
+  };
+
+  fetchReminders();
+  interval = setInterval(fetchReminders, 60000);
+
+  return () => clearInterval(interval);
+}, []);
+const reminderStats = useMemo(() => {
+  const completed = reminders.filter(r => r.status === "completed").length;
+  const pending = reminders.filter(r => r.status !== "completed").length;
+
+  const overdue = reminders.filter(r =>
+    r.status !== "completed" &&
+    new Date(r.reminder_date) < new Date()
+  ).length;
+
+  return { completed, pending, overdue };
+}, [reminders]);
   // Calculate project health distribution
   const statusCounts = {
     active: projects.filter(p => p.status === ProjectStatus.IN_PROGRESS).length,
@@ -36,6 +73,7 @@ const Dashboard: React.FC<{ projects: Project[]; tasks: Task[] }> = ({ projects,
   });
 
   useEffect(() => {
+    let interval: any;
     const fetchInfrastructureData = async () => {
       try {
         const [serversRes, domainsRes, credentialsRes] = await Promise.all([
@@ -85,6 +123,9 @@ const Dashboard: React.FC<{ projects: Project[]; tasks: Task[] }> = ({ projects,
     };
 
     fetchInfrastructureData();
+    interval = setInterval(fetchInfrastructureData, 60000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Mock activity data for now, but could be derived from tasks' createdAt/updatedAt
@@ -254,6 +295,7 @@ const activityData = useMemo(() => {
           { label: 'Completed Tasks', value: completedTasksCount, icon: 'bi-check2-circle', color: 'success' },
           { label: 'Pending Tasks', value: pendingTasksCount, icon: 'bi-clock-history', color: 'warning' },
           { label: 'Client Satisfaction', value: '98%', icon: 'bi-heart', color: 'danger' },
+        
         ].map((stat, i) => (
           <div className="col-md-3" key={i}>
             <div className="card p-4 h-100 border-0 shadow-sm">
@@ -269,6 +311,8 @@ const activityData = useMemo(() => {
           </div>
         ))}
       </div>
+
+
 
       <div className="row g-4">
         <div className="col-lg-8">
@@ -315,89 +359,90 @@ const activityData = useMemo(() => {
           </div>
         </div>
       </div>
-
+     
+      {/* NEW SECTION: Reminders & Domain Alerts */}
       <div className="row g-4 mb-4">
-        <div className="col-12">
-          <h5 className="fw-bold mb-3 text-dark">Infrastructure Overview</h5>
-          <div className="row g-4">
-            {[
-              { label: 'Servers', value: infrastructureStats.totalServers, icon: 'bi-hdd-network', color: 'primary' },
-              { label: 'Domains', value: infrastructureStats.totalDomains, icon: 'bi-globe', color: 'info' },
-              { label: 'Expiring Soon', value: infrastructureStats.expiringDomainsCount, icon: 'bi-exclamation-triangle', color: 'warning' },
-              { label: 'Credentials', value: infrastructureStats.totalCredentials, icon: 'bi-shield-lock', color: 'success' },
-            ].map((stat, i) => (
-              <div className="col-md-3" key={i}>
-                <div className="card p-4 h-100 border-0 shadow-sm">
-                  <div className="d-flex justify-content-between align-items-start mb-3">
-                    <div className={`p-2 rounded-3 bg-${stat.color}-subtle text-${stat.color}`}>
-                      <i className={`bi ${stat.icon} fs-4`}></i>
-                    </div>
-                  </div>
-                  <h3 className="fw-bold mb-1 text-dark">{stat.value}</h3>
-                  <p className="text-secondary small fw-bold mb-0 text-uppercase tracking-wider">{stat.label}</p>
-                </div>
+        <div className="col-md-6">
+          <div 
+            className={`card p-4 h-100 border-0 shadow-sm shadow-hover ${reminderStats.overdue > 0 ? 'border-start border-danger border-4' : ''}`}
+            onClick={() => navigate('/reminders')}
+            style={{ cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s' }}
+          >
+            <div className="d-flex justify-content-between align-items-start mb-3">
+              <h5 className="fw-bold mb-0 text-dark d-flex align-items-center">
+                <i className={`bi bi-bell${reminderStats.overdue > 0 ? '-fill text-danger' : ' text-primary'} me-2`}></i>
+                Reminders Overview
+              </h5>
+              {reminderStats.overdue > 0 && (
+                <span className="badge bg-danger rounded-pill shadow-sm">
+                  {reminderStats.overdue} Overdue
+                </span>
+              )}
+            </div>
+            
+            <div className="row g-3 mt-2">
+              <div className="col-4 text-center">
+                <div className="text-secondary small mb-1">Pending</div>
+                <div className="fw-bold fs-4 text-warning">{reminderStats.pending}</div>
               </div>
-            ))}
+              <div className="col-4 text-center border-start border-end">
+                <div className="text-secondary small mb-1">Completed</div>
+                <div className="fw-bold fs-4 text-success">{reminderStats.completed}</div>
+              </div>
+              <div className="col-4 text-center">
+                <div className="text-secondary small mb-1">Overdue</div>
+                <div className="fw-bold fs-4 text-danger">{reminderStats.overdue}</div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Domain Renewal Alerts Widget */}
-      <div className="row g-4">
-        <div className="col-12">
-          <div className="card border-0 shadow-sm rounded-4 overflow-hidden">
-            <div className="card-header bg-white border-bottom p-4">
+        <div className="col-md-6">
+          <div 
+            className={`card p-4 h-100 border-0 shadow-sm shadow-hover ${(expiringDomains.length > 0 && expiringDomains[0].daysRemaining <= 7) ? 'border-start border-warning border-4' : ''}`}
+            onClick={() => navigate('/infrastructure/domains')}
+            style={{ cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s' }}
+          >
+            <div className="d-flex justify-content-between align-items-start mb-3">
               <h5 className="fw-bold mb-0 text-dark d-flex align-items-center">
-                <i className="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+                <i className={`bi bi-exclamation-triangle${(expiringDomains.length > 0 && expiringDomains[0].daysRemaining <= 7) ? '-fill text-warning' : ' text-info'} me-2`}></i>
                 Domain Renewal Alerts
               </h5>
+              {(expiringDomains.filter(d => d.daysRemaining <= 7).length) > 0 && (
+                <span className="badge bg-warning text-dark rounded-pill shadow-sm">
+                  {(expiringDomains.filter(d => d.daysRemaining <= 7).length)} Expiring Soon
+                </span>
+              )}
             </div>
-            <div className="card-body p-0">
-              {loadingDomains ? (
-                <div className="text-center p-4">
-                  <span className="spinner-border spinner-border-sm text-secondary me-2"></span>
-                  Loading domain alerts...
-                </div>
-              ) : expiringDomains.length === 0 ? (
-                <div className="text-center p-4 text-muted">
-                  No domains expiring soon.
-                </div>
+            
+            <div className="mt-2">
+              {expiringDomains.length > 0 ? (
+                <ul className="list-unstyled mb-0 gap-2 d-flex flex-column">
+                  {expiringDomains.slice(0, 2).map((domain, idx) => (
+                    <li key={idx} className="d-flex justify-content-between align-items-center bg-light p-2 rounded-3">
+                      <span className="fw-medium text-dark text-truncate me-3">{domain.domain_name}</span>
+                      <span className={`badge ${domain.daysRemaining <= 7 ? 'bg-danger text-white' : 'bg-warning text-dark'} rounded-pill`}>
+                        {domain.daysRemaining} days left
+                      </span>
+                    </li>
+                  ))}
+                  {expiringDomains.length > 2 && (
+                    <li className="text-center text-muted small mt-1">
+                      +{expiringDomains.length - 2} more expiring
+                    </li>
+                  )}
+                </ul>
               ) : (
-                <div className="table-responsive">
-                  <table className="table table-hover align-middle mb-0">
-                    <thead className="bg-light">
-                      <tr>
-                        <th className="px-4 py-3">Domain Name</th>
-                        <th className="py-3">Project</th>
-                        <th className="py-3">Expiry Date</th>
-                        <th className="py-3 text-end pe-4">Days Left</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {expiringDomains.map((domain, idx) => (
-                        <tr key={idx}>
-                          <td className="px-4 py-3 fw-medium text-dark">{domain.domain_name}</td>
-                          <td className="py-3 text-secondary">{domain.project_name || '-'}</td>
-                          <td className="py-3 text-secondary">{domain.expiry_date}</td>
-                          <td className="py-3 text-end pe-4">
-                            <span className={`badge px-3 py-2 rounded-pill ${
-                              domain.daysRemaining <= 7 
-                                ? 'bg-danger text-white' 
-                                : 'bg-warning text-dark'
-                            }`}>
-                              {domain.daysRemaining} days left
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="text-center text-muted py-3">
+                  <i className="bi bi-shield-check fs-2 text-success opacity-50 d-block mb-2"></i>
+                  No domains expiring soon
                 </div>
               )}
             </div>
           </div>
         </div>
       </div>
+    
     </div>
   );
 };

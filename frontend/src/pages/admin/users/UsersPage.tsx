@@ -56,25 +56,35 @@ const UsersPage: React.FC<UsersPageProps> = ({ roles, departments }) => {
   };
 
   const { values, errors, handleChange, handleSubmit, setValues, resetForm, isSubmitting } = useForm({
-    initialValues: {
-      name: '',
-      username: '',
-      email: '',
-      password: '',
-    role: '' as any,
-      departmentId: '' as any,
-      status: 'active' as 'active' | 'inactive'
-    },
+   initialValues: {
+  name: '',
+  username: '',
+  email: '',
+  password: '',
+  role: '' as any,
+  departmentId: '' as any,
+  status: 'active' as 'active' | 'inactive',
+  position: '',
+  joining_date: '',
+  salary_monthly: '',
+  address: "",
+},
     validationSchema,
     onSubmit: async (formValues) => {
-  const data: any = {
-    name: formValues.name,
-    username: formValues.username,
-    email: formValues.email,
-    role: Number(formValues.role),               // ✅ role ID
-    department: Number(formValues.departmentId), // ✅ correct key
-    status: formValues.status
-  };
+ const data: any = {
+  name: formValues.name,
+  username: formValues.username,
+  email: formValues.email,
+  role: Number(formValues.role),
+  department: Number(formValues.departmentId),
+  status: formValues.status,
+  position: formValues.position || null,
+  joining_date: formValues.joining_date || null,
+  salary_monthly: formValues.salary_monthly
+    ? Number(formValues.salary_monthly)
+    : null,
+  address: formValues.address || null,
+};
 
   // Only send password if entered
   if (formValues.password) {
@@ -95,14 +105,20 @@ const UsersPage: React.FC<UsersPageProps> = ({ roles, departments }) => {
   if (!isModalOpen) return;
 
   if (editingUser) {
-   setValues({
+ setValues({
   name: editingUser.name || '',
   username: editingUser.username || '',
   email: editingUser.email || '',
   password: '',
   role: editingUser.role ? String(editingUser.role) : '',
   departmentId: editingUser.department ? String(editingUser.department) : '',
-  status: editingUser.status || 'active'
+  status: editingUser.status || 'active',
+  position: editingUser.position || '',
+  joining_date: editingUser.joining_date || '',
+  salary_monthly: editingUser.salary_monthly
+    ? String(editingUser.salary_monthly)
+    : '',
+  address: editingUser.address || "",
 });
   } else {
     resetForm();
@@ -114,15 +130,13 @@ const UsersPage: React.FC<UsersPageProps> = ({ roles, departments }) => {
     setEditingUser(null);
     resetForm();
   };
-
-  const filteredUsers = useMemo(() => {
-    return users.filter(u => 
-      u.name || "".toLowerCase().includes(searchTerm.toLowerCase()) || 
-      u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [users, searchTerm]);
-
+const filteredUsers = useMemo(() => {
+  return users.filter(u =>
+    u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+}, [users, searchTerm]);
   const handleEdit = (user: User) => {
     setEditingUser(user);
     setModalOpen(true);
@@ -335,6 +349,16 @@ const UsersPage: React.FC<UsersPageProps> = ({ roles, departments }) => {
                         />
                       </FormField>
                     </div>
+                    <div className="col-12">
+  <FormField label="Address">
+    <textarea
+      className="form-control form-control-lg border-light bg-light"
+      value={values.address || ""}
+      onChange={(e) => handleChange("address", e.target.value)}
+      placeholder="Enter employee address"
+    />
+  </FormField>
+</div>
                     <div className="col-md-6">
                       <FormField label="Access Role" error={errors.role} required>
                         <select 
@@ -365,6 +389,39 @@ const UsersPage: React.FC<UsersPageProps> = ({ roles, departments }) => {
                         </select>
                       </FormField>
                     </div>
+                    <div className="col-md-6">
+  <FormField label="Position">
+    <input
+      className="form-control form-control-lg border-light bg-light"
+      value={values.position}
+      onChange={(e) => handleChange('position', e.target.value)}
+      placeholder="e.g. Software Developer"
+    />
+  </FormField>
+</div>
+
+<div className="col-md-6">
+  <FormField label="Joining Date">
+    <input
+      type="date"
+      className="form-control form-control-lg border-light bg-light"
+      value={values.joining_date}
+      onChange={(e) => handleChange('joining_date', e.target.value)}
+    />
+  </FormField>
+</div>
+
+<div className="col-md-6">
+  <FormField label="Monthly Salary">
+    <input
+      type="number"
+      className="form-control form-control-lg border-light bg-light"
+      value={values.salary_monthly}
+      onChange={(e) => handleChange('salary_monthly', e.target.value)}
+      placeholder="Optional"
+    />
+  </FormField>
+</div>
                     <div className="col-12">
                       <FormField label="Account Visibility & Status">
                         <select 

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import axiosInstance from "../../api/axiosInstance";
-import { Employee, Permission } from "../../types";
+import {  Permission, User } from "../../types";
 import { useAuth } from "../../context/AuthContext";
 import { useCrud } from "../../hooks/useCrud";
 import { downloadBlob } from "../../utils/download";
@@ -37,13 +37,41 @@ const HRDocumentsPage: React.FC = () => {
   const { hasPermission } = useAuth();
   const canGenerate = hasPermission(Permission.GENERATE_HR_DOCS);
 
-  const { items: employees } = useCrud<Employee>({ endpoint: "/employees" });
+ const { items: users } = useCrud<User>({ endpoint: "/users" });
 
-  const employeeById = useMemo(() => {
-    const map = new Map<number, Employee>();
-    employees.forEach((e) => map.set(e.id, e));
-    return map;
-  }, [employees]);
+  const userById = useMemo(() => {
+  const map = new Map<number, User>();
+  users.forEach((u) => map.set(u.id, u));
+  return map;
+}, [users]);
+const handleOfferUserChange = (id: string) => {
+  const user = userById.get(Number(id));
+
+  if (user) {
+    setOffer({
+      employeeId: id,
+      employeeName: user.name || "",
+      address: user.address || "",   // optional (you don’t have in model)
+      position: user.position || "",
+      joiningDate: user.joining_date || "",
+      salaryMonthly: user.salary_monthly
+        ? String(user.salary_monthly)
+        : "",
+      department: user.department_name || "", // or user.department if string
+    });
+  } else {
+    // reset if no user selected
+    setOffer({
+      employeeId: "",
+      employeeName: "",
+      address: "",
+      position: "",
+      joiningDate: "",
+      salaryMonthly: "",
+      department: "",
+    });
+  }
+};
 
   const [activeTab, setActiveTab] = useState<
     "offer" | "appraisal" | "experience" | "salary"
@@ -78,7 +106,7 @@ const HRDocumentsPage: React.FC = () => {
   });
 
   const selectedAppraisalEmployee = appraisal.employeeId
-    ? employeeById.get(Number(appraisal.employeeId))
+    ? userById.get(Number(appraisal.employeeId))
     : undefined;
   const computedNewSalary = useMemo(() => {
     if (!selectedAppraisalEmployee) return "";
@@ -89,7 +117,7 @@ const HRDocumentsPage: React.FC = () => {
   }, [selectedAppraisalEmployee, appraisal.increasePercentage]);
 
   const selectedSalaryEmployee = salaryCert.employeeId
-    ? employeeById.get(Number(salaryCert.employeeId))
+    ? userById.get(Number(salaryCert.employeeId))
     : undefined;
 
   const postPdf = async (url: string, payload: any, filename: string) => {
@@ -191,16 +219,14 @@ const HRDocumentsPage: React.FC = () => {
                   <select
                     className="form-select"
                     value={offer.employeeId}
-                    onChange={(e) =>
-                      setOffer((p) => ({ ...p, employeeId: e.target.value }))
-                    }
+                    onChange={(e) => handleOfferUserChange(e.target.value)}
                   >
                     <option value="">-- Select employee --</option>
-                    {employees.map((emp) => (
-                      <option key={emp.id} value={emp.id}>
-                        #{emp.id} (User: {emp.user})
-                      </option>
-                    ))}
+                    {users.map((user) => (
+  <option key={user.id} value={user.id}>
+    {user.name} ({user.email})
+  </option>
+))}
                   </select>
                 </div>
 
@@ -311,9 +337,9 @@ const HRDocumentsPage: React.FC = () => {
                     }
                   >
                     <option value="">-- Select employee --</option>
-                    {employees.map((emp) => (
-                      <option key={emp.id} value={emp.id}>
-                        #{emp.id} (User: {emp.user})
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} ({user.email})
                       </option>
                     ))}
                   </select>
@@ -375,9 +401,9 @@ const HRDocumentsPage: React.FC = () => {
                     }
                   >
                     <option value="">-- Select employee --</option>
-                    {employees.map((emp) => (
-                      <option key={emp.id} value={emp.id}>
-                        #{emp.id} (User: {emp.user})
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} ({user.email})
                       </option>
                     ))}
                   </select>
@@ -454,9 +480,9 @@ const HRDocumentsPage: React.FC = () => {
                     }
                   >
                     <option value="">-- Select employee --</option>
-                    {employees.map((emp) => (
-                      <option key={emp.id} value={emp.id}>
-                        #{emp.id} (User: {emp.user})
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} ({user.email})
                       </option>
                     ))}
                   </select>

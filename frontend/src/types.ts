@@ -138,6 +138,10 @@ export interface User {
   createdAt?: string;
 
   role: UserRole;
+  position?: string;
+  joining_date?: string;
+  salary_monthly?: number | string;
+  address?: string;
 }
 
 
