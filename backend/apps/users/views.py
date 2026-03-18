@@ -12,16 +12,18 @@ from .serializers import (
     UserSerializer, UserCreateUpdateSerializer, 
     RoleSerializer, DepartmentSerializer,UserProfileSerializer
 )
-from core.permissions import IsSuperAdmin
+from core.permissions import HasPermission
 
 class RoleViewSet(viewsets.ModelViewSet):
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
-    permission_classes = [IsSuperAdmin]
+    permission_classes = [HasPermission]
+    required_permission = 'MANAGE_SETTINGS'
 
     def create(self, request, *args, **kwargs):
         name = request.data.get("name")
         description = request.data.get("description", "")
+        permissions = request.data.get("permissions", [])
 
         if not name:
             return Response(
@@ -31,14 +33,13 @@ class RoleViewSet(viewsets.ModelViewSet):
 
         name = name.upper()
 
-        # 🔥 Check including soft deleted roles
         existing_role = Role.all_objects.filter(name=name).first()
 
         if existing_role:
-            # If soft deleted → restore
             if existing_role.deleted_at:
                 existing_role.deleted_at = None
                 existing_role.description = description
+                existing_role.permissions = permissions
                 existing_role.save()
 
             serializer = self.get_serializer(existing_role)
@@ -47,10 +48,10 @@ class RoleViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_200_OK,
             )
 
-        # Create new role
         role = Role.objects.create(
             name=name,
-            description=description
+            description=description,
+            permissions=permissions
         )
 
         serializer = self.get_serializer(role)
@@ -61,11 +62,18 @@ class RoleViewSet(viewsets.ModelViewSet):
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
-    permission_classes = [IsSuperAdmin]
+    permission_classes = [HasPermission]
+    required_permission = 'MANAGE_USERS'
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
-    permission_classes = [IsSuperAdmin]
+    
+    def get_permissions(self):
+        if self.action == 'me':
+            return [permissions.IsAuthenticated()]
+        return [HasPermission()]
+
+    required_permission = 'MANAGE_USERS'
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:

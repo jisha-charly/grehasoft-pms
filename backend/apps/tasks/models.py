@@ -7,6 +7,9 @@ class TaskType(SoftDeleteModel):
     name = models.CharField(max_length=100, unique=True) # Dev, SEO, Design, Ads
     description = models.TextField(blank=True)
 
+    class Meta:
+        ordering = ['-id']
+
     def __str__(self):
         return self.name
 
@@ -41,6 +44,7 @@ class Task(SoftDeleteModel):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
 
     class Meta:
+        ordering = ['-id']
         indexes = [
             models.Index(fields=['project', 'status']),
             models.Index(fields=['due_date']),

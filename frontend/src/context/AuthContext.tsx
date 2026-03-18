@@ -10,7 +10,7 @@ import {
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<User>;
   logout: () => void;
   updateUser: (updates: Partial<User>) => void;
   isAuthenticated: boolean;
@@ -19,6 +19,21 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const getDefaultRoute = (user: User | null): string => {
+  if (!user) return "/login";
+  if (user.is_superuser) return "/";
+
+  const perms = (user.role_permissions || []).map((p) => String(p).toUpperCase());
+
+  if (perms.includes("VIEW_DASHBOARD")) return "/";
+  if (perms.includes("VIEW_PROJECTS")) return "/projects";
+  if (perms.includes("VIEW_TASKS")) return "/tasks";
+  if (perms.includes("VIEW_LEADS")) return "/crm";
+  if (perms.includes("VIEW_CLIENTS")) return "/clients";
+
+  return "/profile";
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -48,9 +63,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           username: backendUser.username,
           email: backendUser.email,
           role: backendUser.role_name as UserRole, // ✅ FIXED
+          role_permissions: backendUser.role_permissions,
           departmentId: backendUser.department,
           status: backendUser.status,
           createdAt: backendUser.created_at,
+          is_superuser: backendUser.is_superuser,
         });
       } catch (error) {
         console.error("Token verification failed:", error);
@@ -81,16 +98,21 @@ const login = async (username: string, password: string) => {
     const userRes = await api.get("/users/me/");
     const backendUser = userRes.data;
 
-    setUser({
+    const newUser = {
       id: backendUser.id,
       name: backendUser.name,
       username: backendUser.username,
       email: backendUser.email,
       role: backendUser.role_name as UserRole,
+      role_permissions: backendUser.role_permissions,
       departmentId: backendUser.department,
       status: backendUser.status,
       createdAt: backendUser.created_at,
-    });
+      is_superuser: backendUser.is_superuser,
+    };
+    
+    setUser(newUser);
+    return newUser;
   } catch (error) {
     console.error("Login error:", error);
     throw error;
@@ -124,12 +146,14 @@ const login = async (username: string, password: string) => {
 
   const hasPermission = (permission: Permission): boolean => {
     if (!user) return false;
-
-    const rolePermissions = ROLE_PERMISSIONS[user.role];
-
-    if (!rolePermissions) return false;
-
-    return rolePermissions.includes(permission);
+    if (user.is_superuser) return true; // Native Django bypass
+    if (!user.role_permissions) return false;
+    
+    // Normalize string cases to ensure case-insensitive comparison
+    const targetPerm = String(permission).toUpperCase();
+    return user.role_permissions.some(
+      (p) => String(p).toUpperCase() === targetPerm
+    );
   };
 
   return (

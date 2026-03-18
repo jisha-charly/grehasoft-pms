@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from .models import Task, TaskType, TaskFile, TaskComment, TaskReview, TaskProgress
 from .serializers import TaskSerializer, TaskTypeSerializer, TaskFileSerializer, TaskCommentSerializer, TaskReviewSerializer
 from apps.activity.utils import log_system_activity
-from core.permissions import IsProjectManager
+from core.permissions import HasPermission
 from django.db import IntegrityError
 from rest_framework.permissions import IsAuthenticated
 from apps.projects.utils import log_system_activity
@@ -12,6 +12,8 @@ from rest_framework.exceptions import PermissionDenied
 class TaskTypeViewSet(viewsets.ModelViewSet):
     queryset = TaskType.objects.all()
     serializer_class = TaskTypeSerializer
+    permission_classes = [HasPermission]
+    required_permission = 'VIEW_TASKS'
 
     def create(self, request, *args, **kwargs):
         name = request.data.get("name", "").upper().strip()
@@ -60,7 +62,8 @@ class TaskTypeViewSet(viewsets.ModelViewSet):
 class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [HasPermission]
+    required_permission = 'VIEW_TASKS'
 
     def get_queryset(self):
         user = self.request.user
@@ -104,13 +107,15 @@ class TaskViewSet(viewsets.ModelViewSet):
 class TaskFileViewSet(viewsets.ModelViewSet):
     queryset = TaskFile.objects.all()
     serializer_class = TaskFileSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [HasPermission]
+    required_permission = 'VIEW_TASKS'
     parser_classes = [MultiPartParser, FormParser]  # ✅ IMPORTANT
 
 class TaskCommentViewSet(viewsets.ModelViewSet):
     queryset = TaskComment.objects.all()
     serializer_class = TaskCommentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [HasPermission]
+    required_permission = 'VIEW_TASKS'
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -118,7 +123,8 @@ class TaskCommentViewSet(viewsets.ModelViewSet):
 class TaskReviewViewSet(viewsets.ModelViewSet):
     queryset = TaskReview.objects.all()
     serializer_class = TaskReviewSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [HasPermission]
+    required_permission = 'VIEW_TASKS'
 
     def perform_create(self, serializer):
         serializer.save(reviewer=self.request.user)

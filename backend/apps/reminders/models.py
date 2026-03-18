@@ -28,6 +28,7 @@ class Reminder(models.Model):
 
     class Meta:
         app_label = "reminders"   # 👈 add this
+        ordering = ['-id']
 
     def __str__(self) -> str:
         return f"{self.title} ({self.due_date})"

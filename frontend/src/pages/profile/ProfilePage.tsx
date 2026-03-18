@@ -181,7 +181,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ activityLogs, onUpdatePasswor
               <h4 className="fw-bold mb-1">{user.name}</h4>
               <p className="text-muted mb-3">{user.email}</p>
               <span className="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill fw-bold">
-                {user.role.replace('_', ' ')}
+                {user.role_name || user.role}
               </span>
             </div>
             <div className="card-footer bg-white border-top-0 px-4 pb-4">

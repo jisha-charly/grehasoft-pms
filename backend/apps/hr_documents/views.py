@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.permissions import IsSuperAdmin
+from core.permissions import HasPermission
 
 from .models import Employee, HRDocument
 from .pdf import (
@@ -30,13 +30,15 @@ from .serializers import (
 class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.all().order_by("-created_at")
     serializer_class = EmployeeSerializer
-    permission_classes = [IsSuperAdmin]
+    permission_classes = [HasPermission]
+    required_permission = 'GENERATE_HR_DOCS'
 
 
 class HRDocumentViewSet(viewsets.ModelViewSet):
     queryset = HRDocument.objects.all().order_by("-created_at")
     serializer_class = HRDocumentSerializer
-    permission_classes = [IsSuperAdmin]
+    permission_classes = [HasPermission]
+    required_permission = 'GENERATE_HR_DOCS'
 
 
 def _pdf_response(pdf_bytes: bytes, filename: str) -> HttpResponse:
@@ -46,7 +48,8 @@ def _pdf_response(pdf_bytes: bytes, filename: str) -> HttpResponse:
 
 
 class OfferLetterGenerateView(APIView):
-    permission_classes = [IsSuperAdmin]
+    permission_classes = [HasPermission]
+    required_permission = 'GENERATE_HR_DOCS'
 
     def post(self, request):
         ser = OfferLetterInputSerializer(data=request.data)
@@ -76,7 +79,8 @@ class OfferLetterGenerateView(APIView):
 
 
 class AppraisalLetterGenerateView(APIView):
-    permission_classes = [IsSuperAdmin]
+    permission_classes = [HasPermission]
+    required_permission = 'GENERATE_HR_DOCS'
 
     def post(self, request):
         ser = AppraisalInputSerializer(data=request.data)
@@ -115,7 +119,8 @@ class AppraisalLetterGenerateView(APIView):
 
 
 class ExperienceCertificateGenerateView(APIView):
-    permission_classes = [IsSuperAdmin]
+    permission_classes = [HasPermission]
+    required_permission = 'GENERATE_HR_DOCS'
 
     def post(self, request):
         ser = ExperienceCertificateInputSerializer(data=request.data)
@@ -135,7 +140,8 @@ class ExperienceCertificateGenerateView(APIView):
 
 
 class SalaryCertificateGenerateView(APIView):
-    permission_classes = [IsSuperAdmin]
+    permission_classes = [HasPermission]
+    required_permission = 'GENERATE_HR_DOCS'
 
     def post(self, request):
         ser = SalaryCertificateInputSerializer(data=request.data)

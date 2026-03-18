@@ -11,6 +11,10 @@ class Role(SoftDeleteModel):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-id']
+
     def __str__(self):
         return self.name
 
@@ -24,6 +28,9 @@ class Department(SoftDeleteModel):
         blank=True, 
         related_name='sub_departments'
     )
+
+    class Meta:
+        ordering = ['-id']
 
     def __str__(self):
         return self.name
@@ -46,6 +53,7 @@ class User(AbstractUser, SoftDeleteModel):
 
     class Meta:
         db_table = 'users'
+        ordering = ['-id']
 
     def __str__(self):
         return f"{self.name} ({self.username})"

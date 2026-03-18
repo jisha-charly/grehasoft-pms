@@ -26,6 +26,7 @@ class Lead(SoftDeleteModel):
     converted_project = models.ForeignKey('projects.Project', on_delete=models.SET_NULL, null=True, blank=True)
 
     class Meta:
+        ordering = ['-id']
         indexes = [
             models.Index(fields=['status', 'created_at']),
         ]

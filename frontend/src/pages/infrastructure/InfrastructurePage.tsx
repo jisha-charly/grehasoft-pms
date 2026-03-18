@@ -46,11 +46,7 @@ type ServerRow = {
 const InfrastructurePage: React.FC = () => {
   const { user, hasPermission } = useAuth();
 
-  const isAdmin =
-    !!user &&
-    (user.role === UserRole.SUPER_ADMIN ||
-      hasPermission(Permission.MANAGE_SETTINGS) ||
-      hasPermission(Permission.MANAGE_USERS));
+  const isAdmin = hasPermission(Permission.MANAGE_INFRASTRUCTURE);
 
   const {
     items: domains,

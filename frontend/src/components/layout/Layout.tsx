@@ -10,18 +10,18 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, logout } = useAuth(); // ❌ removed hasRole
+  const { user, logout, hasPermission } = useAuth(); // ✅ Using dynamic RBAC
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
  
   if (!user) return null;
 
-  type NavChild = { label: string; path: string };
+  type NavChild = { label: string; path: string; permission?: Permission };
   type NavItem = {
     label: string;
     icon: string;
-    roles: UserRole[];
+    permission: Permission;
     path?: string;
     children?: NavChild[];
   };
@@ -31,103 +31,94 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       label: "Dashboard",
       path: "/",
       icon: "bi-speedometer2",
-      roles: [
-        UserRole.SUPER_ADMIN,
-        UserRole.PROJECT_MANAGER,
-        UserRole.TEAM_MEMBER,
-        UserRole.SALES_MANAGER,
-      ],
+      permission: Permission.VIEW_DASHBOARD,
     },
     {
       label: "Projects",
       path: "/projects",
       icon: "bi-briefcase",
-      roles: [
-        UserRole.SUPER_ADMIN,
-        UserRole.PROJECT_MANAGER,
-        UserRole.TEAM_MEMBER,
-        UserRole.CLIENT,
-      ],
+      permission: Permission.VIEW_PROJECTS,
     },
     {
       label: "Tasks",
       path: "/tasks",
       icon: "bi-check2-square",
-      roles: [UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.TEAM_MEMBER],
+      permission: Permission.VIEW_TASKS,
     },
     {
       label: "Clients",
       path: "/clients",
       icon: "bi-people",
-      roles: [
-        UserRole.SUPER_ADMIN,
-        UserRole.PROJECT_MANAGER,
-        UserRole.SALES_MANAGER,
-      ],
+      permission: Permission.VIEW_CLIENTS,
     },
     {
       label: "CRM",
       icon: "bi-graph-up-arrow",
-      roles: [
-        UserRole.SUPER_ADMIN,
-        UserRole.SALES_MANAGER,
-        UserRole.SALES_EXECUTIVE,
-      ],
+      permission: Permission.VIEW_LEADS,
       children: [
-        { label: "Leads", path: "/crm" },
-        { label: "Proposals", path: "/proposals" },
+        { label: "Leads", path: "/crm", permission: Permission.VIEW_LEADS },
+        { label: "Proposals", path: "/proposals", permission: Permission.VIEW_PROPOSALS },
       ],
     },
     {
       label: "Finance",
       icon: "bi-cash-stack",
-      roles: [UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER],
-      children: [{ label: "Invoices", path: "/invoices" }],
+      permission: Permission.MANAGE_PROJECTS,
+      children: [{ label: "Invoices", path: "/invoices", permission: Permission.MANAGE_PROJECTS }],
     },
     {
       label: "Operations",
       icon: "bi-gear",
-      roles: [
-        UserRole.SUPER_ADMIN,
-        UserRole.SALES_MANAGER,
-        UserRole.SALES_EXECUTIVE,
-      ],
+      permission: Permission.VIEW_REMINDERS,
       children: [
-        { label: "Reminders", path: "/reminders" },
-        { label: "SEO", path: "/seo" },
-        { label: "SEO Websites", path: "/seo/websites" }
+        { label: "Reminders", path: "/reminders", permission: Permission.VIEW_REMINDERS },
+        { label: "SEO", path: "/seo", permission: Permission.VIEW_TASKS },
+        { label: "SEO Websites", path: "/seo/websites", permission: Permission.VIEW_TASKS }
       ],
     },
     {
       label: "HR Docs",
       path: "/hr-documents",
       icon: "bi-file-earmark-lock",
-      roles: [UserRole.SUPER_ADMIN],
+      permission: Permission.GENERATE_HR_DOCS,
     },
     {
      label: "Infrastructure",
      icon: "bi-hdd-network",
-      roles: [UserRole.SUPER_ADMIN],
+     permission: Permission.MANAGE_INFRASTRUCTURE,
      children: [
-    { label: "Servers", path: "/admin/servers" },
-    { label: "Domains", path: "/infrastructure/domains" },
-    { label: "Credentials", path: "/infrastructure/credentials" }
+    { label: "Servers", path: "/admin/servers", permission: Permission.MANAGE_INFRASTRUCTURE },
+    { label: "Domains", path: "/infrastructure/domains", permission: Permission.MANAGE_INFRASTRUCTURE },
+    { label: "Credentials", path: "/infrastructure/credentials", permission: Permission.MANAGE_INFRASTRUCTURE }
   ]
   },
    ];
 
-  const hasAccess = (roles: UserRole[]) => {
-    return !!(user?.role && roles.includes(user.role as UserRole));
+  const hasAccess = (permission?: Permission) => {
+    return !!(permission && hasPermission(permission));
   };
 
+  const accessibleNavConfig = navigationConfig.map(item => {
+    if (item.children) {
+      const accessibleChildren = item.children.filter(child => 
+        hasAccess(child.permission || item.permission)
+      );
+      if (accessibleChildren.length > 0 || hasAccess(item.permission)) {
+        return { ...item, children: accessibleChildren };
+      }
+      return null;
+    }
+    return hasAccess(item.permission) ? item : null;
+  }).filter(Boolean) as NavItem[];
+
   // Flat list for mobile drawer (keeps existing drawer JSX unchanged)
-  const navItems = navigationConfig.flatMap((item) => {
+  const navItems = accessibleNavConfig.flatMap((item) => {
     if (item.children && item.children.length) {
       return item.children.map((child) => ({
         label: child.label,
         path: child.path,
         icon: item.icon,
-        roles: item.roles,
+        permission: child.permission || item.permission,
       }));
     }
     return item.path
@@ -136,7 +127,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             label: item.label,
             path: item.path,
             icon: item.icon,
-            roles: item.roles,
+            permission: item.permission,
           },
         ]
       : [];
@@ -208,9 +199,8 @@ useEffect(() => {
 
           {/* Desktop nav (>=992px) */}
          <div className="d-none d-lg-flex align-items-center flex-grow-1 justify-content-between">
-           <ul className="navbar-nav mb-0 ms-lg-4 flex-nowrap">
-              {navigationConfig
-                .filter((item) => hasAccess(item.roles))
+            <ul className="navbar-nav mb-0 ms-lg-4 flex-nowrap">
+              {accessibleNavConfig
                 .map((item) => {
                   const hasChildren = item.children && item.children.length > 0;
 
@@ -381,7 +371,7 @@ useEffect(() => {
   )}
 </div>
             <div className="d-flex align-items-center">
-              {user.role === UserRole.SUPER_ADMIN && (
+              {hasAccess(Permission.MANAGE_SETTINGS) && (
                 <div className="dropdown me-3">
                   <button
                     className="btn btn-light dropdown-toggle btn-sm fw-bold border-0"
@@ -418,7 +408,7 @@ useEffect(() => {
                 <ul className="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3">
                   <li className="px-3 py-2 d-sm-none border-bottom mb-2">
                     <div className="fw-bold small">{user.name}</div>
-                    <div className="text-primary smaller" style={{ fontSize: '0.7rem', textTransform: 'uppercase' }}>{user.role.replace('_', ' ')}</div>
+                    <div className="text-primary smaller" style={{ fontSize: '0.7rem', textTransform: 'uppercase' }}>{user.role_name || user.role}</div>
                   </li>
                   <li>
                     <Link className="dropdown-item d-flex align-items-center py-2 small fw-medium" to="/profile">
@@ -464,7 +454,7 @@ useEffect(() => {
               <ul className="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3">
                 <li className="px-3 py-2 border-bottom mb-2">
                   <div className="fw-bold small">{user.name}</div>
-                  <div className="text-primary smaller" style={{ fontSize: '0.7rem', textTransform: 'uppercase' }}>{user.role.replace('_', ' ')}</div>
+                  <div className="text-primary smaller" style={{ fontSize: '0.7rem', textTransform: 'uppercase' }}>{user.role_name || user.role}</div>
                 </li>
                 <li>
                   <Link className="dropdown-item d-flex align-items-center py-2 small fw-medium" to="/profile">
@@ -516,7 +506,6 @@ useEffect(() => {
         <nav className="p-2">
           <ul className="list-unstyled mb-2">
             {navItems
-              .filter((item) => user?.role && item.roles.includes(user.role as UserRole))
               .map((item) => {
                 const active = location.pathname === item.path;
                 return (
@@ -536,7 +525,7 @@ useEffect(() => {
               })}
           </ul>
 
-          {user.role === UserRole.SUPER_ADMIN && (
+          {hasAccess(Permission.MANAGE_SETTINGS) && (
             <>
               <div className="px-3 pt-2 pb-1 small text-secondary fw-bold text-uppercase">Admin</div>
               <ul className="list-unstyled mb-0">

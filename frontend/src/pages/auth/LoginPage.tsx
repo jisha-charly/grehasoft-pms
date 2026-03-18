@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth, getDefaultRoute } from '../../context/AuthContext';
 import { UserRole } from '../../types';
 import axiosInstance from "../../api/axiosInstance";
 const LoginPage: React.FC = () => {
@@ -19,7 +19,7 @@ const [email, setEmail] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = (location.state as any)?.from?.pathname || "/dashboard";
+  const from = (location.state as any)?.from?.pathname;
 
  const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
@@ -39,8 +39,9 @@ const [email, setEmail] = useState('');
   if (newErrors.username || newErrors.password) return;
 
   try {
-    await login(username, password);
-    navigate(from, { replace: true });
+    const loggedInUser = await login(username, password);
+    const targetRoute = from && from !== "/login" ? from : getDefaultRoute(loggedInUser);
+    navigate(targetRoute, { replace: true });
   } catch {
     setError('Invalid username or password');
   }

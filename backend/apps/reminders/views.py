@@ -13,6 +13,6 @@ class ReminderViewSet(viewsets.ModelViewSet):
        if user.is_anonymous:
             return Reminder.objects.none() 
 
-       return Reminder.objects.filter(user=user)
+       return Reminder.objects.filter(user=user).order_by('-id')
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

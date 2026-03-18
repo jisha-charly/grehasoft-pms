@@ -17,13 +17,15 @@ class DepartmentSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     role_name = serializers.CharField(source='role.name', read_only=True)
     department_name = serializers.CharField(source='department.name', read_only=True)
+    role_permissions = serializers.JSONField(source='role.permissions', read_only=True)
     
     class Meta:
         model = User
         fields = [
-            'id', 'name', 'username', 'email', 'role', 'role_name', 
+            'id', 'name', 'username', 'email', 'role', 'role_name', 'role_permissions',
             'department', 'department_name', 'status', 'is_active', 
-            'date_joined', 'last_login','position', 'joining_date', 'salary_monthly','address'
+            'date_joined', 'last_login','position', 'joining_date', 'salary_monthly','address',
+            'is_superuser'
         ]
         read_only_fields = ['last_login', 'date_joined']
 
@@ -50,6 +52,7 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 class UserProfileSerializer(serializers.ModelSerializer):
+    role_permissions = serializers.JSONField(source='role.permissions', read_only=True)
 
     class Meta:
         model = User
@@ -59,8 +62,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "username",
             "email",
             "role",
+            "role_permissions",
             "department",
             "date_joined",
             "last_login",
+            "is_superuser"
         ]
-        read_only_fields = ["role", "department", "date_joined", "last_login"]
+        read_only_fields = ["role", "department", "date_joined", "last_login", "is_superuser"]

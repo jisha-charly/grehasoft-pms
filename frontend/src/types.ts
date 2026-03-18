@@ -127,6 +127,7 @@ export interface User {
   email: string;
 
   role_name?: string;
+  role_permissions?: Permission[];
 
   department?: number | null;
   department_name?: string;
@@ -144,6 +145,7 @@ export interface User {
   joining_date?: string;
   salary_monthly?: number | string;
   address?: string;
+  is_superuser?: boolean;
 }
 
 

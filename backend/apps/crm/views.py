@@ -5,14 +5,15 @@ from .models import Lead, LeadFollowup, LeadAssignment
 from .serializers import LeadSerializer, LeadFollowupSerializer,LeadAssignmentSerializer
 from apps.projects.models import Project
 from apps.projects.serializers import ProjectSerializer
-from core.permissions import IsSalesManager
+from core.permissions import HasPermission
 from django.db import transaction
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 class LeadViewSet(viewsets.ModelViewSet):
     queryset = Lead.objects.all()
     serializer_class = LeadSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [HasPermission]
+    required_permission = 'VIEW_LEADS'
 
     def get_queryset(self):
         user = self.request.user
@@ -21,8 +22,11 @@ class LeadViewSet(viewsets.ModelViewSet):
         # Sales Executives only see leads assigned to them
         return Lead.objects.filter(assignments__sales_exec=user)
  
-    @action(detail=True, methods=['post'], permission_classes=[IsSalesManager])
+    @action(detail=True, methods=['post'])
     def convert_to_project(self, request, pk=None):
+     from core.permissions import has_permission
+     if not has_permission(request.user, 'MANAGE_LEADS'):
+        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
      lead = self.get_object()
 
@@ -67,7 +71,8 @@ class LeadViewSet(viewsets.ModelViewSet):
 class LeadFollowupViewSet(viewsets.ModelViewSet):
     queryset = LeadFollowup.objects.all()
     serializer_class = LeadFollowupSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [HasPermission]
+    required_permission = 'VIEW_LEADS'
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['lead', 'status', 'followup_type']
     search_fields = ['notes']
@@ -84,7 +89,8 @@ class LeadFollowupViewSet(viewsets.ModelViewSet):
 class LeadAssignmentViewSet(viewsets.ModelViewSet):
     queryset = LeadAssignment.objects.all()
     serializer_class = LeadAssignmentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [HasPermission]
+    required_permission = 'VIEW_LEADS'
 
     def get_queryset(self):
         lead_id = self.request.query_params.get('lead_id')

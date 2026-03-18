@@ -10,6 +10,9 @@ class Client(SoftDeleteModel):
     gst_no = models.CharField(max_length=50, null=True, blank=True)
     address = models.TextField()
 
+    class Meta:
+        ordering = ['-id']
+
     def __str__(self):
         return self.company_name
 
@@ -32,6 +35,7 @@ class Project(SoftDeleteModel):
     progress_percentage = models.IntegerField(default=0)
 
     class Meta:
+        ordering = ['-id']
         indexes = [
             models.Index(fields=['status']),
             models.Index(fields=['client']),

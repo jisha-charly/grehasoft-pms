@@ -397,7 +397,16 @@ const App: React.FC = () => {
         />
 
 
-        <Route path="*" element={<Navigate to="/" />} />
+      <Route
+  path="*"
+  element={
+    isAuthenticated ? (
+      <Navigate to="/" />
+    ) : (
+      <Navigate to="/login" />
+    )
+  }
+/>
       </Routes>
     </Router>
     </NotificationProvider>
