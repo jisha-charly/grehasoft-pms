@@ -1,10 +1,13 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import axiosInstance from "../api/axiosInstance";
+import { useAuth } from "./AuthContext";
+
 
 type Notification = {
-  type: "reminder" | "domain";
+    type: "reminder" | "domain" | "expired"; // ✅ ADD THIS
   message: string;
   date: string;
+  link?: string; // ✅ add this
 };
 
 type NotificationContextType = {
@@ -21,6 +24,8 @@ export const useNotifications = () => {
 };
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
+
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const fetchNotifications = async () => {
@@ -50,34 +55,60 @@ const reminderAlerts = reminders
   }));
 
       // 🌐 Domain alerts
-      const domainAlerts = domains
-        .filter((d: any) => {
-          if (!d.expiry_date) return false;
-          const days =
-            (new Date(d.expiry_date).getTime() - now.getTime()) /
-            (1000 * 3600 * 24);
-         return days <= 7;
-        })
-        .map((d: any) => ({
-          type: "domain",
-          message: `Domain expiring: ${d.domain_name}`,
-          date: d.expiry_date
-        }));
+const domainAlerts = domains
+  .filter((d: any) => {
+    if (!d.expiry_date) return false;
 
-      setNotifications([...reminderAlerts, ...domainAlerts]);
+    const expiry = new Date(d.expiry_date);
+    const diffDays = Math.ceil(
+      (expiry.getTime() - now.getTime()) / (1000 * 3600 * 24)
+    );
+
+    return diffDays <= 7;
+  })
+  .map((d: any) => {
+    const expiry = new Date(d.expiry_date);
+    const diffDays = Math.ceil(
+      (expiry.getTime() - now.getTime()) / (1000 * 3600 * 24)
+    );
+
+    return {
+      type: diffDays < 0 ? "expired" : "domain",
+      message:
+        diffDays < 0
+          ? `❌ Domain expired: ${d.domain_name}`
+          : `⚠ Domain expiring soon: ${d.domain_name}`,
+      date: d.expiry_date,
+      link: "/infrastructure/domains" // ✅ ADD THIS
+    };
+  });
+const dismissedDomains = JSON.parse(
+  localStorage.getItem("dismissedDomains") || "[]"
+);
+
+// ✅ filter only domain alerts
+const filteredDomainAlerts = domainAlerts.filter((n: Notification) => {
+  const domainName = n.message.split(": ")[1];
+  return !dismissedDomains.includes(domainName);
+});
+
+// ✅ reminders untouched
+setNotifications([...reminderAlerts, ...filteredDomainAlerts]);
 
     } catch (err) {
       console.error("Notification error", err);
     }
   };
 
-  useEffect(() => {
-    fetchNotifications();
+ useEffect(() => {
+  if (!isAuthenticated) return;   // ✅ STOP if not logged in
 
-    const interval = setInterval(fetchNotifications, 60000); // auto refresh
+  fetchNotifications();
 
-    return () => clearInterval(interval);
-  }, []);
+  const interval = setInterval(fetchNotifications, 60000);
+
+  return () => clearInterval(interval);
+}, [isAuthenticated]);
 
   return (
     <NotificationContext.Provider value={{ notifications, refreshNotifications: fetchNotifications }}>

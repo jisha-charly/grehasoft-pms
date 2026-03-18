@@ -173,7 +173,7 @@ const DomainsPage: React.FC = () => {
   );
 
   return (
-    <Layout>
+  
       <div className="container-fluid p-0">
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
           <div>
@@ -492,7 +492,7 @@ const DomainsPage: React.FC = () => {
           </div>
         )}
       </div>
-    </Layout>
+    
   );
 };
 

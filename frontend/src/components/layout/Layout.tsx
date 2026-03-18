@@ -150,10 +150,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   { label: "Servers", path: "/admin/servers", icon: "bi-hdd-network" }
 ];
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+ const handleLogout = () => {
+  // 🔥 clean overlays before leaving
+  document.querySelectorAll(".modal-backdrop, .layout-backdrop")
+    .forEach(el => el.remove());
+
+  document.body.classList.remove("modal-open");
+
+  logout();
+  navigate('/login');
+};
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -173,6 +179,24 @@ useEffect(() => {
   return () => document.removeEventListener("click", handleClick);
 }, []);
 
+
+useEffect(() => {
+  // close sidebar on route change
+  setSidebarOpen(false);
+
+  // 🔥 remove any leftover backdrop
+  document
+    .querySelectorAll(".layout-backdrop, .modal-backdrop")
+    .forEach((el) => el.remove());
+}, [location.pathname]);
+
+useEffect(() => {
+  return () => {
+    document
+      .querySelectorAll(".layout-backdrop, .modal-backdrop")
+      .forEach((el) => el.remove());
+  };
+}, []);
   return (
     <>
       <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top shadow-sm app-navbar">
@@ -289,19 +313,41 @@ useEffect(() => {
     style={{ cursor: "pointer" }}
     onClick={(e) => {
       e.stopPropagation();
+      
+  // ✅ Only store domain dismiss
+  if (n.type === "domain" || n.type === "expired") {
+    const dismissedDomains = JSON.parse(
+      localStorage.getItem("dismissedDomains") || "[]"
+    );
 
-      if (n.type === "reminder") {
-        navigate("/reminders");
-      } else if (n.type === "domain") {
-        navigate("/infrastructure/domains");
-      }
+    const domainName = n.message.split(": ")[1]; // extract grehasoft.com
 
-      setShowDropdown(false);
-    }}
+    if (!dismissedDomains.includes(domainName)) {
+      dismissedDomains.push(domainName);
+      localStorage.setItem(
+        "dismissedDomains",
+        JSON.stringify(dismissedDomains)
+      );
+    }
+  }
+
+  // navigation
+  if (n.type === "reminder") {
+    navigate("/reminders");
+  } else if (n.type === "domain" || n.type === "expired") {
+    navigate("/infrastructure/domains");
+  }
+
+  setShowDropdown(false);
+}}
   >
             <div
               className={`fw-semibold ${
-                n.type === "domain" ? "text-danger" : "text-primary"
+             n.type === "expired"
+    ? "text-danger"
+    : n.type === "domain"
+    ? "text-warning"
+    : "text-primary"
               }`}
             >
               {n.message}
@@ -359,7 +405,8 @@ useEffect(() => {
 
                     
               <div className="dropdown">
-                <button className="btn btn-link text-decoration-none text-dark d-flex align-items-center p-0 border-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <button className="btn btn-link text-decoration-none text-dark d-flex align-items-center p-0 border-0" type="button" data-bs-toggle="dropdown"
+                 aria-expanded="false">
                   {/*<div className="text-end me-2 d-none d-sm-block">
                     <div className="fw-bold small text-dark">{user.name}</div>
                     <div className="text-primary smaller fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.02em' }}>{user.role.replace('_', ' ')}</div>
@@ -408,7 +455,8 @@ useEffect(() => {
             </button>
 
             <div className="dropdown">
-              <button className="btn btn-link text-decoration-none text-dark d-flex align-items-center p-0 border-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <button className="btn btn-link text-decoration-none text-dark d-flex align-items-center p-0 border-0" type="button"  data-bs-toggle="dropdown" 
+              aria-expanded="false">
                 <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style={{ width: '35px', height: '35px', fontSize: '0.9rem', fontWeight: 'bold' }}>
                   {user.username.charAt(0)}
                 </div>

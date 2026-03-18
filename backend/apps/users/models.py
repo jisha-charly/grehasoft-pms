@@ -7,7 +7,10 @@ class Role(SoftDeleteModel):
     # Strictly follows frontend enums: SUPER_ADMIN, PROJECT_MANAGER, TEAM_MEMBER, SALES_MANAGER, SALES_EXECUTIVE, CLIENT
     name = models.CharField(max_length=50, unique=True)
     description = models.TextField(blank=True)
+    permissions = models.JSONField(default=list)  # ✅ store permissions
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     def __str__(self):
         return self.name
 

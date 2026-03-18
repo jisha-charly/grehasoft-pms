@@ -215,6 +215,23 @@ const App: React.FC = () => {
 
   const milestoneCrud = createCrud("/milestones", setMilestones);
   const memberCrud = createCrud("/project-members", setProjectMembers);
+  useEffect(() => {
+  const cleanUI = () => {
+    // remove overlays
+    document.querySelectorAll(".modal-backdrop, .layout-backdrop")
+      .forEach(el => el.remove());
+
+    // fix body scroll lock
+    document.body.classList.remove("modal-open");
+    document.body.style.overflow = "auto";
+  };
+
+  cleanUI();
+
+  window.addEventListener("hashchange", cleanUI);
+
+  return () => window.removeEventListener("hashchange", cleanUI);
+}, []);
 
   /* ================= ROUTES ================= */
 
@@ -361,9 +378,9 @@ const App: React.FC = () => {
           path="/infrastructure/domains"
           element={
             <ProtectedRoute requiredPermission={Permission.MANAGE_INFRASTRUCTURE}>
-
+                <Layout>
               <DomainsPage />
-
+</Layout>
             </ProtectedRoute>
           }
         />

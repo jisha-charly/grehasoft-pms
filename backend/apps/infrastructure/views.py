@@ -8,7 +8,7 @@ from .serializers import (
     DomainSerializer,
     WebsiteCredentialSerializer
 )
-
+from rest_framework.permissions import IsAuthenticated
 
 class BaseInfraViewSet(viewsets.ModelViewSet):
 
@@ -42,6 +42,7 @@ class ServerViewSet(BaseInfraViewSet):
 
 
 class DomainViewSet(BaseInfraViewSet):
+    permission_classes = [IsAuthenticated]   # ✅ ADD THIS
 
     queryset = Domain.objects.select_related(
         "project",

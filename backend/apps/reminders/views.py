@@ -8,7 +8,11 @@ class ReminderViewSet(viewsets.ModelViewSet):
     serializer_class = ReminderSerializer
 
     def get_queryset(self):
-        return Reminder.objects.filter(user=self.request.user)
+       user = self.request.user
 
+       if user.is_anonymous:
+            return Reminder.objects.none() 
+
+       return Reminder.objects.filter(user=user)
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

@@ -5,7 +5,7 @@ from .models import User, Role, Department
 class RoleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Role
-        fields = ['id', 'name', 'description', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'description','permissions', 'created_at', 'updated_at']
 
 class DepartmentSerializer(serializers.ModelSerializer):
     parent_name = serializers.CharField(source='parent.name', read_only=True)

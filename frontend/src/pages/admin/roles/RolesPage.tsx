@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Role } from '../../../types';
+import { Permission, Role } from '../../../types';
 import { useForm } from '../../../hooks/useForm';
 import { useCrud } from '../../../hooks/useCrud';
 import FormField from '../../../components/FormField';
-
+const ALL_PERMISSIONS = Object.values(Permission);
 const RolesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const {
@@ -20,7 +20,18 @@ const RolesPage: React.FC = () => {
   useEffect(() => {
     setPage(1);
   }, [searchTerm]);
+ const togglePermission = (perm: Permission) => {
+  const current = values.permissions || [];
 
+  if (current.includes(perm)) {
+    handleChange(
+      'permissions',
+      current.filter(p => p !== perm)
+    );
+  } else {
+    handleChange('permissions', [...current, perm]);
+  }
+};
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
@@ -38,13 +49,15 @@ const RolesPage: React.FC = () => {
   const { values, errors, isSubmitting, handleChange, handleSubmit, resetForm, setValues } = useForm({
     initialValues: {
       name: '',
-      description: ''
+      description: '',
+       permissions: [] as Permission[]
     },
     validationSchema,
     onSubmit: async (formData) => {
       const data = {
         name: formData.name.toUpperCase().replace(/\s+/g, '_'),
-        description: formData.description
+        description: formData.description,
+        permissions: formData.permissions   // ✅ ADD THIS
       };
       
       if (editingRole) {
@@ -58,15 +71,16 @@ const RolesPage: React.FC = () => {
   });
 
   useEffect(() => {
-    if (editingRole) {
-      setValues({
-        name: editingRole.name,
-        description: editingRole.description
-      });
-    } else {
-      resetForm();
-    }
-  }, [editingRole, setValues, resetForm]);
+  if (editingRole) {
+    setValues({
+      name: editingRole.name,
+      description: editingRole.description,
+      permissions: editingRole.permissions || []   // ✅ ADD THIS
+    });
+  } else {
+    resetForm();
+  }
+}, [editingRole, setValues, resetForm]);
 
  const filteredRoles = useMemo(() => {
   return roles.filter(role => {
@@ -131,6 +145,7 @@ const RolesPage: React.FC = () => {
               <tr>
                 <th className="px-4">Internal Name</th>
                 <th>Description</th>
+                  <th>Permissions</th>
                 <th>Created At</th>
                 <th className="text-end px-4">Actions</th>
               </tr>
@@ -155,6 +170,15 @@ const RolesPage: React.FC = () => {
                       </div>
                     </td>
                     <td><p className="small text-secondary mb-0 text-truncate" style={{ maxWidth: '350px' }}>{role.description}</p></td>
+                    {/* ✅ ADD THIS BLOCK */}
+<td>
+  {role.permissions?.slice(0, 3).map(p => (
+    <span key={p} className="badge bg-light text-dark me-1">
+      {p}
+    </span>
+  ))}
+  {role.permissions?.length > 3 && '...'}
+</td>
                     <td className="small text-muted">{role.created_at
   ? new Date(role.created_at).toLocaleDateString()
   : 'N/A'}</td>
@@ -262,6 +286,27 @@ const RolesPage: React.FC = () => {
                     ></textarea>
                     {errors.description && <div className="invalid-feedback">{errors.description}</div>}
                   </div>
+                  <div className="mt-4">
+  <label className="form-label fw-bold">Permissions</label>
+
+  <div className="row">
+    {ALL_PERMISSIONS.map((perm) => (
+      <div className="col-md-4 mb-2" key={perm}>
+        <div className="form-check">
+          <input
+            type="checkbox"
+            className="form-check-input"
+            checked={values.permissions?.includes(perm)}
+            onChange={() => togglePermission(perm)}
+          />
+          <label className="form-check-label small">
+            {perm}
+          </label>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
                 </div>
                 <div className="modal-footer border-0 p-4 pt-0 bg-white gap-2">
                   <button type="button" className="btn btn-light fw-bold px-4 py-2 border" onClick={() => setModalOpen(false)}>Discard</button>

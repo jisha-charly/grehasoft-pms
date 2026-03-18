@@ -80,6 +80,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.VIEW_TASKS,
   ],
 };
+export const ALL_PERMISSIONS = Object.values(Permission);
 
 export enum TaskStatus {
   TODO = 'todo',
@@ -99,6 +100,7 @@ export interface Role {
   id: number;
   name: string;
   description: string;
+  permissions: Permission[]; // ✅ ADD THIS
   created_at?: string;
   updated_at?: string;
 }
