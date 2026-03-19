@@ -361,7 +361,7 @@ const App: React.FC = () => {
         <Route path="/invoices/edit/:id" element={<CreateInvoicePage />} />
         <Route path="/invoices/:id" element={<InvoiceDetailsPage />} />
         <Route path="/reminders" element={<ProtectedRoute requiredPermission={Permission.VIEW_REMINDERS}><Layout><RemindersPage /></Layout></ProtectedRoute>} />
-        <Route path="/proposals" element={<ProtectedRoute requiredPermission={Permission.VIEW_PROPOSALS}><Layout><ProposalsPage leads={leads} setProjects={setProjects} /></Layout></ProtectedRoute>} />
+        <Route path="/proposals" element={<ProtectedRoute requiredPermission={Permission.VIEW_PROPOSALS}><Layout><ProposalsPage leads={leads} setProjects={setProjects} setLeads={setLeads} /></Layout></ProtectedRoute>} />
         <Route path="/hr-documents" element={<ProtectedRoute requiredPermission={Permission.GENERATE_HR_DOCS}><Layout><HRDocumentsPage /></Layout></ProtectedRoute>} />
         <Route
           path="/admin/servers"

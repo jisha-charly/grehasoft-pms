@@ -70,7 +70,7 @@ const overlayStyle: React.CSSProperties = {
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
-  zIndex: 1050,
+  zIndex: 9999,
 };
 
 const modalStyle: React.CSSProperties = {

@@ -96,6 +96,7 @@ export function useCrud<T extends { id?: number | string }>(options: UseCrudOpti
           page: String(page),
           ...queryParams,
           ...(typeof params === "object" && params !== null ? params : {}),
+          _t: Date.now(),
         };
         const query =
           typeof params === "string"

@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useForm } from '../../hooks/useForm';
 import { useCrud } from '../../hooks/useCrud';
 import FormField from '../../components/FormField';
+import DeleteConfirmModal from '@/components/DeleteConfirmModal';
 
 interface ProjectsPageProps {
   users: User[];
@@ -29,7 +30,21 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+const handleDeleteConfirm = async () => {
+  if (!selectedProjectId) return;
 
+  try {
+    await deleteProject(selectedProjectId);
+
+    // OPTIONAL: reset selection
+    setSelectedProjectId(null);
+
+  } catch (error) {
+    console.error("Delete failed", error);
+  }
+};
   const canManage = hasPermission(Permission.MANAGE_PROJECTS);
 
   const validationSchema = {
@@ -196,7 +211,10 @@ const pageNumbers: number[] = Array.from(
                 {canManage && (
                   <>
                     <button className="btn btn-light btn-sm flex-grow-1 fw-bold text-secondary rounded-pill" onClick={() => handleOpenModal(p)}>Edit</button>
-                    <button className="btn btn-light btn-sm fw-bold text-danger rounded-circle p-2" onClick={() => { if(confirm('Delete project?')) deleteProject(p.id); }}><i className="bi bi-trash"></i></button>
+                    <button className="btn btn-light btn-sm fw-bold text-danger rounded-circle p-2" onClick={() => {
+  setSelectedProjectId(p.id);
+  setShowDeleteModal(true);
+}}><i className="bi bi-trash"></i></button>
                   </>
                 )}
                 <Link to={`/projects/${p.id}/kanban`} className="btn btn-light btn-sm flex-grow-1 fw-bold text-secondary d-flex align-items-center justify-content-center text-decoration-none rounded-pill">Kanban</Link>
@@ -484,6 +502,15 @@ const pageNumbers: number[] = Array.from(
     </div>
   </div>
 )}
+
+<DeleteConfirmModal
+  isOpen={showDeleteModal}
+  onClose={() => setShowDeleteModal(false)}
+  onConfirm={handleDeleteConfirm}
+  title="Delete Project"
+  message="Are you sure you want to delete this project?"
+  confirmText="Delete"
+/>
     </div>
   );
 };

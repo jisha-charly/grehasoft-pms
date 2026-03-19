@@ -51,6 +51,30 @@ const LeadsPage: React.FC<LeadsPageProps> = ({
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState<Lead | null>(null);
   const currentUserId = users?.[0]?.id || null;
+  const [assignmentToDelete, setAssignmentToDelete] = useState<LeadAssignment | null>(null);
+const [assignmentDeleteModal, setAssignmentDeleteModal] = useState(false);
+const handleDeleteAssignmentClick = (assignment: LeadAssignment) => {
+  setAssignmentToDelete(assignment);
+  setAssignmentDeleteModal(true);
+};
+const handleConfirmAssignmentDelete = async () => {
+  if (!assignmentToDelete) return;
+
+  try {
+    await axiosInstance.delete(`/lead-assignments/${assignmentToDelete.id}/`);
+
+    // 🔥 Refresh assignments list
+    if (selectedLead) {
+      await fetchLeadDetails(selectedLead.id);
+    }
+
+  } catch (error) {
+    console.error("Assignment delete failed:", error);
+  }
+
+  setAssignmentDeleteModal(false);
+  setAssignmentToDelete(null);
+};
 
   const salesExecs = (users || []).filter(
     (u) =>
@@ -65,18 +89,21 @@ const LeadsPage: React.FC<LeadsPageProps> = ({
     }
   }, [selectedLead]);
 
-  const fetchLeadDetails = async (leadId: number) => {
-    try {
-      const [assignRes, followRes] = await Promise.all([
-        axiosInstance.get(`/lead-assignments/?lead_id=${leadId}`),
-        axiosInstance.get(`/lead-followups/?lead_id=${leadId}`),
-      ]);
-      setAssignments(assignRes.data ?? []);
-      setFollowups(followRes.data ?? []);
-    } catch (error) {
-      console.error('Error fetching lead details:', error);
-    }
-  };
+ const fetchLeadDetails = async (leadId: number) => {
+  try {
+    const [assignRes, followRes] = await Promise.all([
+      axiosInstance.get(`/lead-assignments/?lead_id=${leadId}`),
+      axiosInstance.get(`/lead-followups/?lead_id=${leadId}`),
+    ]);
+
+    // ✅ FIX HERE
+    setAssignments(assignRes.data.results || assignRes.data || []);
+    setFollowups(followRes.data.results || followRes.data || []);
+
+  } catch (error) {
+    console.error('Error fetching lead details:', error);
+  }
+};
 
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
   const validationSchema = {
@@ -112,6 +139,7 @@ const LeadsPage: React.FC<LeadsPageProps> = ({
     onSubmit: async (formData) => {
       const payload = {
         ...formData,
+        
         converted_project_id: formData.converted_project_id ? Number(formData.converted_project_id) : null
       };
 
@@ -662,15 +690,33 @@ const handleConfirmDelete = async () => {
                         <p className="text-muted smaller italic">No executives assigned yet.</p>
                       ) : (
                         <ul className="list-group list-group-flush">
-                          {assignments.map(a => (
-  <li key={a.id} className="list-group-item bg-transparent px-0 py-2 border-0">
+                          {Array.isArray(assignments) && assignments.map(a => (
+ <li
+  key={a.id}
+  className="list-group-item bg-transparent px-0 py-2 border-0 d-flex justify-content-between align-items-start"
+>
+  {/* LEFT SIDE */}
+  <div>
     <div className="fw-bold small">
       {a.sales_exec_details?.name || 'Unknown'}
     </div>
     <div className="smaller text-muted">
       Assigned: {new Date(a.assigned_at).toLocaleDateString()}
     </div>
-  </li>
+  </div>
+
+  {/* RIGHT SIDE (DELETE BUTTON) */}
+  <button
+    className="btn btn-sm text-danger p-0 ms-2"
+    onClick={() => handleDeleteAssignmentClick(a)}
+    title="Remove Assignment"
+  >
+    <i className="bi bi-x-circle"></i>
+  </button>
+</li>
+
+ 
+  
 ))}
                         </ul>
                       )}
@@ -823,7 +869,18 @@ const handleConfirmDelete = async () => {
         </div>
       )}
     </div>
-
+{assignmentDeleteModal && assignmentToDelete && (
+  <DeleteConfirmModal
+    isOpen={assignmentDeleteModal}
+    title="Remove Assignment"
+    message={`Remove ${assignmentToDelete.sales_exec_details?.name}?`}
+    onClose={() => {
+      setAssignmentDeleteModal(false);
+      setAssignmentToDelete(null);
+    }}
+    onConfirm={handleConfirmAssignmentDelete}
+  />
+)}
 
     {deleteModalOpen && leadToDelete && (
   <DeleteConfirmModal

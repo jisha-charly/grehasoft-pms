@@ -8,9 +8,10 @@ import { useCrud } from '../../hooks/useCrud';
 interface ProposalsPageProps {
   leads: Lead[];
   setProjects?: (projects: any[]) => void;
+  setLeads?: (leads: any[]) => void;
 }
 
-const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects }) => {
+const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects, setLeads }) => {
   const {
     items: proposals,
     pagination: { page, setPage, totalPages, totalCount: count },
@@ -52,15 +53,35 @@ const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects }) => 
   }
 }, [leadId]);
 
-  useEffect(() => {
-    if (editingProposal) {
-      setItems(editingProposal.items || [{ service: '', description: '', cost: 0 }]);
-      setDiscount(editingProposal.discount || 0);
-    } else {
-      setItems([{ service: '', description: '', cost: 0 }]);
-      setDiscount(0);
+ useEffect(() => {
+  if (editingProposal) {
+    // ✅ Existing logic
+    setItems(editingProposal.items || [{ service: '', description: '', cost: 0 }]);
+    setDiscount(editingProposal.discount || 0);
+
+    // 🔥 ADD THIS BLOCK
+    const lead = leads.find(l => l.id === editingProposal.leadId);
+
+    if (lead) {
+      setSelectedLeadId(lead.id);   // ✅ FIX DROPDOWN
+      setClientName(lead.name);
+      setEmail(lead.email);
+      setPhone(lead.phone);
     }
-  }, [editingProposal, isModalOpen]);
+
+  } else {
+    setItems([{ service: '', description: '', cost: 0 }]);
+    setDiscount(0);
+
+    // 🔥 Reset when creating new
+    setSelectedLeadId('');
+    setClientName('');
+    setEmail('');
+    setPhone('');
+  }
+}, [editingProposal, isModalOpen, leads]);
+
+
   useEffect(() => {
   if (!selectedLeadId) return;
 
@@ -100,6 +121,7 @@ const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects }) => 
     const payload = {
       lead: Number(data.leadId),
       leadName: selectedLead?.name,
+    
       title: data.title,
       description: data.description,
       projectOverview: data.projectOverview,
@@ -128,21 +150,42 @@ const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects }) => 
     }
   };
 
-  const handleConvert = async (id: number) => {
-    try {
-      await axiosInstance.post(`/proposals/${id}/convert/`);
-      setProposalsList((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, is_converted: true } : p))
-      );
-      if (setProjects) {
-        const res = await axiosInstance.get('/projects/?limit=1000');
-        setProjects(res.data.results ?? []);
-      }
-    } catch (err) {
-      console.error('Convert error:', err);
-    }
-  };
+const handleConvert = async (proposal: Proposal) => {
+  try {
+    console.log("Converting proposal:", proposal.id);
 
+    const res = await axiosInstance.post(
+      `/proposals/${proposal.id}/convert/`
+    );
+
+    console.log("✅ Convert success:", res.data);
+
+    // ✅ update UI instantly
+    setProposalsList(prev =>
+      prev.map(p =>
+        p.id === proposal.id
+          ? { ...p, is_converted: true, client: res.data.project?.client }
+          : p
+      )
+    );
+
+    // ✅ refresh projects
+    if (setProjects) {
+      const projectRes = await axiosInstance.get('/projects/?limit=1000');
+      setProjects(projectRes.data.results ?? []);
+    }
+
+    // ✅ refresh leads
+    if (setLeads) {
+      const leadsRes = await axiosInstance.get('/leads/');
+      setLeads(leadsRes.data.results ?? leadsRes.data ?? []);
+    }
+
+  } catch (err: any) {
+    console.error("❌ Convert error:", err.response?.data);
+    alert(err.response?.data?.error || "Convert failed");
+  }
+};
   return (
     <div className="card shadow-sm border-0">
       <div className="card-header bg-white border-0 py-4 px-4 d-flex justify-content-between align-items-center">
@@ -195,9 +238,7 @@ const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects }) => 
 ) : proposal.status === "accepted" && (
   <button
     className="btn btn-sm btn-outline-success me-2 shadow-sm"
-    onClick={async () => {
-      await handleConvert(proposal.id);
-    }}
+   onClick={() => handleConvert(proposal)}
   >
     <i className="bi bi-rocket-takeoff me-1"></i>Convert
   </button>
@@ -350,7 +391,7 @@ const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects }) => 
                      <select
   name="leadId"
   className="form-select"
-  value={selectedLeadId}
+  value={selectedLeadId || ""} 
   onChange={(e) => setSelectedLeadId(Number(e.target.value))}
   required
 >
