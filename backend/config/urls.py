@@ -26,7 +26,7 @@ from apps.projects.views import ActivityLogViewSet as ProjectActivityLogViewSet
 from apps.invoices.views import InvoicePaymentViewSet, InvoiceViewSet
 from apps.invoices import views
 from apps.proposals.views import ProposalViewSet
-from apps.reminders.views import ReminderViewSet
+from apps.reminders.views import ReminderViewSet, reminder_dashboard_summary
 
 router = routers.DefaultRouter()
 
@@ -84,7 +84,8 @@ urlpatterns = [
     path('api/v1/', include(router.urls)),
     path("api/v1/", include("apps.hr_documents.urls")),
     path("api/v1/infrastructure/", include("apps.infrastructure.urls")),
-   
+    path('api/v1/dashboard-summary/', reminder_dashboard_summary),
+    path("api/v1/dashboard/", include("apps.dashboard.urls")),
     path('api/v1/dashboard/stats/', DashboardStatsView.as_view(), name='dashboard-stats'),
     path('api/v1/auth/', include('rest_framework.urls')), 
     path('api/v1/password_reset/', include('django_rest_passwordreset.urls', namespace='password_reset')),

@@ -118,7 +118,7 @@ const sendResetLink = async () => {
     <div className="text-danger small mt-1">{errors.password}</div>
   )}
 </div>
-            <div className="mb-4">
+           {/* <div className="mb-4">
               <label className="form-label small fw-bold text-secondary uppercase tracking-wider">Access Tier (Simulation)</label>
               <select 
                 className="form-select bg-light border-0" 
@@ -129,7 +129,7 @@ const sendResetLink = async () => {
                   <option key={r} value={r}>{r.replace('_', ' ')}</option>
                 ))}
               </select>
-            </div>
+            </div> */}
             <button type="submit" className="btn btn-primary btn-lg w-100 fw-bold shadow-sm py-3" style={{ borderRadius: '0.75rem' }}>
               Authenticate
             </button>

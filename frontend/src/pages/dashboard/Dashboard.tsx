@@ -9,20 +9,36 @@ import { Project, Task, TaskStatus, ProjectStatus } from '../../types';
 
 const Dashboard: React.FC<{ projects: Project[]; tasks: Task[] }> = ({ projects, tasks }) => {
   const navigate = useNavigate();
-  const activeCount = projects.filter(p => p.status === ProjectStatus.IN_PROGRESS).length;
-  const completedTasksCount = tasks.filter(t => t.status === TaskStatus.DONE).length;
-  const pendingTasksCount = tasks.filter(t => t.status === TaskStatus.TODO || t.status === TaskStatus.IN_PROGRESS).length;
+  const [stats, setStats] = useState<any>(null);
+  const activeCount = stats?.projects?.active || 0;
+const completedTasksCount = stats?.tasks?.completed || 0;
+const pendingTasksCount = stats?.tasks?.pending || 0;
+const activeClients = stats?.clients?.active || 0;
   const [isReportModalOpen, setReportModalOpen] = useState(false);
   const [reminders, setReminders] = useState<any[]>([]);
   const [loadingReminders, setLoadingReminders] = useState(true);
   const pendingRemindersCount = useMemo(() => {
   return reminders.filter(r => r.status !== "completed").length;
 }, [reminders]);
+const [report, setReport] = useState<any>(null);
+
+const fetchQuarterlyReport = async () => {
+  const res = await axiosInstance.get("dashboard/quarterly-report/");
+  setReport(res.data);
+};
+
+
+useEffect(() => {
+  axiosInstance.get("dashboard/stats/")
+    .then(res => setStats(res.data))
+    .catch(err => console.error("Dashboard stats error", err));
+}, []);
+
 useEffect(() => {
   let interval: any;
   const fetchReminders = async () => {
     try {
-      const res = await axiosInstance.get("/reminders/");
+      const res = await axiosInstance.get("reminders/");
       const data = res.data.results || res.data;
       setReminders(data);
     } catch (err) {
@@ -38,12 +54,16 @@ useEffect(() => {
   return () => clearInterval(interval);
 }, []);
 const reminderStats = useMemo(() => {
-  const completed = reminders.filter(r => r.status === "completed").length;
-  const pending = reminders.filter(r => r.status !== "completed").length;
+  const today = new Date().toISOString().split("T")[0];
 
-  const overdue = reminders.filter(r =>
-    r.status !== "completed" &&
-    new Date(r.reminder_date) < new Date()
+  const completed = reminders.filter((r: any) => r.is_completed === true).length;
+
+  const pending = reminders.filter((r: any) =>
+    r.is_completed === false && r.due_date >= today
+  ).length;
+
+  const overdue = reminders.filter((r: any) =>
+    r.is_completed === false && r.due_date < today
   ).length;
 
   return { completed, pending, overdue };
@@ -196,105 +216,140 @@ const activityData = useMemo(() => {
         </div>
       <button 
           className="btn btn-primary shadow-sm fw-bold px-4"
-          onClick={() => setReportModalOpen(true)}
+       onClick={() => {
+  setReportModalOpen(true);
+  fetchQuarterlyReport();
+}}
         >
           <i className="bi bi-calendar3 me-2"></i>Q2 2026 Report
         </button>
       </div>
       
       {/* Report Modal */}
-      {isReportModalOpen && (
-        <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
-          <div className="modal-dialog modal-lg modal-dialog-centered">
-            <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
-              <div className="modal-header bg-primary text-white p-4 border-0">
-                <div>
-                  <h5 className="modal-title fw-bold mb-0">Quarterly Performance Report</h5>
-                  <p className="mb-0 small opacity-75">Fiscal Year 2026 • Quarter 2 (Apr - Jun)</p>
-                </div>
-                <button type="button" className="btn-close btn-close-white" onClick={() => setReportModalOpen(false)}></button>
-              </div>
-              <div className="modal-body p-4 bg-white">
-                <div className="row g-4 mb-4">
-                  <div className="col-md-6">
-                    <div className="p-4 rounded-4 bg-light h-100">
-                      <h6 className="text-secondary small fw-bold uppercase mb-3">Project Summary</h6>
-                      <div className="d-flex align-items-end gap-2 mb-2">
-                        <h2 className="fw-bold mb-0">{q2Report.projectsCount}</h2>
-                        <span className="text-success small mb-1"><i className="bi bi-arrow-up-short"></i>15% vs Q1</span>
-                      </div>
-                      <p className="text-muted small mb-0">Total active projects during this period across all departments.</p>
-                    </div>
-                  </div>
-                  <div className="col-md-6">
-                    <div className="p-4 rounded-4 bg-light h-100">
-                      <h6 className="text-secondary small fw-bold uppercase mb-3">Operational Efficiency</h6>
-                      <div className="d-flex align-items-end gap-2 mb-2">
-                        <h2 className="fw-bold mb-0">{q2Report.efficiency}</h2>
-                        <span className="text-success small mb-1"><i className="bi bi-check-circle-fill me-1"></i>Target Met</span>
-                      </div>
-                      <p className="text-muted small mb-0">Calculated based on task completion rates and milestone deadlines.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="card border-0 bg-primary bg-opacity-10 p-4 mb-4 rounded-4">
-                  <div className="row align-items-center">
-                    <div className="col-md-8">
-                      <h6 className="fw-bold text-primary mb-2">Executive Summary</h6>
-                      <p className="text-dark small mb-0">
-                        Q2 2024 showed significant growth in project throughput. The transition to the new PMS system has improved 
-                        collaboration by 24%. Key focus for Q3 remains on scaling the SEO and Digital Marketing departments.
-                      </p>
-                    </div>
-                    <div className="col-md-4 text-end">
-                      <button className="btn btn-primary btn-sm px-4 fw-bold">Download PDF</button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="row g-3">
-                  <div className="col-6 col-md-3">
-                    <div className="text-center p-3 border rounded-3">
-                      <div className="text-secondary small mb-1">Tasks Created</div>
-                      <div className="fw-bold">{q2Report.tasksCount}</div>
-                    </div>
-                  </div>
-                  <div className="col-6 col-md-3">
-                    <div className="text-center p-3 border rounded-3">
-                      <div className="text-secondary small mb-1">Tasks Done</div>
-                      <div className="fw-bold">{q2Report.completedTasks}</div>
-                    </div>
-                  </div>
-                  <div className="col-6 col-md-3">
-                    <div className="text-center p-3 border rounded-3">
-                      <div className="text-secondary small mb-1">Revenue Growth</div>
-                      <div className="fw-bold text-success">{q2Report.revenueGrowth}</div>
-                    </div>
-                  </div>
-                  <div className="col-6 col-md-3">
-                    <div className="text-center p-3 border rounded-3">
-                      <div className="text-secondary small mb-1">Satisfaction</div>
-                      <div className="fw-bold">4.9/5</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer bg-light border-0 p-4">
-                <button type="button" className="btn btn-secondary fw-bold px-4" onClick={() => setReportModalOpen(false)}>Close Report</button>
-                <button type="button" className="btn btn-primary fw-bold px-4">Share with Stakeholders</button>
-              </div>
-            </div>
+    {isReportModalOpen && (
+  <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
+    <div className="modal-dialog modal-lg modal-dialog-centered">
+      <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
+        <div className="modal-header bg-primary text-white p-4 border-0">
+          <div>
+            <h5 className="modal-title fw-bold mb-0">Quarterly Performance Report</h5>
+            <p className="mb-0 small opacity-75">Fiscal Year 2026 • Quarter 2 (Apr - Jun)</p>
           </div>
+          <button type="button" className="btn-close btn-close-white" onClick={() => setReportModalOpen(false)}></button>
         </div>
-      )}
+
+        <div className="modal-body p-4 bg-white">
+
+          {!report ? (
+            <div className="text-center py-5">
+              <div className="spinner-border text-primary"></div>
+              <p className="mt-3 text-muted">Loading report...</p>
+            </div>
+          ) : (
+            <>
+              <div className="row g-4 mb-4">
+                <div className="col-md-6">
+                  <div className="p-4 rounded-4 bg-light h-100">
+                    <h6 className="text-secondary small fw-bold uppercase mb-3">Project Summary</h6>
+                    <div className="d-flex align-items-end gap-2 mb-2">
+                      <h2 className="fw-bold mb-0">{report.project_summary}</h2>
+                      <span className="text-success small mb-1">
+                        <i className="bi bi-arrow-up-short"></i> Live Data
+                      </span>
+                    </div>
+                    <p className="text-muted small mb-0">
+                      Total active projects during this period across all departments.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="col-md-6">
+                  <div className="p-4 rounded-4 bg-light h-100">
+                    <h6 className="text-secondary small fw-bold uppercase mb-3">Operational Efficiency</h6>
+                    <div className="d-flex align-items-end gap-2 mb-2">
+                      <h2 className="fw-bold mb-0">{report.efficiency}%</h2>
+                      <span className="text-success small mb-1">
+                        <i className="bi bi-check-circle-fill me-1"></i>Calculated
+                      </span>
+                    </div>
+                    <p className="text-muted small mb-0">
+                      Based on completed tasks vs total tasks for this quarter.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card border-0 bg-primary bg-opacity-10 p-4 mb-4 rounded-4">
+                <div className="row align-items-center">
+                  <div className="col-md-8">
+                    <h6 className="fw-bold text-primary mb-2">Executive Summary</h6>
+                    <p className="text-dark small mb-0">
+                      This quarterly report shows project activity, operational efficiency,
+                      and financial performance for the selected period. These metrics help
+                      management track productivity and revenue growth.
+                    </p>
+                  </div>
+                  <div className="col-md-4 text-end">
+                    <button className="btn btn-primary btn-sm px-4 fw-bold">
+                      Download PDF
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="row g-3">
+                <div className="col-6 col-md-3">
+                  <div className="text-center p-3 border rounded-3">
+                    <div className="text-secondary small mb-1">Tasks Created</div>
+                    <div className="fw-bold">{report.tasks_created}</div>
+                  </div>
+                </div>
+
+                <div className="col-6 col-md-3">
+                  <div className="text-center p-3 border rounded-3">
+                    <div className="text-secondary small mb-1">Tasks Done</div>
+                    <div className="fw-bold">{report.tasks_done}</div>
+                  </div>
+                </div>
+
+                <div className="col-6 col-md-3">
+                  <div className="text-center p-3 border rounded-3">
+                    <div className="text-secondary small mb-1">Revenue</div>
+                    <div className="fw-bold text-success">₹ {report.revenue}</div>
+                  </div>
+                </div>
+
+                <div className="col-6 col-md-3">
+                  <div className="text-center p-3 border rounded-3">
+                    <div className="text-secondary small mb-1">Satisfaction</div>
+                    <div className="fw-bold">{report.satisfaction}/5</div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+        </div>
+
+        <div className="modal-footer bg-light border-0 p-4">
+          <button type="button" className="btn btn-secondary fw-bold px-4" onClick={() => setReportModalOpen(false)}>
+            Close Report
+          </button>
+          <button type="button" className="btn btn-primary fw-bold px-4">
+            Share with Stakeholders
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
       <div className="row g-4 mb-4">
         {[
           { label: 'Active Projects', value: activeCount, icon: 'bi-briefcase', color: 'primary' },
           { label: 'Completed Tasks', value: completedTasksCount, icon: 'bi-check2-circle', color: 'success' },
           { label: 'Pending Tasks', value: pendingTasksCount, icon: 'bi-clock-history', color: 'warning' },
-          { label: 'Client Satisfaction', value: '98%', icon: 'bi-heart', color: 'danger' },
+          { label: 'Active Clients', value: activeClients, icon: 'bi-people', color: 'info' }
         
         ].map((stat, i) => (
           <div className="col-md-3" key={i}>
