@@ -481,6 +481,8 @@ export interface Proposal {
   created_at: string;
   is_converted?: boolean; 
   updatedAt?: string;
+  leadEmail?: string;
+  leadPhone?: string;
 }
 
 export enum ReminderType {

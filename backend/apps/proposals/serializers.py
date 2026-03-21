@@ -11,7 +11,11 @@ class ProposalItemSerializer(serializers.ModelSerializer):
 class ProposalSerializer(serializers.ModelSerializer):
 
     items = ProposalItemSerializer(many=True)
-    leadName = serializers.CharField(source="lead.name", read_only=True)
+    leadId = serializers.IntegerField(source='lead.id', read_only=True)
+    leadName = serializers.CharField(source='lead.name', read_only=True)
+    leadEmail = serializers.CharField(source='lead.email', read_only=True)
+    leadPhone = serializers.CharField(source='lead.phone', read_only=True)
+
 
     class Meta:
         model = Proposal
@@ -31,6 +35,10 @@ class ProposalSerializer(serializers.ModelSerializer):
             "items",
             "created_at",
             "last_sent_at",
+            "leadEmail",
+            "leadPhone",
+            "leadId",
+            
         ]
 
     def create(self, validated_data):

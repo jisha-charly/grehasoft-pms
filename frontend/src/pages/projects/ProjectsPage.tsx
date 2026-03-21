@@ -99,20 +99,16 @@ const handleDeleteConfirm = async () => {
     validationSchema,
   onSubmit: async (values) => {
       const payload = {
-        name: values.name,
-
-        client: Number(values.clientId),
-        department: Number(values.departmentId),
-        project_manager: Number(values.projectManagerId),
-
-        // ✅ get from logged-in user
-        created_by: currentUser?.id,
-
-        start_date: values.startDate,
-        end_date: values.endDate,
-
-        status: values.status
-      };
+  name: values.name,
+  client: Number(values.clientId),
+  department: Number(values.departmentId),
+  project_manager: Number(values.projectManagerId),
+  created_by: currentUser?.id,
+  start_date: values.startDate,
+  end_date: values.endDate,
+  status: values.status,
+  progress_percentage: values.progressPercentage   // ADD THIS
+};
 
   if (editingProject) {
         await update(editingProject.id!, payload);
@@ -136,24 +132,26 @@ const handleDeleteConfirm = async () => {
   // Pagination (filter is client-side on current page results)
   const paginatedProjects = filteredProjects;
 
-  const handleOpenModal = (project: Project | null = null) => {
-    setEditingProject(project);
-    if (project) {
-      setValues({
-        name: project.name,
-        clientId: project.clientId.toString(),
-        departmentId: project.department.toString(),
-        projectManagerId: project.project_manager.toString(),
-        startDate: project.startDate,
-        endDate: project.endDate,
-        status: project.status,
-        progressPercentage: project.progress_percentage
-      });
-    } else {
-      resetForm();
-    }
-    setModalOpen(true);
-  };
+ const handleOpenModal = (project: Project | null = null) => {
+  setEditingProject(project);
+
+  if (project) {
+    setValues({
+      name: project.name || '',
+      clientId: String(project.clientId || project.clientId || ''),
+      departmentId: String(project.department || ''),
+      projectManagerId: String(project.project_manager || ''),
+      startDate: project.startDate || '',
+      endDate: project.endDate || '',
+      status: project.status || 'not_started',
+      progressPercentage: project.progress_percentage || 0
+    });
+  } else {
+    resetForm();
+  }
+
+  setModalOpen(true);
+};
 const pageNumbers: number[] = Array.from(
   { length: totalPages },
   (_, i) => i + 1
@@ -178,7 +176,7 @@ const pageNumbers: number[] = Array.from(
             />
           </div>
           {canManage && (
-            <button className="btn btn-dark fw-bold px-4 shadow-sm rounded-pill" onClick={() => handleOpenModal(null)}>
+            <button className="btn btn-primary fw-bold px-4 shadow-sm rounded-pill" onClick={() => handleOpenModal(null)}>
               <i className="bi bi-plus-lg me-2"></i>New Project
             </button>
           )}
@@ -218,7 +216,7 @@ const pageNumbers: number[] = Array.from(
                   </>
                 )}
                 <Link to={`/projects/${p.id}/kanban`} className="btn btn-light btn-sm flex-grow-1 fw-bold text-secondary d-flex align-items-center justify-content-center text-decoration-none rounded-pill">Kanban</Link>
-                <Link to={`/projects/${p.id}`} className="btn btn-dark btn-sm flex-grow-1 fw-bold text-white d-flex align-items-center justify-content-center text-decoration-none shadow-sm rounded-pill">Details</Link>
+                <Link to={`/projects/${p.id}`} className="btn btn-primary btn-sm flex-grow-1 fw-bold text-white d-flex align-items-center justify-content-center text-decoration-none shadow-sm rounded-pill">Details</Link>
               </div>
             </div>
           </div>

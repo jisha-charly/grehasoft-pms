@@ -355,7 +355,10 @@ const handleConfirmDelete = async () => {
   qualified: leadList.filter(l => l.status === 'qualified').length,
   converted: leadList.filter(l => l.status === 'converted').length,
 };
-
+const formatPhoneForWhatsApp = (phone: string) => {
+  if (!phone) return '';
+  return phone.replace(/\D/g, '');
+};
   return (
      <>
     <div className="container-fluid p-0">
@@ -463,9 +466,24 @@ const handleConfirmDelete = async () => {
                   )}
                 </td>
                 <td>
-                  <div className="small text-dark">{lead.email}</div>
-                  <div className="smaller text-muted">{lead.phone}</div>
-                </td>
+  <div className="small text-dark">{lead.email}</div>
+
+  <div className="smaller text-muted d-flex align-items-center gap-2">
+    <span>{lead.phone}</span>
+
+    {lead.phone && (
+      <a
+        href={`https://wa.me/${formatPhoneForWhatsApp(lead.phone)}?text=Hello%20${lead.name},%20this%20is%20Grehasoft.`}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Chat on WhatsApp"
+        className="text-success"
+      >
+        <i className="bi bi-whatsapp fs-5"></i>
+      </a>
+    )}
+  </div>
+</td>
                 <td><span className="badge bg-light text-dark border fw-normal">{lead.source}</span></td>
                 <td>
                   <span className={`badge rounded-pill ${lead.status === 'converted' ? 'bg-success' : 'bg-primary'}`}>{lead.status}</span>

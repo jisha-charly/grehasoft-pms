@@ -110,36 +110,72 @@ const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects, setLe
     newItems[index] = { ...newItems[index], [field]: value };
     setItems(newItems);
   };
+  const [errors, setErrors] = useState<any>({});
+  const validateForm = () => {
+  const newErrors: any = {};
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const data = Object.fromEntries(formData.entries());
+  if (!selectedLeadId) {
+    newErrors.leadId = "Please select a lead.";
+  }
 
-    const selectedLead = leads.find(l => l.id === Number(data.leadId));
+  const titleInput = (document.querySelector('[name="title"]') as HTMLInputElement)?.value;
+  if (!titleInput || titleInput.trim().length < 3) {
+    newErrors.title = "Title must be at least 3 characters.";
+  }
 
-    const payload = {
-      lead: Number(data.leadId),
-      leadName: selectedLead?.name,
-    
-      title: data.title,
-      description: data.description,
-      projectOverview: data.projectOverview,
-      items: items,
-      subtotal: subtotal,
-      discount: discount,
-      amount: totalAmount,
-      status: data.status || 'draft'
-    };
+  if (items.length === 0) {
+    newErrors.items = "At least one service item is required.";
+  }
 
-    if (editingProposal) {
-      await update(editingProposal.id!, payload);
-    } else {
-      await add(payload);
+  items.forEach((item, index) => {
+    if (!item.service) {
+      newErrors[`service_${index}`] = "Service name is required.";
     }
-    setModalOpen(false);
-    setEditingProposal(null);
+    if (!item.cost || item.cost <= 0) {
+      newErrors[`cost_${index}`] = "Cost must be greater than 0.";
+    }
+  });
+
+  if (discount > subtotal) {
+    newErrors.discount = "Discount cannot be greater than subtotal.";
+  }
+
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
+
+ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+
+  if (!validateForm()) return;
+
+  const formData = new FormData(e.currentTarget);
+  const data = Object.fromEntries(formData.entries());
+
+  const selectedLead = leads.find(l => l.id === Number(data.leadId));
+
+  const payload = {
+    lead: Number(data.leadId),
+    leadName: selectedLead?.name,
+    title: data.title,
+    description: data.description,
+    projectOverview: data.projectOverview,
+    items: items,
+    subtotal: subtotal,
+    discount: discount,
+    amount: totalAmount,
+    status: data.status || 'draft'
   };
+
+  if (editingProposal) {
+    await update(editingProposal.id!, payload);
+  } else {
+    await add(payload);
+  }
+
+  setModalOpen(false);
+  setEditingProposal(null);
+};
 
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
@@ -256,40 +292,40 @@ const handleConvert = async (proposal: Proposal) => {
   </button>
 
   {/* WhatsApp */}
-  <button
-    className="btn btn-sm btn-outline-success me-2 shadow-sm"
-    onClick={() => {
-      const lead = leads.find(l => l.id === proposal.leadId);
-      if (lead?.phone) {
-        const message = encodeURIComponent(
-          `Hi ${lead.name}, here is the proposal for "${proposal.title}".`
-        );
-        window.open(
-          `https://wa.me/${lead.phone.replace(/\D/g, '')}?text=${message}`,
-          '_blank'
-        );
-      }
-    }}
-  >
-    <i className="bi bi-whatsapp"></i>
-  </button>
+ <button
+  className="btn btn-sm btn-outline-success me-2 shadow-sm"
+  onClick={() => {
+    if (proposal.leadPhone) {
+      const phone = proposal.leadPhone.replace(/\D/g, '');
+      const message = encodeURIComponent(
+        `Hi ${proposal.leadName}, here is the proposal for "${proposal.title}".`
+      );
+      window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
+    } else {
+      alert("No phone number for this lead");
+    }
+  }}
+>
+  <i className="bi bi-whatsapp"></i>
+</button>
 
   {/* Email */}
   <button
-    className="btn btn-sm btn-outline-primary me-2 shadow-sm"
-    onClick={() => {
-      const lead = leads.find(l => l.id === proposal.leadId);
-      if (lead?.email) {
-        const subject = encodeURIComponent(`Proposal: ${proposal.title}`);
-        const body = encodeURIComponent(
-          `Hi ${lead.name},\n\nPlease find the attached proposal.`
-        );
-        window.location.href = `mailto:${lead.email}?subject=${subject}&body=${body}`;
-      }
-    }}
-  >
-    <i className="bi bi-envelope"></i>
-  </button>
+  className="btn btn-sm btn-outline-primary me-2 shadow-sm"
+  onClick={() => {
+    if (proposal.leadEmail) {
+      const subject = encodeURIComponent(`Proposal: ${proposal.title}`);
+      const body = encodeURIComponent(
+        `Hi ${proposal.leadName},\n\nPlease find the attached proposal.\n\nThanks.`
+      );
+      window.location.href = `mailto:${proposal.leadEmail}?subject=${subject}&body=${body}`;
+    } else {
+      alert("No email for this lead");
+    }
+  }}
+>
+  <i className="bi bi-envelope"></i>
+</button>
 
   {/* Edit */}
   <button
@@ -379,7 +415,7 @@ const handleConvert = async (proposal: Proposal) => {
         <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
           <div className="modal-dialog">
             <div className="modal-content border-0 shadow">
-              <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} noValidate>
                 <div className="modal-header bg-primary text-white">
                   <h5 className="modal-title fw-bold">{editingProposal ? 'Edit Proposal' : 'Create Proposal'}</h5>
                   <button type="button" className="btn-close btn-close-white" onClick={() => setModalOpen(false)}></button>
@@ -400,10 +436,17 @@ const handleConvert = async (proposal: Proposal) => {
     <option key={l.id} value={l.id}>{l.name}</option>
   ))}
 </select>
+ {/* 🔴 ERROR MESSAGE HERE */}
+  {errors.leadId && (
+    <div className="text-danger small">{errors.leadId}</div>
+  )}
                     </div>
                     <div className="col-md-6 mb-3">
                       <label className="form-label small fw-bold">Title</label>
                       <input name="title" type="text" className="form-control" defaultValue={editingProposal?.title} placeholder="e.g. Website Redesign" required />
+                    {errors.title && (
+  <div className="text-danger small">{errors.title}</div>
+)}
                     </div>
                   </div>
 
@@ -456,7 +499,14 @@ const handleConvert = async (proposal: Proposal) => {
                                 onChange={(e) => handleItemChange(index, 'service', e.target.value)} 
                                 placeholder="Service name"
                                 required
+                                
                               />
+
+{errors[`service_${index}`] && (
+  <div className="text-danger small">
+    {errors[`service_${index}`]}
+  </div>
+)}
                             </td>
                             <td>
                               <input 
@@ -466,6 +516,11 @@ const handleConvert = async (proposal: Proposal) => {
                                 onChange={(e) => handleItemChange(index, 'description', e.target.value)} 
                                 placeholder="Details"
                               />
+                              {errors[`description_${index}`] && (
+  <div className="text-danger small">
+    {errors[`description_${index}`]}
+  </div>
+)}
                             </td>
                             <td>
                               <input 
@@ -475,6 +530,11 @@ const handleConvert = async (proposal: Proposal) => {
                                 onChange={(e) => handleItemChange(index, 'cost', Number(e.target.value))} 
                                 required
                               />
+                              {errors[`cost_${index}`] && (
+  <div className="text-danger small">
+    {errors[`cost_${index}`]}
+  </div>
+)}
                             </td>
                             <td className="text-center">
                               <button 
