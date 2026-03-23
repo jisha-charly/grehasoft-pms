@@ -225,6 +225,7 @@ const pageNumbers: number[] = Array.from(
             <i className="bi bi-folder-x fs-1 text-secondary opacity-25"></i>
             <p className="text-secondary mt-2">No projects found matching your search.</p>
           </div>
+          
         )}
       </div>
 

@@ -18,6 +18,7 @@ type OfferForm = {
 type AppraisalForm = {
   employeeId: string;
   increasePercentage: string;
+  effectiveDate: string;
 };
 
 type ExperienceForm = {
@@ -90,6 +91,7 @@ const handleOfferUserChange = (id: string) => {
   const [appraisal, setAppraisal] = useState<AppraisalForm>({
     employeeId: "",
     increasePercentage: "",
+    effectiveDate: "",
   });
 
   const [experience, setExperience] = useState<ExperienceForm>({
@@ -105,9 +107,58 @@ const handleOfferUserChange = (id: string) => {
     issueDate: "",
   });
 
+  const [errors, setErrors] = useState<any>({});
+
+  const validateOffer = () => {
+    let e: any = {};
+    if (!offer.employeeId && !offer.employeeName?.trim()) e.employee = "Please select employee or enter employee name";
+    if (!offer.department?.trim()) e.department = "Department is required";
+    if (!offer.position?.trim()) e.position = "Position is required";
+    if (!offer.joiningDate) e.joiningDate = "Joining date is required";
+    else if (new Date(offer.joiningDate) > new Date()) e.joiningDate = "Joining date cannot be in the future";
+    if (!offer.salaryMonthly || Number(offer.salaryMonthly) <= 0) e.salaryMonthly = "Monthly salary must be greater than 0";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
   const selectedAppraisalEmployee = appraisal.employeeId
     ? userById.get(Number(appraisal.employeeId))
     : undefined;
+  
+  const validateAppraisal = () => {
+    let e: any = {};
+    if (!appraisal.employeeId) e.employeeId = "Please select employee or enter employee name";
+    if (!selectedAppraisalEmployee?.salary_monthly) e.currentSalary = "Current salary is required";
+    if (!appraisal.increasePercentage || Number(appraisal.increasePercentage) <= 0) e.newSalary = "New salary must be greater than current salary";
+    if (!appraisal.effectiveDate) e.effectiveDate = "Effective date is required";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const validateExperience = () => {
+    let e: any = {};
+    if (!experience.employeeId) e.employeeId = "Please select employee or enter employee name";
+    if (!experience.role?.trim()) e.position = "Position is required";
+    if (!experience.startDate) e.joiningDate = "Joining date is required";
+    if (!experience.endDate) e.endDate = "Experience text/description required"; 
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const selectedSalaryEmployee = salaryCert.employeeId
+    ? userById.get(Number(salaryCert.employeeId))
+    : undefined;
+
+  const validateSalary = () => {
+    let e: any = {};
+    if (!salaryCert.employeeId) e.employeeId = "Please select employee or enter employee name";
+    if (!selectedSalaryEmployee?.department_name) e.department = "Department is required";
+    if (!selectedSalaryEmployee?.position) e.position = "Position is required";
+    if (!selectedSalaryEmployee?.salary_monthly || Number(selectedSalaryEmployee.salary_monthly) <= 0) e.salaryMonthly = "Monthly salary must be greater than 0";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
   const computedNewSalary = useMemo(() => {
     if (!selectedAppraisalEmployee) return "";
     const pct = Number(appraisal.increasePercentage || 0);
@@ -116,13 +167,22 @@ const handleOfferUserChange = (id: string) => {
     return (oldSalary * (1 + pct / 100)).toFixed(2);
   }, [selectedAppraisalEmployee, appraisal.increasePercentage]);
 
-  const selectedSalaryEmployee = salaryCert.employeeId
-    ? userById.get(Number(salaryCert.employeeId))
-    : undefined;
 
   const postPdf = async (url: string, payload: any, filename: string) => {
-    const res = await axiosInstance.post(url, payload, { responseType: "blob" });
-    downloadBlob(filename, res.data);
+    try {
+      const res = await axiosInstance.post(url, payload, { responseType: "blob" });
+      const blobURL = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = blobURL;
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobURL);
+    } catch(err) {
+      console.error(err);
+      alert("Failed to generate document.");
+    }
   };
 
   if (!canGenerate) {
@@ -195,8 +255,11 @@ const handleOfferUserChange = (id: string) => {
         <div className="card-body">
           {activeTab === "offer" && (
             <form
+              noValidate
+              onChange={(e: any) => { if(errors[e.target.name]) setErrors({...errors, [e.target.name]: null}); }}
               onSubmit={async (e) => {
                 e.preventDefault();
+                if (!validateOffer()) return;
                 const payload: any = {
                   employee_id: offer.employeeId ? Number(offer.employeeId) : undefined,
                   employee_name: offer.employeeName || undefined,
@@ -233,29 +296,33 @@ const handleOfferUserChange = (id: string) => {
                 <div className="col-md-4">
                   <label className="form-label fw-bold small">Employee Name</label>
                   <input
-                    className="form-control"
+                    name="employee"
+                    className={`form-control ${errors.employee ? 'is-invalid' : ''}`}
                     value={offer.employeeName}
                     onChange={(e) =>
                       setOffer((p) => ({ ...p, employeeName: e.target.value }))
                     }
                   />
+                  {errors.employee && <div className="invalid-feedback">{errors.employee}</div>}
                 </div>
 
                 <div className="col-md-4">
                   <label className="form-label fw-bold small">Department *</label>
                   <input
-                    className="form-control"
-                    required
+                    name="department"
+                    className={`form-control ${errors.department ? 'is-invalid' : ''}`}
                     value={offer.department}
                     onChange={(e) =>
                       setOffer((p) => ({ ...p, department: e.target.value }))
                     }
                   />
+                  {errors.department && <div className="invalid-feedback">{errors.department}</div>}
                 </div>
 
                 <div className="col-md-6">
                   <label className="form-label fw-bold small">Address</label>
                   <input
+                    name="address"
                     className="form-control"
                     value={offer.address}
                     onChange={(e) =>
@@ -267,39 +334,42 @@ const handleOfferUserChange = (id: string) => {
                 <div className="col-md-6">
                   <label className="form-label fw-bold small">Position *</label>
                   <input
-                    className="form-control"
-                    required
+                    name="position"
+                    className={`form-control ${errors.position ? 'is-invalid' : ''}`}
                     value={offer.position}
                     onChange={(e) =>
                       setOffer((p) => ({ ...p, position: e.target.value }))
                     }
                   />
+                  {errors.position && <div className="invalid-feedback">{errors.position}</div>}
                 </div>
 
                 <div className="col-md-4">
                   <label className="form-label fw-bold small">Joining Date *</label>
                   <input
+                    name="joiningDate"
                     type="date"
-                    className="form-control"
-                    required
+                    className={`form-control ${errors.joiningDate ? 'is-invalid' : ''}`}
                     value={offer.joiningDate}
                     onChange={(e) =>
                       setOffer((p) => ({ ...p, joiningDate: e.target.value }))
                     }
                   />
+                  {errors.joiningDate && <div className="invalid-feedback">{errors.joiningDate}</div>}
                 </div>
 
                 <div className="col-md-4">
                   <label className="form-label fw-bold small">Monthly Salary *</label>
                   <input
+                    name="salaryMonthly"
                     type="number"
-                    className="form-control"
-                    required
+                    className={`form-control ${errors.salaryMonthly ? 'is-invalid' : ''}`}
                     value={offer.salaryMonthly}
                     onChange={(e) =>
                       setOffer((p) => ({ ...p, salaryMonthly: e.target.value }))
                     }
                   />
+                  {errors.salaryMonthly && <div className="invalid-feedback">{errors.salaryMonthly}</div>}
                 </div>
 
                 <div className="col-12">
@@ -313,13 +383,17 @@ const handleOfferUserChange = (id: string) => {
 
           {activeTab === "appraisal" && (
             <form
+              noValidate
+              onChange={(e: any) => { if(errors[e.target.name]) setErrors({...errors, [e.target.name]: null}); }}
               onSubmit={async (e) => {
                 e.preventDefault();
+                if (!validateAppraisal()) return;
                 await postPdf(
                   "/hr-documents/appraisal-letter/",
                   {
                     employee_id: Number(appraisal.employeeId),
                     increase_percentage: Number(appraisal.increasePercentage),
+                    effective_date: appraisal.effectiveDate,
                   },
                   "appraisal_letter.pdf"
                 );
@@ -329,8 +403,8 @@ const handleOfferUserChange = (id: string) => {
                 <div className="col-md-6">
                   <label className="form-label fw-bold small">Employee *</label>
                   <select
-                    className="form-select"
-                    required
+                    name="employeeId"
+                    className={`form-select ${errors.employeeId ? 'is-invalid' : ''}`}
                     value={appraisal.employeeId}
                     onChange={(e) =>
                       setAppraisal((p) => ({ ...p, employeeId: e.target.value }))
@@ -343,13 +417,15 @@ const handleOfferUserChange = (id: string) => {
                       </option>
                     ))}
                   </select>
+                  {errors.employeeId && <div className="invalid-feedback">{errors.employeeId}</div>}
+                  {errors.currentSalary && <div className="text-danger small mt-1">{errors.currentSalary}</div>}
                 </div>
-                <div className="col-md-6">
+                <div className="col-md-3">
                   <label className="form-label fw-bold small">Increase % *</label>
                   <input
+                    name="newSalary"
                     type="number"
-                    className="form-control"
-                    required
+                    className={`form-control ${errors.newSalary ? 'is-invalid' : ''}`}
                     value={appraisal.increasePercentage}
                     onChange={(e) =>
                       setAppraisal((p) => ({
@@ -358,11 +434,28 @@ const handleOfferUserChange = (id: string) => {
                       }))
                     }
                   />
+                  {errors.newSalary && <div className="invalid-feedback">{errors.newSalary}</div>}
                   {computedNewSalary && (
                     <div className="small text-secondary mt-1">
-                      New salary (approx): <span className="fw-bold">{computedNewSalary}</span>
+                      New: <span className="fw-bold">{computedNewSalary}</span>
                     </div>
                   )}
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label fw-bold small">Effective Date *</label>
+                  <input
+                    name="effectiveDate"
+                    type="date"
+                    className={`form-control ${errors.effectiveDate ? 'is-invalid' : ''}`}
+                    value={appraisal.effectiveDate}
+                    onChange={(e) =>
+                      setAppraisal((p) => ({
+                        ...p,
+                        effectiveDate: e.target.value,
+                      }))
+                    }
+                  />
+                  {errors.effectiveDate && <div className="invalid-feedback">{errors.effectiveDate}</div>}
                 </div>
                 <div className="col-12">
                   <button className="btn btn-primary fw-bold" type="submit">
@@ -375,8 +468,11 @@ const handleOfferUserChange = (id: string) => {
 
           {activeTab === "experience" && (
             <form
+              noValidate
+              onChange={(e: any) => { if(errors[e.target.name]) setErrors({...errors, [e.target.name]: null}); }}
               onSubmit={async (e) => {
                 e.preventDefault();
+                if (!validateExperience()) return;
                 await postPdf(
                   "/hr-documents/experience-certificate/",
                   {
@@ -393,8 +489,8 @@ const handleOfferUserChange = (id: string) => {
                 <div className="col-md-6">
                   <label className="form-label fw-bold small">Employee *</label>
                   <select
-                    className="form-select"
-                    required
+                    name="employeeId"
+                    className={`form-select ${errors.employeeId ? 'is-invalid' : ''}`}
                     value={experience.employeeId}
                     onChange={(e) =>
                       setExperience((p) => ({ ...p, employeeId: e.target.value }))
@@ -407,42 +503,46 @@ const handleOfferUserChange = (id: string) => {
                       </option>
                     ))}
                   </select>
+                  {errors.employeeId && <div className="invalid-feedback">{errors.employeeId}</div>}
                 </div>
                 <div className="col-md-6">
                   <label className="form-label fw-bold small">Role *</label>
                   <input
-                    className="form-control"
-                    required
+                    name="position"
+                    className={`form-control ${errors.position ? 'is-invalid' : ''}`}
                     value={experience.role}
                     onChange={(e) =>
                       setExperience((p) => ({ ...p, role: e.target.value }))
                     }
                     placeholder="SEO, Software Development, Digital Marketing..."
                   />
+                  {errors.position && <div className="invalid-feedback">{errors.position}</div>}
                 </div>
                 <div className="col-md-6">
                   <label className="form-label fw-bold small">Start Date *</label>
                   <input
+                    name="joiningDate"
                     type="date"
-                    className="form-control"
-                    required
+                    className={`form-control ${errors.joiningDate ? 'is-invalid' : ''}`}
                     value={experience.startDate}
                     onChange={(e) =>
                       setExperience((p) => ({ ...p, startDate: e.target.value }))
                     }
                   />
+                  {errors.joiningDate && <div className="invalid-feedback">{errors.joiningDate}</div>}
                 </div>
                 <div className="col-md-6">
                   <label className="form-label fw-bold small">End Date *</label>
                   <input
+                    name="endDate"
                     type="date"
-                    className="form-control"
-                    required
+                    className={`form-control ${errors.endDate ? 'is-invalid' : ''}`}
                     value={experience.endDate}
                     onChange={(e) =>
                       setExperience((p) => ({ ...p, endDate: e.target.value }))
                     }
                   />
+                  {errors.endDate && <div className="invalid-feedback">{errors.endDate}</div>}
                 </div>
                 <div className="col-12">
                   <button className="btn btn-primary fw-bold" type="submit">
@@ -455,8 +555,11 @@ const handleOfferUserChange = (id: string) => {
 
           {activeTab === "salary" && (
             <form
+              noValidate
+              onChange={(e: any) => { if(errors[e.target.name]) setErrors({...errors, [e.target.name]: null}); }}
               onSubmit={async (e) => {
                 e.preventDefault();
+                if (!validateSalary()) return;
                 await postPdf(
                   "/hr-documents/salary-certificate/",
                   {
@@ -472,8 +575,8 @@ const handleOfferUserChange = (id: string) => {
                 <div className="col-md-6">
                   <label className="form-label fw-bold small">Employee *</label>
                   <select
-                    className="form-select"
-                    required
+                    name="employeeId"
+                    className={`form-select ${errors.employeeId ? 'is-invalid' : ''}`}
                     value={salaryCert.employeeId}
                     onChange={(e) =>
                       setSalaryCert((p) => ({ ...p, employeeId: e.target.value }))
@@ -486,12 +589,18 @@ const handleOfferUserChange = (id: string) => {
                       </option>
                     ))}
                   </select>
+                  {errors.employeeId && <div className="invalid-feedback">{errors.employeeId}</div>}
+                  {(errors.department || errors.position || errors.salaryMonthly) && (
+                    <div className="text-danger small mt-1">
+                      {errors.department || errors.position || errors.salaryMonthly}
+                    </div>
+                  )}
                 </div>
                 <div className="col-md-6">
                   <label className="form-label fw-bold small">Company Name *</label>
                   <input
+                    name="companyName"
                     className="form-control"
-                    required
                     value={salaryCert.companyName}
                     onChange={(e) =>
                       setSalaryCert((p) => ({ ...p, companyName: e.target.value }))
@@ -501,14 +610,15 @@ const handleOfferUserChange = (id: string) => {
                 <div className="col-md-6">
                   <label className="form-label fw-bold small">Issue Date *</label>
                   <input
+                    name="issueDate"
                     type="date"
-                    className="form-control"
-                    required
+                    className={`form-control ${errors.issueDate ? 'is-invalid' : ''}`}
                     value={salaryCert.issueDate}
                     onChange={(e) =>
                       setSalaryCert((p) => ({ ...p, issueDate: e.target.value }))
                     }
                   />
+                  {errors.issueDate && <div className="invalid-feedback">{errors.issueDate}</div>}
                 </div>
                 <div className="col-md-6">
                   <label className="form-label fw-bold small">Preview</label>

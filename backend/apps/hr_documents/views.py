@@ -59,9 +59,11 @@ class OfferLetterGenerateView(APIView):
         employee_name = data.get("employee_name")
         address = data.get("address")
         if data.get("employee_id"):
-            emp = Employee.objects.filter(id=data["employee_id"]).select_related("user", "department").first()
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            emp = User.objects.filter(id=data["employee_id"]).select_related("department").first()
             if emp:
-                employee_name = employee_name or emp.user.name
+                employee_name = employee_name or emp.name
                 address = address or emp.address
 
         ctx = {
@@ -87,7 +89,10 @@ class AppraisalLetterGenerateView(APIView):
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
 
-        employee = Employee.objects.select_related("user").get(id=data["employee_id"])
+        from django.shortcuts import get_object_or_404
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        employee = get_object_or_404(User.objects.all(), id=data["employee_id"])
         increase_pct = Decimal(data["increase_percentage"])
 
         effective = data.get("effective_date")
@@ -95,19 +100,12 @@ class AppraisalLetterGenerateView(APIView):
             today = timezone.now().date()
             effective = date(today.year, 3, 31)
 
-        # eligibility: >= 1 year since joining date
-        if employee.joining_date and (effective - employee.joining_date).days < 365:
-            return Response(
-                {"error": "Employee not eligible for appraisal (requires 1 year completion)."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         old_salary = Decimal(employee.salary_monthly)
         new_salary = (old_salary * (Decimal("1") + (increase_pct / Decimal("100")))).quantize(Decimal("0.01"))
 
         ctx = {
             "date": timezone.now().date().isoformat(),
-            "employee_name": employee.user.name,
+            "employee_name": employee.name,
             "effective_date": effective.isoformat(),
             "increase_percentage": str(increase_pct),
             "old_salary_monthly": old_salary,
@@ -127,10 +125,13 @@ class ExperienceCertificateGenerateView(APIView):
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
 
-        employee = Employee.objects.select_related("user").get(id=data["employee_id"])
+        from django.shortcuts import get_object_or_404
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        employee = get_object_or_404(User.objects.all(), id=data["employee_id"])
         ctx = {
             "date": timezone.now().date().isoformat(),
-            "employee_name": employee.user.name,
+            "employee_name": employee.name,
             "role": data["role"],
             "start_date": data["start_date"].isoformat(),
             "end_date": data["end_date"].isoformat(),
@@ -148,14 +149,17 @@ class SalaryCertificateGenerateView(APIView):
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
 
-        employee = Employee.objects.select_related("user").get(id=data["employee_id"])
+        from django.shortcuts import get_object_or_404
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        employee = get_object_or_404(User.objects.all(), id=data["employee_id"])
         ctx = {
             "company_name": data["company_name"],
             "issue_date": data["issue_date"].isoformat(),
-            "employee_name": employee.user.name,
+            "employee_name": employee.name,
             "position": employee.position,
             "salary_monthly": employee.salary_monthly,
-            "joining_date": employee.joining_date.isoformat(),
+            "joining_date": employee.joining_date.isoformat() if employee.joining_date else "",
         }
         pdf = build_salary_certificate_pdf(ctx)
         return _pdf_response(pdf, "salary_certificate.pdf")

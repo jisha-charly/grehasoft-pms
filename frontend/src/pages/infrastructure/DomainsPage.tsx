@@ -3,6 +3,7 @@ import Layout from "../../components/layout/Layout";
 import axiosInstance from "../../api/axiosInstance";
 import { useCrud } from "../../hooks/useCrud";
 import { Eye, Pencil, Trash, Search, Plus } from "lucide-react";
+import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 
 interface Domain {
   id: number;
@@ -40,6 +41,7 @@ const DomainsPage: React.FC = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [viewDomain, setViewDomain] = useState<Domain | null>(null);
+  const [domainToDelete, setDomainToDelete] = useState<number | null>(null);
 
   const [form, setForm] = useState({
     project: "",
@@ -247,7 +249,7 @@ const DomainsPage: React.FC = () => {
                           <button
                             className="btn btn-sm btn-light text-danger rounded-circle p-2"
                             title="Delete"
-                            onClick={() => handleDelete(d.id)}
+                          onClick={() => setDomainToDelete(d.id)}
                           >
                             <Trash size={16} />
                           </button>
@@ -491,6 +493,22 @@ const DomainsPage: React.FC = () => {
             </div>
           </div>
         )}
+
+
+
+        <DeleteConfirmModal
+  isOpen={domainToDelete !== null}
+  title="Delete Domain"
+  message="Are you sure you want to delete this domain?"
+  onClose={() => setDomainToDelete(null)}
+  onConfirm={async () => {
+    if (domainToDelete) {
+      await deleteDomain(domainToDelete);
+      refetch();
+      setDomainToDelete(null);
+    }
+  }}
+/>
       </div>
     
   );

@@ -3,6 +3,7 @@ import { Server } from "../../types";
 import { useCrud } from "../../hooks/useCrud";
 import { Pencil, Trash, Search, Plus } from "lucide-react";
 import axiosInstance from "@/api/axiosInstance";
+import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 
 const ServersPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -23,6 +24,7 @@ const ServersPage: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+   const [serverToDelete, setServerToDelete] = useState<number | null>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -156,6 +158,7 @@ const [infrastructureStats, setInfrastructureStats] = useState({
       const servers = serversRes.data.results || serversRes.data || [];
       const domains = domainsRes.data.results || domainsRes.data || [];
       const credentials = credentialsRes.data.results || credentialsRes.data || [];
+     
 
       const now = new Date();
 
@@ -286,7 +289,7 @@ const [infrastructureStats, setInfrastructureStats] = useState({
                         <button
                           className="btn btn-sm btn-light text-danger rounded-circle p-2"
                           title="Delete"
-                          onClick={() => handleDelete(server.id)}
+                       onClick={() => setServerToDelete(server.id)}
                         >
                           <Trash size={16} />
                         </button>
@@ -448,6 +451,21 @@ const [infrastructureStats, setInfrastructureStats] = useState({
           </div>
         </div>
       )}
+
+
+      <DeleteConfirmModal
+  isOpen={serverToDelete !== null}
+  title="Delete Server"
+  message="Are you sure you want to delete this server?"
+  onClose={() => setServerToDelete(null)}
+  onConfirm={async () => {
+    if (serverToDelete) {
+      await deleteServer(serverToDelete);
+      refetch();
+      setServerToDelete(null);
+    }
+  }}
+/>
     </div>
   );
 };

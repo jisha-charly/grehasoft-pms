@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Reminder, ReminderType } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useCrud } from '../../hooks/useCrud';
+import DeleteConfirmModal from '@/components/DeleteConfirmModal';
 
 const RemindersPage: React.FC = () => {
   const { user } = useAuth();
@@ -14,23 +15,70 @@ const RemindersPage: React.FC = () => {
   } = useCrud<Reminder>({ endpoint: '/reminders' });
 
   const [isModalOpen, setModalOpen] = useState(false);
+  const [errors, setErrors] = useState<any>({});
+  const [reminderToDelete, setReminderToDelete] = useState<Reminder | null>(null);
+
+  const validateReminder = (fd: FormData) => {
+    let newErrors: any = {};
+    const type = fd.get("type")?.toString().trim();
+    const title = fd.get("title")?.toString().trim();
+    const dueDate = fd.get("due_date")?.toString();
+
+    if (!type) {
+      newErrors.type = "Please select reminder type";
+    }
+
+    if (!title) {
+      newErrors.title = "Title is required";
+    } else if (title.length < 3) {
+      newErrors.title = "Title must be at least 3 characters";
+    }
+
+    if (!dueDate) {
+      newErrors.due_date = "Due date is required";
+    } else {
+      const selectedDate = new Date(dueDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (selectedDate < today) {
+        newErrors.due_date = "Due date cannot be in the past";
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    
+    if (!validateReminder(formData)) return;
+    
     const data = Object.fromEntries(formData.entries());
 
-    add({
-      type: data.type as ReminderType,
-      title: data.title,
-      description: data.description,
-      due_date: data.due_date,
-      is_completed:false,
-      
-    } as any);
-    setModalOpen(false);
+    try {
+      await add({
+        type: data.type as ReminderType,
+        title: data.title,
+        description: data.description,
+        due_date: data.due_date,
+        is_completed: false,
+      } as any);
+      setModalOpen(false);
+      setErrors({});
+    } catch (error: any) {
+      if (error.response && error.response.data) {
+        const resData = error.response.data;
+        let newErrors: any = {};
+        if (resData.title) newErrors.title = resData.title[0];
+        if (resData.due_date) newErrors.due_date = resData.due_date[0];
+        if (resData.type) newErrors.type = resData.type[0];
+        setErrors(newErrors);
+      }
+    }
   };
 
   const getReminderIcon = (type: ReminderType) => {
@@ -68,7 +116,7 @@ const RemindersPage: React.FC = () => {
           <h4 className="fw-bold mb-0">Reminders & Schedule</h4>
           <p className="text-secondary small mb-0">Track upcoming tasks and follow-ups</p>
         </div>
-        <button className="btn btn-primary btn-sm shadow-sm" onClick={() => setModalOpen(true)}>
+        <button className="btn btn-primary btn-sm shadow-sm" onClick={() => { setErrors({}); setModalOpen(true); }}>
           <i className="bi bi-plus-lg me-2"></i>Add Reminder
         </button>
       </div>
@@ -116,7 +164,7 @@ const RemindersPage: React.FC = () => {
                       <i className={`bi ${reminder.is_completed ? 'bi-arrow-counterclockwise' : 'bi-check-lg'}`}></i>
                       {reminder.is_completed ? ' Reopen' : ' Complete'}
                     </button>
-                    <button className="btn btn-sm btn-outline-danger" onClick={() => deleteReminder(reminder.id!)}>
+                    <button className="btn btn-sm btn-outline-danger"onClick={() => setReminderToDelete(reminder)}>
                       <i className="bi bi-trash"></i>
                     </button>
                   </div>
@@ -176,29 +224,37 @@ const RemindersPage: React.FC = () => {
         <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
           <div className="modal-dialog">
             <div className="modal-content border-0 shadow">
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit} noValidate onChange={(e: any) => {
+                if (errors[e.target.name]) {
+                  setErrors({ ...errors, [e.target.name]: null });
+                }
+              }}>
                 <div className="modal-header bg-primary text-white">
                   <h5 className="modal-title fw-bold">Add Reminder</h5>
                   <button type="button" className="btn-close btn-close-white" onClick={() => setModalOpen(false)}></button>
                 </div>
                 <div className="modal-body p-4">
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Type</label>
-                    <select name="type" className="form-select" required>
+                    <label className="form-label small fw-bold">Type *</label>
+                    <select name="type" className={`form-select ${errors.type ? 'is-invalid' : ''}`} defaultValue="">
+                      <option value="" disabled>Select Type</option>
                       <option value={ReminderType.GENERAL}>General</option>
                       <option value={ReminderType.INVOICE}>Invoice</option>
                       <option value={ReminderType.PAYMENT}>Payment</option>
                       <option value={ReminderType.PROPOSAL}>Proposal</option>
                       <option value={ReminderType.FOLLOWUP}>Follow-up</option>
                     </select>
+                    {errors.type && <div className="invalid-feedback">{errors.type}</div>}
                   </div>
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Title</label>
-                    <input name="title" type="text" className="form-control" placeholder="e.g. Send invoice to Acme" required />
+                    <label className="form-label small fw-bold">Title *</label>
+                    <input name="title" type="text" className={`form-control ${errors.title ? 'is-invalid' : ''}`} placeholder="e.g. Send invoice to Acme" />
+                    {errors.title && <div className="invalid-feedback">{errors.title}</div>}
                   </div>
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Due Date</label>
-                    <input name="due_date" type="date" className="form-control" required />
+                    <label className="form-label small fw-bold">Due Date *</label>
+                    <input name="due_date" type="date" className={`form-control ${errors.due_date ? 'is-invalid' : ''}`} />
+                    {errors.due_date && <div className="invalid-feedback">{errors.due_date}</div>}
                   </div>
                   <div className="mb-3">
                     <label className="form-label small fw-bold">Description</label>
@@ -214,6 +270,19 @@ const RemindersPage: React.FC = () => {
           </div>
         </div>
       )}
+
+
+      <DeleteConfirmModal
+  isOpen={!!reminderToDelete}
+  title="Delete Reminder"
+  message={`Are you sure you want to delete "${reminderToDelete?.title}"?`}
+  onClose={() => setReminderToDelete(null)}
+  onConfirm={async () => {
+    if (!reminderToDelete) return;
+    await deleteReminder(reminderToDelete.id!);
+    setReminderToDelete(null);
+  }}
+/>
     </div>
   );
 };

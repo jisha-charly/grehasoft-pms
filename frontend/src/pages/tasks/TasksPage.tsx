@@ -6,6 +6,7 @@ import TaskDetailsModal from '../../components/TaskDetailsModal';
 import { useForm } from '../../hooks/useForm';
 import { useCrud } from '../../hooks/useCrud';
 import FormField from '../../components/FormField';
+import DeleteConfirmModal from '@/components/DeleteConfirmModal';
 
 interface TasksPageProps {
   milestones: Milestone[];
@@ -39,7 +40,7 @@ const TasksPage: React.FC<TasksPageProps> = ({
   const [priorityFilter, setPriorityFilter] = useState<string | 'all'>('all');
   const [isModalOpen, setModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const validationSchema = {
     projectId: { required: true, message: 'Please select a project.' },
     title: { required: true, message: 'Task title is required.' },
@@ -269,7 +270,7 @@ const TasksPage: React.FC<TasksPageProps> = ({
                             {hasPermission(Permission.MANAGE_TASKS) && (
                               <button
                                 className="btn btn-sm btn-light text-danger"
-                                onClick={() => deleteTask(task.id)}
+                             onClick={() => setTaskToDelete(task)}
                               >
                                 <i className="bi bi-trash"></i>
                               </button>
@@ -351,6 +352,18 @@ const TasksPage: React.FC<TasksPageProps> = ({
       )}
         </>
       )}
+
+      <DeleteConfirmModal
+  isOpen={!!taskToDelete}
+  title="Delete Task"
+  message={`Are you sure you want to delete "${taskToDelete?.title}"?`}
+  onClose={() => setTaskToDelete(null)}
+  onConfirm={async () => {
+    if (!taskToDelete) return;
+    await deleteTask(taskToDelete.id);
+    setTaskToDelete(null);
+  }}
+/>
     </div>
   );
 };

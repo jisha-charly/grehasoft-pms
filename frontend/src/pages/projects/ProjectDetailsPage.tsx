@@ -52,6 +52,93 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
 const [selectedMilestoneId, setSelectedMilestoneId] = useState<number | null>(null);
 const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 const [memberToDelete, setMemberToDelete] = useState<number | null>(null);
+const [taskErrors, setTaskErrors] = useState<any>({});
+const [milestoneErrors, setMilestoneErrors] = useState<any>({});
+
+const validateTask = (fd: FormData) => {
+  let errors: any = {};
+
+  const title = fd.get("title")?.toString().trim();
+  const description = fd.get("description")?.toString().trim();
+  const dueDate = fd.get("dueDate")?.toString();
+  const assignee = fd.get("assignee");
+  const taskTypeId = fd.get("taskTypeId");
+  const priority = fd.get("priority");
+  const status = fd.get("status");
+
+  if (!title) {
+    errors.title = "Task title is required";
+  } else if (title.length < 3) {
+    errors.title = "Task title must be at least 3 characters";
+  }
+
+  if (!description) {
+    errors.description = "Description is required";
+  }
+  
+  if (!taskTypeId) {
+    errors.taskTypeId = "Task type is required";
+  }
+  
+  if (!priority) {
+    errors.priority = "Priority is required";
+  }
+  
+  if (!status) {
+    errors.status = "Status is required";
+  }
+
+  if (!dueDate) {
+    errors.dueDate = "Due date is required";
+  } else {
+    const selectedDate = new Date(dueDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selectedDate < today) {
+      errors.dueDate = "Due date cannot be in the past";
+    }
+  }
+
+  if (!assignee) {
+    errors.assignee = "Assignee is required";
+  }
+
+  setTaskErrors(errors);
+  return Object.keys(errors).length === 0;
+};
+
+const validateMilestone = (fd: FormData) => {
+  let errors: any = {};
+  const title = fd.get("title")?.toString().trim();
+  const dueDate = fd.get("dueDate")?.toString();
+
+  if (!title) {
+    errors.title = "Milestone title is required";
+  } else if (title.length < 3) {
+    errors.title = "Milestone title must be at least 3 characters";
+  }
+
+  if (!dueDate) {
+    errors.dueDate = "Target date is required";
+  } else {
+    const selectedDate = new Date(dueDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+      errors.dueDate = "Target date cannot be in the past";
+    } else if (project?.endDate) {
+      const projectEnd = new Date(project.endDate);
+      projectEnd.setHours(0, 0, 0, 0);
+      if (selectedDate > projectEnd) {
+        errors.dueDate = "Target date cannot be greater than project end date";
+      }
+    }
+  }
+
+  setMilestoneErrors(errors);
+  return Object.keys(errors).length === 0;
+};
 
 useEffect(() => {
   const fetchData = async () => {
@@ -119,23 +206,26 @@ if (activityRes.status === "fulfilled")
   if (!project) return <div className="p-5 text-center"><h3 className="text-muted">Project not found</h3><Link to="/projects">Back to list</Link></div>;
 
   const handleTaskSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-   const payload = {
-  project: project.id,
-  milestone: fd.get('milestoneId')
-    ? Number(fd.get('milestoneId'))
-    : null,
-  title: fd.get('title'),
-  description: fd.get('description'),
-  priority: fd.get('priority'),
-  status: fd.get('status'),
-  due_date: fd.get('dueDate'),
-  task_type: Number(fd.get('taskTypeId')),
-  assignees: fd.get('assignee')
-    ? [Number(fd.get('assignee'))]
-    : []
-};
+  e.preventDefault();
+  const fd = new FormData(e.currentTarget);
+
+  if (!validateTask(fd)) return;
+
+  const payload = {
+    project: project.id,
+    milestone: fd.get('milestoneId')
+      ? Number(fd.get('milestoneId'))
+      : null,
+    title: fd.get('title'),
+    description: fd.get('description'),
+    priority: fd.get('priority'),
+    status: fd.get('status'),
+    due_date: fd.get('dueDate'),
+    task_type: Number(fd.get('taskTypeId')),
+    assignees: fd.get('assignee')
+      ? [Number(fd.get('assignee'))]
+      : []
+  };
 try {
   if (editingTask) {
     const res = await axiosInstance.patch(
@@ -172,8 +262,17 @@ try {
   setTaskModalOpen(false);
   setEditingTask(null);
 
-} catch (error) {
+} catch (error: any) {
   console.error("Error saving task:", error);
+  if (error.response?.data) {
+    const errors: any = {};
+    Object.keys(error.response.data).forEach(key => {
+      const fieldMap: any = { due_date: 'dueDate', task_type: 'taskTypeId' };
+      const errorField = fieldMap[key] || key;
+      errors[errorField] = Array.isArray(error.response.data[key]) ? error.response.data[key][0] : error.response.data[key];
+    });
+    setTaskErrors(errors);
+  }
 }};
 
  const handleTaskDelete = async (taskId: number) => {
@@ -194,10 +293,13 @@ try {
   const handleMilestoneSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    
+    if (!validateMilestone(fd)) return;
+    
     const payload = {
-      project: project.id,
+      project: project?.id,
       title: fd.get('title'),
-     due_date: fd.get('dueDate'),
+      due_date: fd.get('dueDate'),
     };
 
     try {
@@ -210,8 +312,17 @@ try {
       }
       setMilestoneModalOpen(false);
       setEditingMilestone(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving milestone:", error);
+      if (error.response?.data) {
+        const errors: any = {};
+        Object.keys(error.response.data).forEach(key => {
+          const fieldMap: any = { due_date: 'dueDate' };
+          const errorField = fieldMap[key] || key;
+          errors[errorField] = Array.isArray(error.response.data[key]) ? error.response.data[key][0] : error.response.data[key];
+        });
+        setMilestoneErrors(errors);
+      }
     }
   };
 
@@ -389,7 +500,7 @@ try {
             <div>
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h6 className="fw-bold mb-0">Project Deliverables</h6>
-                <button className="btn btn-primary btn-sm fw-bold px-3" onClick={() => { setEditingTask(null); setTaskModalOpen(true); }}>
+                <button className="btn btn-primary btn-sm fw-bold px-3" onClick={() => { setEditingTask(null); setTaskErrors({}); setTaskModalOpen(true); }}>
                   <i className="bi bi-plus-lg me-2"></i>New Task
                 </button>
               </div>
@@ -408,7 +519,7 @@ try {
                           <td className="small text-secondary">{t.dueDate}</td>
                           <td className="text-end">
                             <div className="btn-group">
-                              <button className="btn btn-sm btn-light" onClick={(e) => { e.stopPropagation(); setEditingTask(t); setTaskModalOpen(true); }}>
+                              <button className="btn btn-sm btn-light" onClick={(e) => { e.stopPropagation(); setEditingTask(t); setTaskErrors({}); setTaskModalOpen(true); }}>
                                 <i className="bi bi-pencil"></i>
                               </button>
                               <button className="btn btn-sm btn-light text-danger" onClick={(e) => {
@@ -432,7 +543,7 @@ try {
             <div>
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h6 className="fw-bold mb-0">Strategic Milestones</h6>
-                <button className="btn btn-dark btn-sm fw-bold px-3" onClick={() => { setEditingMilestone(null); setMilestoneModalOpen(true); }}>
+                <button className="btn btn-dark btn-sm fw-bold px-3" onClick={() => { setEditingMilestone(null); setMilestoneErrors({}); setMilestoneModalOpen(true); }}>
                   <i className="bi bi-flag me-2"></i>Add Milestone
                 </button>
               </div>
@@ -459,7 +570,7 @@ try {
                         <div className="text-end">
                           <div className="small fw-bold text-dark mb-1">{m.progress_percentage}% Complete</div>
                           <div className="btn-group">
-                            <button className="btn btn-sm btn-light py-0 px-2" onClick={() => { setEditingMilestone(m); setMilestoneModalOpen(true); }}>
+                            <button className="btn btn-sm btn-light py-0 px-2" onClick={() => { setEditingMilestone(m); setMilestoneErrors({}); setMilestoneModalOpen(true); }}>
                               <i className="bi bi-pencil smaller"></i>
                             </button>
                             <button className="btn btn-sm btn-light text-danger py-0 px-2" onClick={() => {
@@ -576,21 +687,55 @@ try {
         <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
           <div className="modal-dialog modal-lg modal-dialog-centered">
             <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
-              <form onSubmit={handleTaskSubmit}>
+              <form onSubmit={handleTaskSubmit} noValidate onChange={(e: any) => {
+                if (taskErrors[e.target.name]) {
+                  setTaskErrors({ ...taskErrors, [e.target.name]: null });
+                }
+              }}>
                 <div className="modal-header pt-4 px-4 bg-white border-0">
                   <h5 className="modal-title fw-bold text-dark">{editingTask ? 'Edit Task' : 'New Project Task'}</h5>
                   <button type="button" className="btn-close" onClick={() => setTaskModalOpen(false)}></button>
                 </div>
                 <div className="modal-body p-4 bg-white">
                   <div className="row g-3">
-                    <div className="col-12"><label className="form-label smaller fw-bold uppercase text-secondary">Task Title *</label><input name="title" className="form-control" defaultValue={editingTask?.title} required /></div>
-                    <div className="col-12"><label className="form-label smaller fw-bold uppercase text-secondary">Description</label><textarea name="description" className="form-control" rows={3} defaultValue={editingTask?.description}></textarea></div>
-                    <div className="col-md-6"><label className="form-label smaller fw-bold uppercase text-secondary">Milestone (Optional)</label><select name="milestoneId" className="form-select" defaultValue={editingTask?.milestoneId}><option value="">Not linked</option>{projectMilestones.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}</select></div>
-                    <div className="col-md-6"><label className="form-label smaller fw-bold uppercase text-secondary">Task Type</label><select name="taskTypeId" className="form-select" defaultValue={editingTask?.taskTypeId}>{taskTypes.map(tt => <option key={tt.id} value={tt.id}>{tt.name}</option>)}</select></div>
-                    <div className="col-md-4"><label className="form-label smaller fw-bold uppercase text-secondary">Priority</label><select name="priority" className="form-select" defaultValue={editingTask?.priority}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
-                    <div className="col-md-4"><label className="form-label smaller fw-bold uppercase text-secondary">Status</label><select name="status" className="form-select" defaultValue={editingTask?.status || 'todo'}><option value="todo">To Do</option><option value="in_progress">In Progress</option><option value="blocked">Blocked</option><option value="done">Completed</option></select></div>
-                    <div className="col-md-4"><label className="form-label smaller fw-bold uppercase text-secondary">Due Date</label><input name="dueDate" type="date" className="form-control" defaultValue={editingTask?.dueDate} required /></div>
-                    <div className="col-md-12"><label className="form-label smaller fw-bold uppercase text-secondary">Assignee</label><select name="assignee" className="form-select" defaultValue={editingTask?.assignees?.[0] || ""}>{users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+                    <div className="col-12"><label className="form-label smaller fw-bold uppercase text-secondary">Task Title *</label><input name="title" className={`form-control ${taskErrors.title ? 'is-invalid' : ''}`} defaultValue={editingTask?.title} />{taskErrors.title && (
+  <div className="invalid-feedback">{taskErrors.title}</div>
+)}</div>
+                    <div className="col-12"><label className="form-label smaller fw-bold uppercase text-secondary">Description *</label><textarea name="description" className={`form-control ${taskErrors.description ? 'is-invalid' : ''}`} rows={3} defaultValue={editingTask?.description}></textarea>
+                    {taskErrors.description && (
+                      <div className="invalid-feedback">{taskErrors.description}</div>
+                    )}
+                    </div>
+                    <div className="col-md-6"><label className="form-label smaller fw-bold uppercase text-secondary">Milestone (Optional)</label><select name="milestoneId" className={`form-select ${taskErrors.milestoneId ? 'is-invalid' : ''}`} defaultValue={editingTask?.milestoneId}><option value="">Not linked</option>{projectMilestones.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}</select>
+                    {taskErrors.milestoneId && (
+                      <div className="invalid-feedback">{taskErrors.milestoneId}</div>
+                    )}
+                    </div>
+                    <div className="col-md-6"><label className="form-label smaller fw-bold uppercase text-secondary">Task Type *</label><select name="taskTypeId" className={`form-select ${taskErrors.taskTypeId ? 'is-invalid' : ''}`} defaultValue={editingTask?.taskTypeId}><option value="">Select type</option>{taskTypes.map(tt => <option key={tt.id} value={tt.id}>{tt.name}</option>)}</select>
+                    {taskErrors.taskTypeId && (
+                      <div className="invalid-feedback">{taskErrors.taskTypeId}</div>
+                    )}
+                    </div>
+                    <div className="col-md-4"><label className="form-label smaller fw-bold uppercase text-secondary">Priority *</label><select name="priority" className={`form-select ${taskErrors.priority ? 'is-invalid' : ''}`} defaultValue={editingTask?.priority}><option value="">Select priority</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select>
+                    {taskErrors.priority && (
+                      <div className="invalid-feedback">{taskErrors.priority}</div>
+                    )}
+                    </div>
+                    <div className="col-md-4"><label className="form-label smaller fw-bold uppercase text-secondary">Status *</label><select name="status" className={`form-select ${taskErrors.status ? 'is-invalid' : ''}`} defaultValue={editingTask?.status || 'todo'}><option value="">Select status</option><option value="todo">To Do</option><option value="in_progress">In Progress</option><option value="blocked">Blocked</option><option value="done">Completed</option></select>
+                    {taskErrors.status && (
+                      <div className="invalid-feedback">{taskErrors.status}</div>
+                    )}
+                    </div>
+                    <div className="col-md-4"><label className="form-label smaller fw-bold uppercase text-secondary">Due Date *</label><input name="dueDate" type="date" className={`form-control ${taskErrors.dueDate ? 'is-invalid' : ''}`} defaultValue={editingTask?.dueDate} />
+                    {taskErrors.dueDate && (
+                      <div className="invalid-feedback">{taskErrors.dueDate}</div>
+                    )}
+                    </div>
+                    <div className="col-md-12"><label className="form-label smaller fw-bold uppercase text-secondary">Assignee *</label><select name="assignee" className={`form-select ${taskErrors.assignee ? 'is-invalid' : ''}`} defaultValue={editingTask?.assignees?.[0] || ""}><option value="">Select assignee</option>{users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
+                    {taskErrors.assignee && (
+                      <div className="invalid-feedback">{taskErrors.assignee}</div>
+                    )}
+                    </div>
                   </div>
                 </div>
                 <div className="modal-footer bg-white border-0 pb-4 px-4 gap-2">
@@ -608,14 +753,26 @@ try {
         <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 rounded-4 shadow-lg">
-              <form onSubmit={handleMilestoneSubmit}>
+              <form onSubmit={handleMilestoneSubmit} noValidate onChange={(e: any) => {
+                if (milestoneErrors[e.target.name]) {
+                  setMilestoneErrors({ ...milestoneErrors, [e.target.name]: null });
+                }
+              }}>
                 <div className="modal-header border-0 pt-4 px-4 bg-white">
                   <h5 className="modal-title fw-bold">{editingMilestone ? 'Edit Milestone' : 'Create Milestone'}</h5>
                   <button type="button" className="btn-close" onClick={() => setMilestoneModalOpen(false)}></button>
                 </div>
                 <div className="modal-body p-4 bg-white">
-                  <div className="mb-3"><label className="form-label smaller fw-bold">Milestone Title</label><input name="title" className="form-control" defaultValue={editingMilestone?.title} required /></div>
-                  <div className="mb-3"><label className="form-label smaller fw-bold">Target Date</label><input name="dueDate" type="date" className="form-control" defaultValue={editingMilestone?.dueDate} required /></div>
+                  <div className="mb-3"><label className="form-label smaller fw-bold">Milestone Title *</label><input name="title" className={`form-control ${milestoneErrors.title ? 'is-invalid' : ''}`} defaultValue={editingMilestone?.title} />
+                  {milestoneErrors.title && (
+                    <div className="invalid-feedback">{milestoneErrors.title}</div>
+                  )}
+                  </div>
+                  <div className="mb-3"><label className="form-label smaller fw-bold">Target Date *</label><input name="dueDate" type="date" className={`form-control ${milestoneErrors.dueDate ? 'is-invalid' : ''}`} defaultValue={editingMilestone?.dueDate} />
+                  {milestoneErrors.dueDate && (
+                    <div className="invalid-feedback">{milestoneErrors.dueDate}</div>
+                  )}
+                  </div>
                 </div>
                 <div className="modal-footer border-0 p-4 pt-0 bg-white">
                   <button type="button" className="btn btn-light fw-bold" onClick={() => setMilestoneModalOpen(false)}>Cancel</button>

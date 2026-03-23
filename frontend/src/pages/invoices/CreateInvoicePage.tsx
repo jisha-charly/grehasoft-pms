@@ -53,6 +53,55 @@ const [advance,setAdvance] = useState<number | "">("")
 const [selectedTemplate,setSelectedTemplate] = useState("")
 const [pdfPreview,setPdfPreview] = useState("")
 
+const [errors, setErrors] = useState<any>({});
+const [itemErrors, setItemErrors] = useState<{ [key: number]: any }>({});
+
+const validateForm = () => {
+  let newErrors: any = {};
+  let newItemErrors: { [key: number]: any } = {};
+
+  if (!invoiceNumber) newErrors.invoiceNumber = "Invoice Number is required";
+  if (!client) newErrors.client = "Please select a client";
+
+  if (!issueDate) {
+    newErrors.issueDate = "Issue date is required";
+  } else {
+    const issue = new Date(issueDate);
+    issue.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (issue > today) newErrors.issueDate = "Issue date cannot be in the future";
+  }
+
+  if (!dueDate) {
+    newErrors.dueDate = "Due date is required";
+  } else if (issueDate) {
+    if (new Date(dueDate) < new Date(issueDate)) {
+      newErrors.dueDate = "Due date cannot be before issue date";
+    }
+  }
+
+  if (gst !== undefined && gst !== null && gst !== "" as any) {
+    if (Number(gst) < 0 || Number(gst) > 100) newErrors.gst = "Tax rate must be between 0 and 100";
+  }
+
+  if (items.length === 0) {
+    newErrors.items = "At least one invoice item is required";
+  } else {
+    items.forEach((item, index) => {
+      let iErr: any = {};
+      if (!item.description || !item.description.trim()) iErr.description = "Item description is required";
+      if (item.quantity <= 0) iErr.quantity = "Quantity must be greater than 0";
+      if (item.rate <= 0) iErr.rate = "Rate must be greater than 0";
+      if (Object.keys(iErr).length > 0) newItemErrors[index] = iErr;
+    });
+  }
+
+  setErrors(newErrors);
+  setItemErrors(newItemErrors);
+  return Object.keys(newErrors).length === 0 && Object.keys(newItemErrors).length === 0;
+};
+
 useEffect(()=>{
 
 if(isEdit && invoiceId){
@@ -152,6 +201,16 @@ const updateItem = (index:number,field:string,value:any)=>{
 const updated=[...items]
 updated[index]={...updated[index],[field]:value}
 setItems(updated)
+
+if (itemErrors[index] && itemErrors[index][field]) {
+  const newIErrs = { ...itemErrors };
+  newIErrs[index] = { ...newIErrs[index] };
+  delete newIErrs[index][field];
+  setItemErrors(newIErrs);
+}
+if (errors.items) {
+  setErrors({ ...errors, items: null });
+}
 }
 
 /* APPLY TEMPLATE */
@@ -229,7 +288,9 @@ console.error("Preview failed",err)
 
 /* SAVE INVOICE */
 
-const saveInvoice = async ()=>{
+const saveInvoice = async (e?: React.FormEvent)=>{
+if (e) e.preventDefault();
+if (!validateForm()) return;
 
 const formattedItems = items.map(item=>({
 description:item.description,
@@ -265,9 +326,19 @@ alert("Invoice saved successfully")
 
 navigate("/invoices")
 
-}catch(err){
+}catch(err: any){
 
 console.error("Error saving invoice",err)
+if (err.response?.data) {
+  const data = err.response.data;
+  let newErrors: any = {};
+  if (data.invoice_number) newErrors.invoiceNumber = data.invoice_number[0];
+  if (data.due_date) newErrors.dueDate = data.due_date[0];
+  if (data.issue_date) newErrors.issueDate = data.issue_date[0];
+  if (data.client) newErrors.client = data.client[0];
+  if (data.items && typeof data.items[0] === 'string') newErrors.items = data.items[0];
+  setErrors(newErrors);
+}
 
 }
 
@@ -295,35 +366,50 @@ return(
 
 {/* TOP FIELDS */}
 
+<form onSubmit={saveInvoice} noValidate>
 <div className="row g-3 mb-4">
 
 <div className="col-md-6">
-<label>Invoice Number</label>
+<label>Invoice Number *</label>
 <input
-className="form-control"
+name="invoiceNumber"
+className={`form-control ${errors.invoiceNumber ? 'is-invalid' : ''}`}
 value={invoiceNumber}
-readOnly
+onChange={(e) => {
+  setInvoiceNumber(e.target.value);
+  if (errors.invoiceNumber) setErrors({...errors, invoiceNumber: null});
+}}
 />
+{errors.invoiceNumber && <div className="invalid-feedback">{errors.invoiceNumber}</div>}
 </div>
 
 <div className="col-md-6">
 <label>Tax Rate (%)</label>
 <input
 type="number"
-className="form-control"
+name="gst"
+className={`form-control ${errors.gst ? 'is-invalid' : ''}`}
 value={gst}
-onChange={(e)=>setGst(Number(e.target.value))}
+onChange={(e)=>{
+  setGst(Number(e.target.value));
+  if (errors.gst) setErrors({...errors, gst: null});
+}}
 />
+{errors.gst && <div className="invalid-feedback">{errors.gst}</div>}
 </div>
 
 <div className="col-md-6">
-<label>Client</label>
+<label>Client *</label>
 <select
-className="form-control"
+name="client"
+className={`form-select ${errors.client ? 'is-invalid' : ''}`}
 value={client}
-onChange={(e)=>handleClientChange(Number(e.target.value))}
+onChange={(e)=>{
+  handleClientChange(Number(e.target.value));
+  if (errors.client) setErrors({...errors, client: null});
+}}
 >
-<option>Select Client</option>
+<option value="">Select Client</option>
 
 {clients.map(c=>(
 <option key={c.id} value={c.id}>
@@ -332,6 +418,7 @@ onChange={(e)=>handleClientChange(Number(e.target.value))}
 ))}
 
 </select>
+{errors.client && <div className="invalid-feedback">{errors.client}</div>}
 </div>
 
 <div className="col-md-6">
@@ -344,23 +431,33 @@ onChange={(e)=>setProject(e.target.value)}
 </div>
 
 <div className="col-md-6">
-<label>Issue Date</label>
+<label>Issue Date *</label>
 <input
 type="date"
-className="form-control"
+name="issueDate"
+className={`form-control ${errors.issueDate ? 'is-invalid' : ''}`}
 value={issueDate}
-onChange={(e)=>setIssueDate(e.target.value)}
+onChange={(e)=>{
+  setIssueDate(e.target.value);
+  if (errors.issueDate) setErrors({...errors, issueDate: null});
+}}
 />
+{errors.issueDate && <div className="invalid-feedback">{errors.issueDate}</div>}
 </div>
 
 <div className="col-md-6">
-<label>Due Date</label>
+<label>Due Date *</label>
 <input
 type="date"
-className="form-control"
+name="dueDate"
+className={`form-control ${errors.dueDate ? 'is-invalid' : ''}`}
 value={dueDate}
-onChange={(e)=>setDueDate(e.target.value)}
+onChange={(e)=>{
+  setDueDate(e.target.value);
+  if (errors.dueDate) setErrors({...errors, dueDate: null});
+}}
 />
+{errors.dueDate && <div className="invalid-feedback">{errors.dueDate}</div>}
 </div>
 
 </div>
@@ -435,24 +532,27 @@ return(
 
 <div className="d-flex gap-2">
 
+<div className="flex-grow-1">
 <input
 list="services"
-className="form-control"
+className={`form-control ${itemErrors[index]?.description ? 'is-invalid' : ''}`}
 value={item.description}
 onChange={(e)=>{
 updateItem(index,"description",e.target.value)
 handleServiceSelect(index,e.target.value)
 }}
 />
-
 <datalist id="services">
 {services.map(s=>(
 <option key={s.id} value={s.name}/>
 ))}
 </datalist>
+{itemErrors[index]?.description && <div className="invalid-feedback">{itemErrors[index].description}</div>}
+</div>
 
 <button
-className="btn btn-sm btn-secondary"
+type="button"
+className="btn btn-sm btn-secondary h-100"
 onClick={()=>applyTemplate(index)}
 >
 Use
@@ -466,10 +566,11 @@ Use
 
 <input
 type="number"
-className="form-control"
+className={`form-control ${itemErrors[index]?.quantity ? 'is-invalid' : ''}`}
 value={item.quantity}
 onChange={(e)=>updateItem(index,"quantity",Number(e.target.value))}
 />
+{itemErrors[index]?.quantity && <div className="invalid-feedback">{itemErrors[index].quantity}</div>}
 
 </td>
 
@@ -477,10 +578,11 @@ onChange={(e)=>updateItem(index,"quantity",Number(e.target.value))}
 
 <input
 type="number"
-className="form-control"
+className={`form-control ${itemErrors[index]?.rate ? 'is-invalid' : ''}`}
 value={item.rate}
 onChange={(e)=>updateItem(index,"rate",Number(e.target.value))}
 />
+{itemErrors[index]?.rate && <div className="invalid-feedback">{itemErrors[index].rate}</div>}
 
 </td>
 
@@ -489,6 +591,7 @@ onChange={(e)=>updateItem(index,"rate",Number(e.target.value))}
 <td>
 
 <button
+type="button"
 className="btn btn-sm btn-danger"
 onClick={()=>removeItem(index)}
 >
@@ -507,7 +610,10 @@ onClick={()=>removeItem(index)}
 
 </table>
 
+{errors.items && <div className="text-danger small mb-2 fw-bold">{errors.items}</div>}
+
 <button
+type="button"
 className="btn btn-primary mb-3"
 onClick={addItem}
 >
@@ -561,6 +667,7 @@ onChange={(e)=>setAdvance(Number(e.target.value))}
 <div className="mt-4 d-flex gap-2">
 
 <button
+type="button"
 className="btn btn-secondary"
 onClick={previewInvoice}
 >
@@ -568,8 +675,8 @@ Preview PDF
 </button>
 
 <button
+type="submit"
 className="btn btn-success"
-onClick={saveInvoice}
 >
 Save Invoice
 </button>
@@ -592,6 +699,8 @@ title="Invoice Preview"
 </div>
 
 )}
+
+</form>
 
 </div>
 

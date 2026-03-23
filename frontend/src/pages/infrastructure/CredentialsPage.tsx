@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import axiosInstance from "../../api/axiosInstance";
 import { Eye, Pencil, Trash, Search, Plus } from "lucide-react";
 import { useCrud } from "../../hooks/useCrud";
+import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 
 interface Project {
   id: number;
@@ -59,6 +60,7 @@ const CredentialsPage: React.FC<CredentialsPageProps> = ({ projects = [], domain
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [viewCredential, setViewCredential] = useState<Credential | null>(null);
+  const [credentialToDelete, setCredentialToDelete] = useState<number | null>(null);
 
   const [form, setForm] = useState({
     project: "",
@@ -281,7 +283,7 @@ const CredentialsPage: React.FC<CredentialsPageProps> = ({ projects = [], domain
                         <button
                           className="btn btn-sm btn-light text-danger rounded-circle p-2"
                           title="Delete"
-                          onClick={() => handleDelete(cred.id)}
+                       onClick={() => setCredentialToDelete(cred.id)}
                         >
                           <Trash size={16} />
                         </button>
@@ -678,6 +680,21 @@ const CredentialsPage: React.FC<CredentialsPageProps> = ({ projects = [], domain
           </div>
         </div>
       )}
+
+
+      <DeleteConfirmModal
+  isOpen={credentialToDelete !== null}
+  title="Delete Credential"
+  message="Are you sure you want to delete this credential?"
+  onClose={() => setCredentialToDelete(null)}
+  onConfirm={async () => {
+    if (credentialToDelete) {
+      await deleteCredential(credentialToDelete);
+      refetch();
+      setCredentialToDelete(null);
+    }
+  }}
+/>
     </div>
   );
 };

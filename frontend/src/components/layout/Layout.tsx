@@ -138,7 +138,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   { label: 'Roles', path: '/admin/roles', icon: 'bi-person-badge' },
   { label: 'Departments', path: '/admin/departments', icon: 'bi-diagram-3' },
   { label: 'Task Types', path: '/admin/task-types', icon: 'bi-list-task' },
-  { label: "Servers", path: "/admin/servers", icon: "bi-hdd-network" }
+ 
 ];
 
  const handleLogout = () => {
