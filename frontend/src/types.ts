@@ -358,6 +358,8 @@ export interface ActivityLog {
   action: string;
   createdBy: number
   created_at: string;
+  user_name?: string;
+  description?: string;
 }
 
 export interface SEOTask {

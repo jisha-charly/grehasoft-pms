@@ -152,12 +152,11 @@ useEffect(() => {
       setProject(projRes.data);
 
       // ✅ 2. Fetch others separately (do NOT break page if one fails)
-      const [tasksRes, milestonesRes, membersRes, activityRes] =
+      const [tasksRes, milestonesRes, membersRes] =
         await Promise.allSettled([
           axiosInstance.get(`/tasks/?project=${id}`),
           axiosInstance.get(`/milestones/`),
           axiosInstance.get(`/members/`),
-          axiosInstance.get(`/project-activity-logs/`),
         ]);
 
        if (tasksRes.status === "fulfilled") {
@@ -184,13 +183,6 @@ if (membersRes.status === "fulfilled")
   )
 );
 
-if (activityRes.status === "fulfilled")
- setProjectActivity(
-  getResults(activityRes.value).filter(
-    (a: any) => a.project === Number(id)
-  )
-);
-
     } catch (error) {
       console.error("Error fetching project:", error);
       setProject(null);
@@ -200,6 +192,15 @@ if (activityRes.status === "fulfilled")
   };
 
   fetchData();
+}, [id]);
+
+useEffect(() => {
+  if (!id) return;
+  axiosInstance.get(`/project-activity-logs/?project=${id}`)
+    .then(res => {
+      setProjectActivity(getResults(res));
+    })
+    .catch(err => console.error(err));
 }, [id]);
 
   if (loading) return <div className="p-5 text-center"><div className="spinner-border text-primary" role="status"></div><p className="mt-2">Loading project details...</p></div>;
@@ -658,21 +659,13 @@ try {
             <div className="timeline py-2">
               <h6 className="fw-bold mb-4">Project Activity Logs</h6>
               {projectActivity.length === 0 ? (
-                <div className="text-center py-5 text-muted small">No recent activity found.</div>
+                <p>No recent activity found.</p>
               ) : (
-                projectActivity.map(a => (
-                  <div key={a.id} className="d-flex mb-4">
-                    <div className="flex-shrink-0 me-3">
-                      <div className="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center" style={{width: '32px', height: '32px'}}>
-                        <i className="bi bi-lightning-charge smaller"></i>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="small fw-bold text-dark mb-1">
-                        {users.find(u => u.id === a.createdBy)?.name}
-                        <span className="fw-normal text-secondary ms-1">{a.action}</span>
-                      </div>
-                      <div className="smaller text-muted"><i className="bi bi-clock me-1"></i>{a.created_at}</div>
+                projectActivity.map(activity => (
+                  <div key={activity.id} className="border-bottom py-2">
+                    <strong>{activity.user_name}</strong> {activity.description}
+                    <div className="text-muted small">
+                      {new Date(activity.created_at).toLocaleString()}
                     </div>
                   </div>
                 ))

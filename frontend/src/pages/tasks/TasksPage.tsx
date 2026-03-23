@@ -157,11 +157,11 @@ const TasksPage: React.FC<TasksPageProps> = ({
             </button>
           </div>
 
-          {hasPermission(Permission.MANAGE_TASKS) && (
+         {/* {hasPermission(Permission.MANAGE_TASKS) && (
             <button className="btn btn-primary btn-sm" onClick={handleOpenNewTask}>
               <i className="bi bi-plus-lg me-2"></i>New Task
             </button>
-          )}
+          )} */}
         </div>
       </div>
 

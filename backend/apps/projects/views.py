@@ -36,6 +36,30 @@ class MilestoneViewSet(viewsets.ModelViewSet):
     permission_classes = [HasPermission]
     required_permission = 'VIEW_PROJECTS'
 
+    def perform_create(self, serializer):
+        milestone = serializer.save()
+        log_system_activity(
+            user=self.request.user,
+            project=milestone.project,
+            action=f"Created milestone: {milestone.title}"
+        )
+
+    def perform_update(self, serializer):
+        milestone = serializer.save()
+        log_system_activity(
+            user=self.request.user,
+            project=milestone.project,
+            action=f"Updated milestone: {milestone.title}"
+        )
+
+    def perform_destroy(self, instance):
+        log_system_activity(
+            user=self.request.user,
+            project=instance.project,
+            action=f"Deleted milestone: {instance.title}"
+        )
+        instance.delete()
+
 
 class ProjectMemberViewSet(viewsets.ModelViewSet):
     queryset = ProjectMember.objects.all()
@@ -69,7 +93,16 @@ class ProjectMemberViewSet(viewsets.ModelViewSet):
 
 
 class ActivityLogViewSet(viewsets.ModelViewSet):
-    queryset = ActivityLog.objects.all()
+    queryset = ActivityLog.objects.all().order_by('-created_at')
     serializer_class = ActivityLogSerializer
     permission_classes = [HasPermission]
     required_permission = 'VIEW_PROJECTS'
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        project_id = self.request.query_params.get('project')
+
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+
+        return queryset

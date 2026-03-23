@@ -62,6 +62,9 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
 
 
 class ActivityLogSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.name', read_only=True)
+    description = serializers.CharField(source='action', read_only=True)
+
     class Meta:
         model = ActivityLog
         fields = "__all__"
