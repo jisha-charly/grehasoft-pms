@@ -111,6 +111,13 @@ class TaskFileViewSet(viewsets.ModelViewSet):
     required_permission = 'VIEW_TASKS'
     parser_classes = [MultiPartParser, FormParser]  # ✅ IMPORTANT
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        task_id = self.request.query_params.get("task")
+        if task_id:
+            queryset = queryset.filter(task_id=task_id)
+        return queryset
+
 class TaskCommentViewSet(viewsets.ModelViewSet):
     queryset = TaskComment.objects.all()
     serializer_class = TaskCommentSerializer
@@ -120,6 +127,13 @@ class TaskCommentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        task_id = self.request.query_params.get("task")
+        if task_id:
+            queryset = queryset.filter(task_id=task_id)
+        return queryset
+
 class TaskReviewViewSet(viewsets.ModelViewSet):
     queryset = TaskReview.objects.all()
     serializer_class = TaskReviewSerializer
@@ -127,7 +141,23 @@ class TaskReviewViewSet(viewsets.ModelViewSet):
     required_permission = 'VIEW_TASKS'
 
     def perform_create(self, serializer):
-        serializer.save(reviewer=self.request.user)
+        user = self.request.user
+        role_map = {
+            'SUPER_ADMIN': 'ADMIN',
+            'PROJECT_MANAGER': 'PM'
+        }
+        reviewed_by_role = role_map.get(user.role.name)
+        if not reviewed_by_role:
+            raise PermissionDenied("Only SUPER_ADMIN and PROJECT_MANAGER can review files.")
+
+        task_file = serializer.validated_data.get('task_file')
+        existing_reviews = TaskReview.objects.filter(task_file=task_file).count()
+        
+        serializer.save(
+            reviewer=user,
+            reviewed_by_role=reviewed_by_role,
+            review_version=existing_reviews + 1
+        )
 
     def get_queryset(self):
      queryset = super().get_queryset()

@@ -30,6 +30,7 @@ class TaskCommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = TaskComment
         fields = '__all__'
+        read_only_fields = ['user']
 
 class TaskReviewSerializer(serializers.ModelSerializer):
     reviewer_name = serializers.CharField(source='reviewer.name', read_only=True)
@@ -37,7 +38,7 @@ class TaskReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = TaskReview
         fields = "__all__"
-        read_only_fields = ["reviewer"]
+        read_only_fields = ["reviewer", "review_version", "reviewed_by_role"]
     def validate(self, data):
         task_file = data.get("task_file")
 

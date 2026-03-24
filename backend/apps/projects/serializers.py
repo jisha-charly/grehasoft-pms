@@ -14,42 +14,19 @@ class ClientSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class MilestoneSerializer(serializers.ModelSerializer):
-    progress_percentage = serializers.SerializerMethodField()
+    progress_percentage = serializers.IntegerField(source='progress', read_only=True)
 
     class Meta:
         model = Milestone
-        fields = "__all__"  # this will automatically include progress_percentage
-
-    def get_progress_percentage(self, obj):
-     tasks = obj.tasks.filter(deleted_at__isnull=True)
-
-     total = tasks.count()
-     if total == 0:
-        return 0
-
-     completed = tasks.filter(status='done').count()
-     return int((completed / total) * 100)
+        fields = "__all__"
 
 class ProjectSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source='client.company_name', read_only=True)
     milestones = MilestoneSerializer(many=True, read_only=True)
-    progress_percentage = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = '__all__'
-
-    def get_progress_percentage(self, obj):
-        tasks = obj.tasks.filter(deleted_at__isnull=True)
-
-        total = tasks.count()
-        if total == 0:
-            return 0
-
-        completed = tasks.filter(status='done').count()
-        return int((completed / total) * 100)
-
-
 
 
 

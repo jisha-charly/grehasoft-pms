@@ -4,6 +4,7 @@ import axiosInstance from '../api/axiosInstance';
 import { useForm } from '../hooks/useForm';
 import FormField from './FormField';
 
+import './layout/Layout.css';
 interface TaskDetailsModalProps {
   task: Task;
   onClose: () => void;
@@ -33,9 +34,9 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
         axiosInstance.get(`/task-reviews/?task=${task.id}`), // only if backend supports filtering by task
       ]);
 
-      setFiles(filesRes.data);
-      setComments(commentsRes.data);
-      setReviews(reviewsRes.data);
+      setFiles(Array.isArray(filesRes.data) ? filesRes.data : filesRes.data.results || []);
+setComments(Array.isArray(commentsRes.data) ? commentsRes.data : commentsRes.data.results || []);
+setReviews(Array.isArray(reviewsRes.data) ? reviewsRes.data : reviewsRes.data.results || []);
 
     } catch (error) {
       console.error("Error fetching task details:", error);
@@ -52,10 +53,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const handleProgressUpdate = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const newPercentage = Number(e.target.value);
     try {
-      const res = await axiosInstance.post('/task-progress', {
-        taskId: task.id,
-        progressPercentage: newPercentage,
-        updatedBy: currentUser.id
+      const res = await axiosInstance.post('/task-progress/', {
+        task: task.id,
+        progress_percentage: newPercentage,
+        updated_by: currentUser.id
       });
       setProgress(prev => [...prev, res.data]);
     } catch (error) {
@@ -113,10 +114,6 @@ const getFileReviews = (fileId: number) =>
       if (reviewFileId) {
        const payload = {
   task_file: reviewFileId,
-  
-  reviewed_by_role:
-    currentUser.role_name === UserRole.SUPER_ADMIN? "ADMIN" : "PM",
-  review_version: getFileReviews(reviewFileId).length + 1,
   comments: values.comments,
   status: values.status
 };
@@ -136,19 +133,21 @@ const getFileReviews = (fileId: number) =>
       comment: { required: true, message: 'Comment cannot be empty.' }
     },
     onSubmit: async (values) => {
-      const res = await axiosInstance.post('/task-comments', {
-        taskId: task.id,
-        userId: currentUser.id,
-        comment: values.comment
+      const res = await axiosInstance.post('/task-comments/', {
+         task: task.id,
+         comment: values.comment
       });
       setComments(prev => [...prev, res.data]);
       commentForm.resetForm();
     }
   });
 
- const isReviewer =
+  const isReviewer =
+  currentUser.role === UserRole.SUPER_ADMIN ||
+  currentUser.role === UserRole.PROJECT_MANAGER ||
   currentUser.role_name === UserRole.SUPER_ADMIN ||
-  currentUser.role_name === UserRole.PROJECT_MANAGER;
+  currentUser.role_name === UserRole.PROJECT_MANAGER ||
+  currentUser.is_superuser;
 
   return (
     <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1} style={{ zIndex: 1060 }}>
@@ -384,11 +383,11 @@ const getFileReviews = (fileId: number) =>
                     ) : (
                       comments.map(c => (
                         <div key={c.id} className="d-flex mb-3">
-                          <img src={`https://i.pravatar.cc/32?u=${c.userId}`} className="rounded-circle me-3 border shadow-sm" style={{ width: '32px', height: '32px' }} alt="" />
+                          <img src={`https://i.pravatar.cc/32?u=${c.user}`} className="rounded-circle me-3 border shadow-sm" style={{ width: '32px', height: '32px' }} alt="" />
                           <div className="flex-grow-1">
                             <div className="d-flex justify-content-between align-items-center mb-1">
-                              <span className="fw-bold small text-dark">{users.find(u => u.id === c.userId)?.name}</span>
-                              <span className="text-muted" style={{ fontSize: '0.65rem' }}>{c.createdAt}</span>
+                              <span className="fw-bold small text-dark">{c.user_name}</span>
+                              <span className="text-muted" style={{ fontSize: '0.65rem' }}>{new Date(c.created_at).toLocaleString()}</span>
                             </div>
                             <div className="p-2 bg-light rounded-3 small text-dark">{c.comment}</div>
                           </div>

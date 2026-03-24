@@ -430,10 +430,12 @@ try {
         {[
           { label: 'Status', value: project.status.replace('_', ' '), icon: 'bi-activity', color: 'primary' },
           { label: 'Progress', value: `${project.progress_percentage}%`, icon: 'bi-bullseye', color: 'info' },
-          { label: 'Total Tasks', value: projectTasks.length, icon: 'bi-check2-circle', color: 'dark' },
-          { label: 'Deadline', value: project.endDate, icon: 'bi-calendar3', color: 'danger' }
+          { label: 'Total Tasks', value: projectTasks.length, icon: 'bi-list-task', color: 'dark' },
+          { label: 'Completed Tasks', value: projectTasks.filter(t => t.status==='done').length, icon: 'bi-check2-circle', color: 'success' },
+          { label: 'Total Milestones', value: projectMilestones.length, icon: 'bi-flag', color: 'secondary' },
+          { label: 'Completed Milestones', value: projectMilestones.filter(m => m.status==='completed').length, icon: 'bi-flag-fill', color: 'success' }
         ].map((s, i) => (
-          <div className="col-lg-3 col-md-6" key={i}>
+          <div className="col-12 col-sm-6 col-md-4 col-xl" key={i}>
             <div className="card p-3 border-0 shadow-sm d-flex flex-row align-items-center h-100">
               <div className={`p-2 rounded-3 bg-${s.color}-subtle text-${s.color} me-3`}><i className={`bi ${s.icon} fs-5`}></i></div>
               <div>

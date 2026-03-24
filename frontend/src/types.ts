@@ -259,11 +259,12 @@ export interface TaskProgress {
 
 export interface TaskComment {
   id: number;
-  taskId: string;
-  userId: number;
+  task: number;
+  user: number;
+  user_name: string;
   comment: string;
-  createdAt: string;
-  deletedAt?: string;
+  created_at: string;
+  deleted_at?: string;
 }
 
 export interface TaskFile {
