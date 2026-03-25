@@ -8,6 +8,7 @@ from .views import (
     HRDocumentViewSet,
     OfferLetterGenerateView,
     SalaryCertificateGenerateView,
+    InternshipCertificateGenerateView,
 )
 
 router = DefaultRouter()
@@ -19,6 +20,7 @@ urlpatterns = [
     path("hr-documents/appraisal-letter/", AppraisalLetterGenerateView.as_view()),
     path("hr-documents/experience-certificate/", ExperienceCertificateGenerateView.as_view()),
     path("hr-documents/salary-certificate/", SalaryCertificateGenerateView.as_view()),
+    path("hr-documents/internship-certificate/", InternshipCertificateGenerateView.as_view()),
     *router.urls,
 ]
 

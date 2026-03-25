@@ -1,9 +1,14 @@
+import os
 from io import BytesIO
 from decimal import Decimal
 from typing import Any, Dict
 
+from django.conf import settings
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from reportlab.lib.colors import HexColor
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph
 
 
 def _money(value: Any) -> str:
@@ -19,18 +24,75 @@ def _base_canvas() -> tuple[canvas.Canvas, BytesIO]:
     return p, buf
 
 
+def draw_hr_document_template(p: canvas.Canvas, width: float, height: float):
+    blue = HexColor("#0753F6")
+    green = HexColor("#1AB728")
+    dark_blue = HexColor("#05044A")
+
+    # Header Background
+    p.setFillColor(dark_blue)
+    p.rect(0, height - 80, width, 80, stroke=0, fill=1)
+
+    # Logo
+    logo_path = os.path.join(settings.BASE_DIR, 'media', 'logo', 'Grehasoft-logo.png')
+    if os.path.exists(logo_path):
+        p.drawImage(logo_path, 40, height - 65, width=140, preserveAspectRatio=True, mask='auto')
+    else:
+        p.setFillColor(blue)
+        p.setFont("Helvetica-Bold", 24)
+        p.drawString(40, height - 50, "GREHASOFT")
+
+    # Right Contact Info
+    p.setFillColor(HexColor("#FFFFFF"))
+    p.setFont("Helvetica", 9)
+    rx = width - 200
+    y_contact = height - 30
+    p.drawString(rx, y_contact, "Phone: (+91) 89215 40183")
+    p.drawString(rx, y_contact - 15, "Email: info@grehasoft.com")
+    p.drawString(rx + 110, y_contact, "Loc: Infopark, Kochi")
+    p.drawString(rx + 110, y_contact - 15, "Web: grehasoft.com")
+
+    # Curved Green + Blue lines (using bezier for aesthetic curves)
+    p.setStrokeColor(green)
+    p.setLineWidth(4)
+    p.bezier(0, height - 85, width/2, height - 85, width/2 + 50, height - 70, width, height - 70)
+    
+    p.setStrokeColor(blue)
+    p.setLineWidth(4)
+    p.bezier(0, height - 90, width/2 - 20, height - 90, width/2 + 30, height - 75, width, height - 75)
+
+    # Watermark
+    p.saveState()
+    p.setFillAlpha(0.1)
+    if os.path.exists(logo_path):
+        p.drawImage(logo_path, width/2 - 150, height/2 - 150, width=300, preserveAspectRatio=True, mask='auto', anchor='c')
+    else:
+        p.setFillColor(blue)
+        p.setFont("Helvetica-Bold", 120)
+        p.drawCentredString(width/2, height/2 - 40, "GS")
+    p.restoreState()
+
+    # Footer Line
+    p.setStrokeColor(green)
+    p.setLineWidth(3)
+    p.line(50, 60, width - 50, 60)
+    p.setFillColor(dark_blue)
+    p.setFont("Helvetica", 9)
+    p.drawCentredString(width/2, 40, "Grehasoft | Infopark, Kochi, Kerala | www.grehasoft.com")
+
+
 def build_offer_letter_pdf(context: Dict[str, Any]) -> bytes:
     p, buf = _base_canvas()
     width, height = A4
+    draw_hr_document_template(p, width, height)
 
-    y = height - 60
+    y = height - 150
+    p.setFillColor(HexColor("#05044A"))
     p.setFont("Helvetica-Bold", 16)
-    p.drawString(50, y, "GREHASOFT")
-    y -= 24
-    p.setFont("Helvetica", 10)
     p.drawString(50, y, "Job Offer Letter")
-    y -= 24
+    y -= 30
 
+    p.setFillColor(HexColor("#444444"))
     p.setFont("Helvetica", 11)
     p.drawString(50, y, f"Date: {context.get('date')}")
     y -= 20
@@ -57,29 +119,30 @@ def build_offer_letter_pdf(context: Dict[str, Any]) -> bytes:
         p.drawString(50, y, line)
         y -= 18
 
-    y -= 18
+    y -= 20
     p.drawString(50, y, "Sincerely,")
-    y -= 36
+    y -= 40
     p.setFont("Helvetica-Bold", 11)
     p.drawString(50, y, "Authorized Signatory")
 
     p.showPage()
     p.save()
+    buf.seek(0)
     return buf.getvalue()
 
 
 def build_appraisal_letter_pdf(context: Dict[str, Any]) -> bytes:
     p, buf = _base_canvas()
     width, height = A4
-    y = height - 60
-
+    draw_hr_document_template(p, width, height)
+    
+    y = height - 150
+    p.setFillColor(HexColor("#05044A"))
     p.setFont("Helvetica-Bold", 16)
-    p.drawString(50, y, "GREHASOFT")
-    y -= 24
-    p.setFont("Helvetica", 10)
     p.drawString(50, y, "Annual Salary Appraisal Letter")
-    y -= 24
+    y -= 30
 
+    p.setFillColor(HexColor("#444444"))
     p.setFont("Helvetica", 11)
     p.drawString(50, y, f"Date: {context.get('date')}")
     y -= 24
@@ -100,63 +163,71 @@ def build_appraisal_letter_pdf(context: Dict[str, Any]) -> bytes:
         p.drawString(50, y, line)
         y -= 18
 
-    y -= 18
+    y -= 20
     p.drawString(50, y, "Sincerely,")
-    y -= 36
+    y -= 40
     p.setFont("Helvetica-Bold", 11)
     p.drawString(50, y, "Authorized Signatory")
 
     p.showPage()
     p.save()
+    buf.seek(0)
     return buf.getvalue()
 
 
 def build_experience_certificate_pdf(context: Dict[str, Any]) -> bytes:
     p, buf = _base_canvas()
     width, height = A4
+    draw_hr_document_template(p, width, height)
 
+    y = height - 160
+    p.setFillColor(HexColor("#05044A"))
     p.setFont("Helvetica-Bold", 20)
-    p.drawCentredString(width / 2, height - 80, "EXPERIENCE CERTIFICATE")
+    p.drawCentredString(width / 2, y, "EXPERIENCE CERTIFICATE")
+    y -= 40
 
+    p.setFillColor(HexColor("#444444"))
     p.setFont("Helvetica", 11)
-    p.drawCentredString(width / 2, height - 110, "This is to certify that")
+    p.drawCentredString(width / 2, y, "This is to certify that")
+    y -= 30
 
     p.setFont("Helvetica-Bold", 14)
-    p.drawCentredString(width / 2, height - 140, str(context.get("employee_name")))
+    p.drawCentredString(width / 2, y, str(context.get("employee_name")))
+    y -= 30
 
     p.setFont("Helvetica", 11)
     body = (
         f"has worked with GREHASOFT as {context.get('role')} "
         f"from {context.get('start_date')} to {context.get('end_date')}."
     )
-    p.drawCentredString(width / 2, height - 170, body)
+    p.drawCentredString(width / 2, y, body)
+    y -= 40
 
-    p.setFont("Helvetica", 11)
-    p.drawCentredString(width / 2, height - 210, "We wish them all the best for future endeavors.")
+    p.drawCentredString(width / 2, y, "We wish them all the best for future endeavors.")
+    y -= 50
 
-    p.setFont("Helvetica", 11)
-    p.drawString(50, 120, f"Date: {context.get('date')}")
-
+    p.drawString(50, y, f"Date: {context.get('date')}")
     p.setFont("Helvetica-Bold", 11)
-    p.drawString(width - 220, 90, "Authorized Signatory")
+    p.drawString(width - 200, y, "Authorized Signatory")
 
     p.showPage()
     p.save()
+    buf.seek(0)
     return buf.getvalue()
 
 
 def build_salary_certificate_pdf(context: Dict[str, Any]) -> bytes:
     p, buf = _base_canvas()
     width, height = A4
-    y = height - 60
-
+    draw_hr_document_template(p, width, height)
+    
+    y = height - 150
+    p.setFillColor(HexColor("#05044A"))
     p.setFont("Helvetica-Bold", 16)
-    p.drawString(50, y, context.get("company_name") or "GREHASOFT")
-    y -= 24
-    p.setFont("Helvetica", 10)
     p.drawString(50, y, "Salary Certificate")
-    y -= 28
+    y -= 30
 
+    p.setFillColor(HexColor("#444444"))
     p.setFont("Helvetica", 11)
     lines = [
         f"Date of Issue: {context.get('issue_date')}",
@@ -171,11 +242,82 @@ def build_salary_certificate_pdf(context: Dict[str, Any]) -> bytes:
         p.drawString(50, y, line)
         y -= 18
 
-    y -= 18
+    y -= 20
     p.setFont("Helvetica-Bold", 11)
     p.drawString(50, y, "Authorized Signatory")
 
     p.showPage()
     p.save()
+    buf.seek(0)
     return buf.getvalue()
 
+
+def build_internship_certificate_pdf(context: Dict[str, Any]) -> bytes:
+    p, buf = _base_canvas()
+    width, height = A4
+    draw_hr_document_template(p, width, height)
+
+    y = height - 150
+    p.setFillColor(HexColor("#05044A"))
+    p.setFont("Helvetica-Bold", 20)
+    p.drawCentredString(width / 2, y, "INTERNSHIP CERTIFICATE")
+    y -= 40
+
+    styles = getSampleStyleSheet()
+    style = styles["Normal"]
+    style.fontName = "Helvetica"
+    style.fontSize = 12
+    style.leading = 18
+    style.textColor = HexColor("#444444")
+
+    intern_name = context.get('intern_name')
+    college_name = context.get('college_name')
+    position = context.get('position')
+    company_name = context.get('company_name') or 'GREHASOFT'
+    start_date = context.get('start_date')
+    end_date = context.get('end_date')
+
+    para1_text = (
+        f"This is to certify that Mr./Ms. <b>{intern_name}</b> from <b>{college_name}</b> has "
+        f"successfully completed an internship as <b>{position}</b> at <b>{company_name}</b> "
+        f"from <b>{start_date}</b> to <b>{end_date}</b>."
+    )
+    para1 = Paragraph(para1_text, style)
+
+    para2_text = (
+        "During the internship period, the intern demonstrated sincerity, dedication, "
+        "and professionalism in assigned tasks."
+    )
+    para2 = Paragraph(para2_text, style)
+
+    para3_text = "We wish them all the best in their future endeavors."
+    para3 = Paragraph(para3_text, style)
+
+    para1.wrapOn(p, width - 100, height)
+    para1.drawOn(p, 50, y - para1.height)
+    y -= (para1.height + 25)
+
+    para2.wrapOn(p, width - 100, height)
+    para2.drawOn(p, 50, y - para2.height)
+    y -= (para2.height + 25)
+
+    para3.wrapOn(p, width - 100, height)
+    para3.drawOn(p, 50, y - para3.height)
+    y -= (para3.height + 50)
+
+    p.setFont("Helvetica", 11)
+    p.setFillColor(HexColor("#05044A"))
+    p.drawString(50, y, f"Date: {context.get('issue_date')}")
+
+    p.setFont("Helvetica-Bold", 11)
+    p.drawString(width - 200, y, "Authorized Signatory")
+    y -= 20
+    p.setFont("Helvetica", 11)
+    p.drawString(width - 200, y, str(context.get('hr_name')))
+    y -= 15
+    p.drawString(width - 200, y, str(company_name))
+
+    p.showPage()
+    p.save()
+    buf.seek(0)
+    return buf.getvalue()

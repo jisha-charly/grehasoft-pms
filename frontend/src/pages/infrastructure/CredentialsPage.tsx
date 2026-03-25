@@ -31,6 +31,9 @@ interface Credential {
   ftp_password?: string;
   client_email?: string;
   client_email_password?: string;
+  business_email?: string;
+  business_email_password?: string;
+  business_email_type?: string;
   notes?: string;
 }
 
@@ -76,6 +79,9 @@ const CredentialsPage: React.FC<CredentialsPageProps> = ({ projects = [], domain
     ftp_password: "",
     client_email: "",
     client_email_password: "",
+    business_email: "",
+    business_email_password: "",
+    business_email_type: "",
     notes: ""
   });
 
@@ -148,6 +154,9 @@ const CredentialsPage: React.FC<CredentialsPageProps> = ({ projects = [], domain
       ftp_password: cred.ftp_password || "",
       client_email: cred.client_email || "",
       client_email_password: cred.client_email_password || "",
+      business_email: cred.business_email || "",
+      business_email_password: cred.business_email_password || "",
+      business_email_type: cred.business_email_type || "",
       notes: cred.notes || ""
     });
     setEditingId(cred.id);
@@ -187,6 +196,9 @@ const CredentialsPage: React.FC<CredentialsPageProps> = ({ projects = [], domain
       ftp_password: "",
       client_email: "",
       client_email_password: "",
+      business_email: "",
+      business_email_password: "",
+      business_email_type: "",
       notes: ""
     });
   };
@@ -424,6 +436,21 @@ const CredentialsPage: React.FC<CredentialsPageProps> = ({ projects = [], domain
                   </div>
                 </div>
 
+                <div className="row mt-3">
+                  <div className="col-md-4 mb-3">
+                    <strong>Business Email:</strong> <br />
+                    <span className="text-secondary">{viewCredential.business_email || "-"}</span>
+                  </div>
+                  <div className="col-md-4 mb-3">
+                    <strong>Email Password:</strong> <br />
+                    <code className="bg-light px-2 py-1 rounded text-dark">{viewCredential.business_email_password || "-"}</code>
+                  </div>
+                  <div className="col-md-4 mb-3">
+                    <strong>Email Type:</strong> <br />
+                    <span className="text-secondary text-capitalize">{viewCredential.business_email_type || "-"}</span>
+                  </div>
+                </div>
+
                 {viewCredential.notes && (
                   <>
                     <hr className="text-muted opacity-25" />
@@ -634,6 +661,47 @@ const CredentialsPage: React.FC<CredentialsPageProps> = ({ projects = [], domain
                         value={form.client_email_password}
                         onChange={handleChange}
                       />
+                    </div>
+
+                    <div className="col-md-4 mt-3">
+                      <label className="form-label fw-medium text-dark">Business Email</label>
+                      <input
+                        type="email"
+                        className="form-control"
+                        name="business_email"
+                        placeholder="hr@example.com"
+                        value={form.business_email}
+                        onChange={handleChange}
+                      />
+                    </div>
+
+                    <div className="col-md-4 mt-3">
+                      <label className="form-label fw-medium text-dark">Business Email Password</label>
+                      <input
+                        type="password"
+                        className="form-control"
+                        name="business_email_password"
+                        placeholder="••••••••"
+                        value={form.business_email_password}
+                        onChange={handleChange}
+                      />
+                    </div>
+
+                    <div className="col-md-4 mt-3">
+                      <label className="form-label fw-medium text-dark">Business Email Type</label>
+                      <select
+                        className="form-select"
+                        name="business_email_type"
+                        value={form.business_email_type}
+                        onChange={handleChange}
+                      >
+                        <option value="">Select Type</option>
+                        <option value="gsuite">GSuite</option>
+                        <option value="zoho">Zoho</option>
+                        <option value="google">Google Workspace</option>
+                        <option value="microsoft">Microsoft 365</option>
+                        <option value="other">Other</option>
+                      </select>
                     </div>
 
                     <div className="col-12 mt-4">

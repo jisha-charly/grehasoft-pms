@@ -158,6 +158,12 @@ class WebsiteCredential(models.Model):
 
     client_email_password = EncryptedTextField(blank=True)
 
+    business_email = models.EmailField(blank=True, null=True)
+
+    business_email_password = EncryptedTextField(blank=True, null=True)
+
+    business_email_type = models.CharField(max_length=50, blank=True, null=True)
+
     notes = models.TextField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

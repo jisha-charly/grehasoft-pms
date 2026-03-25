@@ -57,6 +57,7 @@ class WebsiteCredentialSerializer(serializers.ModelSerializer):
             "cpanel_password",
             "ftp_password",
             "client_email_password",
+            "business_email_password",
         ]:
             if data.get(field):
                 data[field] = "••••••••"

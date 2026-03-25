@@ -18,6 +18,7 @@ type OfferForm = {
 type AppraisalForm = {
   employeeId: string;
   increasePercentage: string;
+  newMonthlySalary: string;
   effectiveDate: string;
 };
 
@@ -32,6 +33,17 @@ type SalaryCertForm = {
   employeeId: string;
   companyName: string;
   issueDate: string;
+};
+
+type InternshipForm = {
+  employeeName: string;
+  collegeName: string;
+  position: string;
+  startDate: string;
+  endDate: string;
+  issueDate: string;
+  companyName: string;
+  hrName: string;
 };
 
 const HRDocumentsPage: React.FC = () => {
@@ -75,7 +87,7 @@ const handleOfferUserChange = (id: string) => {
 };
 
   const [activeTab, setActiveTab] = useState<
-    "offer" | "appraisal" | "experience" | "salary"
+    "offer" | "appraisal" | "experience" | "salary" | "internship"
   >("offer");
 
   const [offer, setOffer] = useState<OfferForm>({
@@ -91,6 +103,7 @@ const handleOfferUserChange = (id: string) => {
   const [appraisal, setAppraisal] = useState<AppraisalForm>({
     employeeId: "",
     increasePercentage: "",
+    newMonthlySalary: "",
     effectiveDate: "",
   });
 
@@ -105,6 +118,17 @@ const handleOfferUserChange = (id: string) => {
     employeeId: "",
     companyName: "GREHASOFT",
     issueDate: "",
+  });
+
+  const [internship, setInternship] = useState<InternshipForm>({
+    employeeName: "",
+    collegeName: "",
+    position: "",
+    startDate: "",
+    endDate: "",
+    issueDate: "",
+    companyName: "GREHASOFT",
+    hrName: "",
   });
 
   const [errors, setErrors] = useState<any>({});
@@ -129,7 +153,7 @@ const handleOfferUserChange = (id: string) => {
     let e: any = {};
     if (!appraisal.employeeId) e.employeeId = "Please select employee or enter employee name";
     if (!selectedAppraisalEmployee?.salary_monthly) e.currentSalary = "Current salary is required";
-    if (!appraisal.increasePercentage || Number(appraisal.increasePercentage) <= 0) e.newSalary = "New salary must be greater than current salary";
+    if (!appraisal.increasePercentage && !appraisal.newMonthlySalary) e.newSalary = "Enter Increase % or New Salary";
     if (!appraisal.effectiveDate) e.effectiveDate = "Effective date is required";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -159,13 +183,29 @@ const handleOfferUserChange = (id: string) => {
     return Object.keys(e).length === 0;
   };
 
+  const validateInternship = () => {
+    let e: any = {};
+    if (!internship.employeeName?.trim()) e.employeeName = "Intern name is required";
+    if (!internship.collegeName?.trim()) e.collegeName = "College name is required";
+    if (!internship.position?.trim()) e.position = "Position is required";
+    if (!internship.startDate) e.startDate = "Start date is required";
+    if (!internship.endDate) e.endDate = "End date is required";
+    if (!internship.issueDate) e.issueDate = "Issue date is required";
+    if (!internship.hrName?.trim()) e.hrName = "HR Manager name is required";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
   const computedNewSalary = useMemo(() => {
     if (!selectedAppraisalEmployee) return "";
+    
+    if (appraisal.newMonthlySalary) return Number(appraisal.newMonthlySalary).toFixed(2);
+
     const pct = Number(appraisal.increasePercentage || 0);
     const oldSalary = Number(selectedAppraisalEmployee.salary_monthly || 0);
     if (!pct || !oldSalary) return "";
     return (oldSalary * (1 + pct / 100)).toFixed(2);
-  }, [selectedAppraisalEmployee, appraisal.increasePercentage]);
+  }, [selectedAppraisalEmployee, appraisal.increasePercentage, appraisal.newMonthlySalary]);
 
 
   const postPdf = async (url: string, payload: any, filename: string) => {
@@ -247,6 +287,15 @@ const handleOfferUserChange = (id: string) => {
                 type="button"
               >
                 Salary Certificate
+              </button>
+            </li>
+            <li className="nav-item">
+              <button
+                className={`nav-link ${activeTab === "internship" ? "active" : ""}`}
+                onClick={() => setActiveTab("internship")}
+                type="button"
+              >
+                Internship Certificate
               </button>
             </li>
           </ul>
@@ -392,7 +441,8 @@ const handleOfferUserChange = (id: string) => {
                   "/hr-documents/appraisal-letter/",
                   {
                     employee_id: Number(appraisal.employeeId),
-                    increase_percentage: Number(appraisal.increasePercentage),
+                    increase_percentage: appraisal.increasePercentage ? Number(appraisal.increasePercentage) : undefined,
+                    new_monthly_salary: appraisal.newMonthlySalary ? Number(appraisal.newMonthlySalary) : undefined,
                     effective_date: appraisal.effectiveDate,
                   },
                   "appraisal_letter.pdf"
@@ -400,7 +450,7 @@ const handleOfferUserChange = (id: string) => {
               }}
             >
               <div className="row g-3">
-                <div className="col-md-6">
+                <div className="col-md-4">
                   <label className="form-label fw-bold small">Employee *</label>
                   <select
                     name="employeeId"
@@ -420,8 +470,8 @@ const handleOfferUserChange = (id: string) => {
                   {errors.employeeId && <div className="invalid-feedback">{errors.employeeId}</div>}
                   {errors.currentSalary && <div className="text-danger small mt-1">{errors.currentSalary}</div>}
                 </div>
-                <div className="col-md-3">
-                  <label className="form-label fw-bold small">Increase % *</label>
+                <div className="col-md-2">
+                  <label className="form-label fw-bold small">Increase %</label>
                   <input
                     name="newSalary"
                     type="number"
@@ -431,11 +481,34 @@ const handleOfferUserChange = (id: string) => {
                       setAppraisal((p) => ({
                         ...p,
                         increasePercentage: e.target.value,
+                        newMonthlySalary: "", 
                       }))
                     }
                   />
                   {errors.newSalary && <div className="invalid-feedback">{errors.newSalary}</div>}
-                  {computedNewSalary && (
+                  {computedNewSalary && !appraisal.newMonthlySalary && (
+                    <div className="small text-secondary mt-1">
+                      New: <span className="fw-bold">{computedNewSalary}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label fw-bold small">New Salary (Manual)</label>
+                  <input
+                    name="newMonthlySalary"
+                    type="number"
+                    className="form-control"
+                    placeholder="Enter new monthly salary"
+                    value={appraisal.newMonthlySalary}
+                    onChange={(e) =>
+                       setAppraisal((p) => ({
+                         ...p,
+                         newMonthlySalary: e.target.value,
+                         increasePercentage: "",
+                       }))
+                    }
+                  />
+                  {computedNewSalary && appraisal.newMonthlySalary && (
                     <div className="small text-secondary mt-1">
                       New: <span className="fw-bold">{computedNewSalary}</span>
                     </div>
@@ -631,6 +704,139 @@ const handleOfferUserChange = (id: string) => {
                 <div className="col-12">
                   <button className="btn btn-primary fw-bold" type="submit">
                     Download Salary Certificate PDF
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+
+          {activeTab === "internship" && (
+            <form
+              noValidate
+              onChange={(e: any) => { if(errors[e.target.name]) setErrors({...errors, [e.target.name]: null}); }}
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!validateInternship()) return;
+                await postPdf(
+                  "/hr-documents/internship-certificate/",
+                  {
+                    intern_name: internship.employeeName,
+                    college_name: internship.collegeName,
+                    position: internship.position,
+                    start_date: internship.startDate,
+                    end_date: internship.endDate,
+                    issue_date: internship.issueDate,
+                    company_name: internship.companyName,
+                    hr_name: internship.hrName,
+                  },
+                  "internship_certificate.pdf"
+                );
+              }}
+            >
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <label className="form-label fw-bold small">Intern Name *</label>
+                  <input
+                    name="employeeName"
+                    className={`form-control ${errors.employeeName ? 'is-invalid' : ''}`}
+                    value={internship.employeeName}
+                    onChange={(e) =>
+                      setInternship((p) => ({ ...p, employeeName: e.target.value }))
+                    }
+                  />
+                  {errors.employeeName && <div className="invalid-feedback">{errors.employeeName}</div>}
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label fw-bold small">College / Institution *</label>
+                  <input
+                    name="collegeName"
+                    className={`form-control ${errors.collegeName ? 'is-invalid' : ''}`}
+                    value={internship.collegeName}
+                    onChange={(e) =>
+                      setInternship((p) => ({ ...p, collegeName: e.target.value }))
+                    }
+                  />
+                  {errors.collegeName && <div className="invalid-feedback">{errors.collegeName}</div>}
+                </div>
+                <div className="col-md-12">
+                  <label className="form-label fw-bold small">Internship Position *</label>
+                  <input
+                    name="position"
+                    className={`form-control ${errors.position ? 'is-invalid' : ''}`}
+                    value={internship.position}
+                    placeholder="e.g., Frontend Developer Intern"
+                    onChange={(e) =>
+                      setInternship((p) => ({ ...p, position: e.target.value }))
+                    }
+                  />
+                  {errors.position && <div className="invalid-feedback">{errors.position}</div>}
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label fw-bold small">Start Date *</label>
+                  <input
+                    name="startDate"
+                    type="date"
+                    className={`form-control ${errors.startDate ? 'is-invalid' : ''}`}
+                    value={internship.startDate}
+                    onChange={(e) =>
+                      setInternship((p) => ({ ...p, startDate: e.target.value }))
+                    }
+                  />
+                  {errors.startDate && <div className="invalid-feedback">{errors.startDate}</div>}
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label fw-bold small">End Date *</label>
+                  <input
+                    name="endDate"
+                    type="date"
+                    className={`form-control ${errors.endDate ? 'is-invalid' : ''}`}
+                    value={internship.endDate}
+                    onChange={(e) =>
+                      setInternship((p) => ({ ...p, endDate: e.target.value }))
+                    }
+                  />
+                  {errors.endDate && <div className="invalid-feedback">{errors.endDate}</div>}
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label fw-bold small">Issue Date *</label>
+                  <input
+                    name="issueDate"
+                    type="date"
+                    className={`form-control ${errors.issueDate ? 'is-invalid' : ''}`}
+                    value={internship.issueDate}
+                    onChange={(e) =>
+                      setInternship((p) => ({ ...p, issueDate: e.target.value }))
+                    }
+                  />
+                  {errors.issueDate && <div className="invalid-feedback">{errors.issueDate}</div>}
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label fw-bold small">Company Name (Optional)</label>
+                  <input
+                    name="companyName"
+                    className="form-control"
+                    value={internship.companyName}
+                    onChange={(e) =>
+                      setInternship((p) => ({ ...p, companyName: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label fw-bold small">Authorized Signatory *</label>
+                  <input
+                    name="hrName"
+                    className={`form-control ${errors.hrName ? 'is-invalid' : ''}`}
+                    placeholder="HR Manager Name"
+                    value={internship.hrName}
+                    onChange={(e) =>
+                      setInternship((p) => ({ ...p, hrName: e.target.value }))
+                    }
+                  />
+                  {errors.hrName && <div className="invalid-feedback">{errors.hrName}</div>}
+                </div>
+                <div className="col-12">
+                  <button className="btn btn-primary fw-bold" type="submit">
+                    Download Internship Certificate PDF
                   </button>
                 </div>
               </div>

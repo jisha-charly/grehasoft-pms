@@ -16,6 +16,7 @@ from .pdf import (
     build_experience_certificate_pdf,
     build_offer_letter_pdf,
     build_salary_certificate_pdf,
+    build_internship_certificate_pdf,
 )
 from .serializers import (
     AppraisalInputSerializer,
@@ -24,6 +25,7 @@ from .serializers import (
     HRDocumentSerializer,
     OfferLetterInputSerializer,
     SalaryCertificateInputSerializer,
+    InternshipCertificateInputSerializer,
 )
 
 
@@ -93,7 +95,9 @@ class AppraisalLetterGenerateView(APIView):
         from django.contrib.auth import get_user_model
         User = get_user_model()
         employee = get_object_or_404(User.objects.all(), id=data["employee_id"])
-        increase_pct = Decimal(data["increase_percentage"])
+        
+        increase_pct = data.get("increase_percentage")
+        new_monthly = data.get("new_monthly_salary")
 
         effective = data.get("effective_date")
         if not effective:
@@ -101,7 +105,13 @@ class AppraisalLetterGenerateView(APIView):
             effective = date(today.year, 3, 31)
 
         old_salary = Decimal(employee.salary_monthly)
-        new_salary = (old_salary * (Decimal("1") + (increase_pct / Decimal("100")))).quantize(Decimal("0.01"))
+        
+        if new_monthly is not None:
+            new_salary = Decimal(new_monthly)
+            increase_pct = ((new_salary - old_salary) / old_salary * Decimal("100")).quantize(Decimal("0.01")) if old_salary else Decimal("0")
+        else:
+            increase_pct = Decimal(increase_pct or 0)
+            new_salary = (old_salary * (Decimal("1") + (increase_pct / Decimal("100")))).quantize(Decimal("0.01"))
 
         ctx = {
             "date": timezone.now().date().isoformat(),
@@ -163,4 +173,27 @@ class SalaryCertificateGenerateView(APIView):
         }
         pdf = build_salary_certificate_pdf(ctx)
         return _pdf_response(pdf, "salary_certificate.pdf")
+
+
+class InternshipCertificateGenerateView(APIView):
+    permission_classes = [HasPermission]
+    required_permission = 'GENERATE_HR_DOCS'
+
+    def post(self, request):
+        ser = InternshipCertificateInputSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        data = ser.validated_data
+
+        ctx = {
+            "intern_name": data["intern_name"],
+            "college_name": data["college_name"],
+            "position": data["position"],
+            "start_date": data["start_date"].isoformat(),
+            "end_date": data["end_date"].isoformat(),
+            "issue_date": data["issue_date"].isoformat(),
+            "company_name": data.get("company_name", ""),
+            "hr_name": data["hr_name"],
+        }
+        pdf = build_internship_certificate_pdf(ctx)
+        return _pdf_response(pdf, "internship_certificate.pdf")
 
