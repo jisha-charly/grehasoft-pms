@@ -41,6 +41,23 @@ class LeadSerializer(serializers.ModelSerializer):
         allow_null=True
     )
 
+    # ✨ Array fields - validate as lists
+    service_required = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        allow_empty=True
+    )
+    documents_given = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        allow_empty=True
+    )
+    login_credentials = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        allow_empty=True
+    )
+
     class Meta:
         model = Lead
         fields = [
@@ -51,12 +68,32 @@ class LeadSerializer(serializers.ModelSerializer):
             'source',
             'status',
 
-            # 🔥 NEW
+            # 🔥 Existing
             'client',
             'client_name',
-
             'converted_project',
             'converted_project_name',
+
+            # ✨ NEW - Lead Source
+            'enquiry_from',
+            'how_contacted',
+            'contacted_person',
+            'reference_person',
+
+            # ✨ NEW - Company
+            'company_name',
+
+            # ✨ NEW - Services
+            'service_required',
+
+            # ✨ NEW - Project Details
+            'client_requirements',
+            'details_given',
+            'competitor_websites',
+
+            # ✨ NEW - Assets
+            'documents_given',
+            'login_credentials',
 
             'followups',
             'assignments',
@@ -66,3 +103,21 @@ class LeadSerializer(serializers.ModelSerializer):
         ]
 
         read_only_fields = ['converted_project']
+
+    def validate_service_required(self, value):
+        """Ensure service_required is a list"""
+        if not isinstance(value, list):
+            raise serializers.ValidationError("service_required must be a list of strings")
+        return value
+
+    def validate_documents_given(self, value):
+        """Ensure documents_given is a list"""
+        if not isinstance(value, list):
+            raise serializers.ValidationError("documents_given must be a list of strings")
+        return value
+
+    def validate_login_credentials(self, value):
+        """Ensure login_credentials is a list"""
+        if not isinstance(value, list):
+            raise serializers.ValidationError("login_credentials must be a list of strings")
+        return value

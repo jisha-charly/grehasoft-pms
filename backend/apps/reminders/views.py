@@ -17,7 +17,14 @@ class ReminderViewSet(viewsets.ModelViewSet):
         return Reminder.objects.filter(user=user).order_by('-id')
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        reminder = serializer.save(user=self.request.user)
+        # Send email on creation if not already sent
+        if not reminder.email_sent_created:
+            from .utils import send_reminder_email
+            success = send_reminder_email(reminder.id, "Created")
+            if success:
+                reminder.email_sent_created = True
+                reminder.save(update_fields=['email_sent_created'])
 
 
 # DASHBOARD API (OUTSIDE THE CLASS)

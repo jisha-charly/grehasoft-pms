@@ -92,6 +92,31 @@ class UserViewSet(viewsets.ModelViewSet):
             
         return queryset
 
+    def check_email_permission(self, request, instance):
+        if 'email' in request.data and request.data['email'] != instance.email:
+            req_user = request.user
+            req_is_super = req_user.is_superuser or (req_user.role and req_user.role.name == 'SUPER_ADMIN')
+            tgt_is_super = instance.is_superuser or (instance.role and instance.role.name == 'SUPER_ADMIN')
+            
+            if not req_is_super:
+                return False
+            if req_user.id != instance.id and tgt_is_super:
+                return False
+        return True
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not self.check_email_permission(request, instance):
+            return Response({"email": ["You do not have permission to change this user's email."]}, status=status.HTTP_403_FORBIDDEN)
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not self.check_email_permission(request, instance):
+            return Response({"email": ["You do not have permission to change this user's email."]}, status=status.HTTP_403_FORBIDDEN)
+        return super().partial_update(request, *args, **kwargs)
+
+
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def me(self, request):
         """

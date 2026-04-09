@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'apps.reminders.apps.RemindersConfig',  # 👈 add this
     'apps.hr_documents.apps.HrDocumentsConfig',
     "apps.infrastructure.apps.InfrastructureConfig",
+    'apps.notifications.apps.NotificationsConfig',
     'core.apps.CoreConfig',
 ]
 
@@ -176,3 +177,15 @@ DEFAULT_FROM_EMAIL = 'Grehasoft PMS <noreply@grehasoft.com>'
 CELERY_BROKER_URL = "redis://localhost:6379/0"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
+
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    'send_daily_reminders': {
+        'task': 'apps.reminders.tasks.check_and_create_reminder_notifications',
+         'schedule': crontab(minute='*/1'),
+    },
+    'send_domain_alerts': {
+        'task': 'apps.infrastructure.tasks.check_and_create_domain_notifications',
+        'schedule': crontab(hour=9, minute=30),
+    },
+}

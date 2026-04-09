@@ -43,7 +43,25 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
+    def validate_email(self, value):
+        if not value or str(value).strip() == "":
+            raise serializers.ValidationError("Email cannot be blank.")
+        return value
+
     def update(self, instance, validated_data):
+        request = self.context.get('request')
+        
+        if request and 'email' in validated_data and validated_data['email'] != instance.email:
+            req_user = request.user
+            req_is_super = req_user.is_superuser or (req_user.role and req_user.role.name == 'SUPER_ADMIN')
+            tgt_is_super = instance.is_superuser or (instance.role and instance.role.name == 'SUPER_ADMIN')
+            
+            if not req_is_super:
+                raise serializers.ValidationError({"email": "You do not have permission to change this user's email."})
+                
+            if req_user.id != instance.id and tgt_is_super:
+                raise serializers.ValidationError({"email": "You do not have permission to change this user's email."})
+
         password = validated_data.pop('password', None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
