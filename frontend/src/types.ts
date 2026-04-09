@@ -302,6 +302,19 @@ export interface Lead {
   client_name?: string | null;  
   createdAt: string;
   updatedAt?: string;
+  enquiry_from?: string;
+how_contacted?: string;
+contacted_person?: string;
+reference_person?: string;
+company_name?: string;
+
+service_required?: string[];
+client_requirements?: string;
+details_given?: string;
+competitor_websites?: string;
+
+documents_given?: string[];
+login_credentials?: string[];
 }
 export interface LeadAssignment {
   id: number;

@@ -6,6 +6,26 @@ import { useCrud } from '../../hooks/useCrud';
 import FormField from '../../components/FormField';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 
+type LeadFormValues = {
+  name: string;
+  email: string;
+  phone: string;
+  source: string;
+  status: string;
+  converted_project_id: string;
+  enquiry_from: string;
+  how_contacted: string;
+  contacted_person: string;
+  reference_person: string;
+  company_name: string;
+  service_required: string[];
+  client_requirements: string;
+  details_given: string;
+  competitor_websites: string;
+  documents_given: string[];
+  login_credentials: string[];
+};
+
 interface LeadsPageProps {
   users: User[];
   clients: Client[];
@@ -126,21 +146,34 @@ const handleConfirmAssignmentDelete = async () => {
     handleSubmit,
     resetForm,
     setValues
-  } = useForm({
+  } = useForm<LeadFormValues>({
     initialValues: {
       name: '',
       email: '',
       phone: '',
       source: 'Web',
       status: 'new',
-      converted_project_id: ''
+      converted_project_id: '',
+      enquiry_from: '',
+      how_contacted: '',
+      contacted_person: '',
+      reference_person: '',
+      company_name: '',
+      service_required: [],
+      client_requirements: '',
+      details_given: '',
+      competitor_websites: '',
+      documents_given: [],
+      login_credentials: []
     },
     validationSchema,
     onSubmit: async (formData) => {
       const payload = {
         ...formData,
-        
-        converted_project_id: formData.converted_project_id ? Number(formData.converted_project_id) : null
+        converted_project_id: formData.converted_project_id ? Number(formData.converted_project_id) : null,
+        service_required: formData.service_required || [],
+        documents_given: formData.documents_given || [],
+        login_credentials: formData.login_credentials || []
       };
 
       if (editingLead) {
@@ -201,7 +234,18 @@ const handleConfirmDelete = async () => {
       phone: lead.phone || '',
       source: lead.source,
       status: lead.status,
-      converted_project_id: lead.converted_project?.toString() || ''
+      converted_project_id: lead.converted_project?.toString() || '',
+      enquiry_from: lead.enquiry_from || '',
+      how_contacted: lead.how_contacted || '',
+      contacted_person: lead.contacted_person || '',
+      reference_person: lead.reference_person || '',
+      company_name: lead.company_name || '',
+      service_required: lead.service_required || [],
+      client_requirements: lead.client_requirements || '',
+      details_given: lead.details_given || '',
+      competitor_websites: lead.competitor_websites || '',
+      documents_given: lead.documents_given || [],
+      login_credentials: lead.login_credentials || []
     });
     setModalOpen(true);
   };
@@ -571,103 +615,220 @@ const formatPhoneForWhatsApp = (phone: string) => {
 </div>
       </div>
 
-      {/* Add/Edit Lead Modal */}
+      {/* Add/Edit Lead Modal - ENHANCED */}
       {isModalOpen && (
-        <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
-              <form onSubmit={handleSubmit} noValidate>
-                <div className="modal-header border-0 bg-white pt-4 px-4">
+        <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100vh', position: 'fixed', top: 0, left: 0 }}>
+          <div className="modal-dialog modal-lg" style={{ maxHeight: '95vh', display: 'flex', margin: 'auto' }}>
+            <div className="modal-content border-0 rounded-4 shadow-lg d-flex flex-column" style={{ maxHeight: '95vh', overflow: 'hidden' }}>
+              <form onSubmit={handleSubmit} noValidate className="d-flex flex-column" style={{ height: '100%' }}>
+                <div className="modal-header border-0 bg-white pt-4 px-4 flex-shrink-0">
                   <h5 className="modal-title fw-bold text-dark">{editingLead ? 'Update Prospect Profile' : 'Register New Prospect'}</h5>
                   <button type="button" className="btn-close" onClick={() => setModalOpen(false)}></button>
                 </div>
-                <div className="modal-body p-4 bg-white">
+                <div className="modal-body p-4 bg-white" style={{ flex: '1 1 auto', overflowY: 'auto', minHeight: 0 }}>
                   <div className="row g-3">
+                    {/* BASIC INFO SECTION */}
                     <div className="col-12">
-                      <FormField
-                        label="Full Name *"
-                        name="name"
-                        value={values.name}
-                        onChange={handleChange}
-                        error={errors.name}
-                        placeholder="e.g. Alex Thompson"
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <FormField
-                        label="Email *"
-                        name="email"
-                        type="email"
-                        value={values.email}
-                        onChange={handleChange}
-                        error={errors.email}
-                        placeholder="alex@example.com"
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <FormField
-                        label="Phone"
-                        name="phone"
-                        value={values.phone}
-                        onChange={handleChange}
-                        placeholder="+91 00000 00000"
-                      />
+                      <h6 className="fw-bold text-primary small uppercase border-bottom pb-2 mb-3">
+                        <i className="bi bi-person me-2"></i>Basic Information
+                      </h6>
                     </div>
                     <div className="col-12">
-                      <FormField
-                        label="Source"
-                        name="source"
-                        type="select"
-                        value={values.source}
-                        onChange={handleChange}
-                        options={[
-                          { label: 'Website', value: 'Web' },
-                          { label: 'Ads', value: 'Ads' },
-                          { label: 'Referral', value: 'Referral' },
-                          { label: 'Direct', value: 'Direct' }
-                        ]}
-                      />
+                      <FormField label="Full Name *" name="name" value={values.name} onChange={handleChange} error={errors.name} placeholder="e.g. Alex Thompson" />
                     </div>
+                    <div className="col-md-6">
+                      <FormField label="Email *" name="email" type="email" value={values.email} onChange={handleChange} error={errors.email} placeholder="alex@example.com" />
+                    </div>
+                    <div className="col-md-6">
+                      <FormField label="Phone" name="phone" value={values.phone} onChange={handleChange} placeholder="+91 00000 00000" />
+                    </div>
+                    <div className="col-12">
+                      <FormField label="Company Name" name="company_name" value={values.company_name} onChange={handleChange} placeholder="e.g. ABC Corporation" />
+                    </div>
+
+                    {/* LEAD SOURCE SECTION */}
+                    <div className="col-12 mt-3">
+                      <h6 className="fw-bold text-primary small uppercase border-bottom pb-2 mb-3">
+                        <i className="bi bi-funnel me-2"></i>Lead Source
+                      </h6>
+                    </div>
+                    <div className="col-12">
+                      <FormField label="Source" name="source" type="select" value={values.source} onChange={handleChange} options={[
+                        { label: 'Website', value: 'Web' },
+                        { label: 'Ads', value: 'Ads' },
+                        { label: 'Referral', value: 'Referral' },
+                        { label: 'Direct', value: 'Direct' }
+                      ]} />
+                    </div>
+                    <div className="col-md-6">
+                      <FormField label="Enquiry From" name="enquiry_from" type="select" value={values.enquiry_from} onChange={handleChange} options={[
+                        { label: 'WhatsApp', value: 'WhatsApp' },
+                        { label: 'Call', value: 'Call' },
+                        { label: 'Facebook', value: 'Facebook' },
+                        { label: 'Instagram', value: 'Instagram' },
+                        { label: 'LinkedIn', value: 'LinkedIn' }
+                      ]} />
+                    </div>
+                    <div className="col-md-6">
+                      <FormField label="How Contacted" name="how_contacted" type="select" value={values.how_contacted} onChange={handleChange} options={[
+                        { label: 'Direct', value: 'Direct' },
+                        { label: 'Reference', value: 'Reference' },
+                        { label: 'Friend', value: 'Friend' }
+                      ]} />
+                    </div>
+                    <div className="col-md-6">
+                      <FormField label="Contacted Person" name="contacted_person" value={values.contacted_person} onChange={handleChange} placeholder="Name of person contacted" />
+                    </div>
+                    <div className="col-md-6">
+                      <FormField label="Reference Person" name="reference_person" value={values.reference_person} onChange={handleChange} placeholder="If referred by someone" />
+                    </div>
+
+                    {/* SERVICES SECTION */}
+                    <div className="col-12 mt-3">
+                      <h6 className="fw-bold text-primary small uppercase border-bottom pb-2 mb-3">
+                        <i className="bi bi-gear me-2"></i>Services Required
+                      </h6>
+                    </div>
+                    <div className="col-12">
+                      <div className="row g-2">
+                        {[
+                          { label: 'Logo', value: 'Logo' },
+                          { label: 'Branding', value: 'Branding' },
+                          { label: 'Poster Design', value: 'Poster Design' },
+                          { label: 'Letter Head', value: 'Letter Head' },
+                          { label: 'Business Card', value: 'Business Card' },
+                          { label: 'WordPress Website', value: 'WordPress Website' },
+                          { label: 'Shopify', value: 'Shopify' },
+                          { label: 'WooCommerce', value: 'WooCommerce' },
+                          { label: 'LearnPress', value: 'LearnPress' },
+                          { label: 'HTML Website', value: 'HTML Website' },
+                          { label: 'Dynamic Custom Website', value: 'Dynamic Custom Website' },
+                          { label: 'Custom Software', value: 'Custom Software' },
+                          { label: 'Mobile App', value: 'Mobile App' },
+                        ].map(service => (
+                          <div key={service.value} className="col-md-4">
+                            <div className="form-check">
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                id={`service_${service.value}`}
+                                checked={values.service_required.includes(service.value)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setValues({ ...values, service_required: [...values.service_required, service.value] });
+                                  } else {
+                                    setValues({ ...values, service_required: values.service_required.filter(s => s !== service.value) });
+                                  }
+                                }}
+                              />
+                              <label className="form-check-label small" htmlFor={`service_${service.value}`}>{service.label}</label>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* PROJECT DETAILS SECTION */}
+                    <div className="col-12 mt-3">
+                      <h6 className="fw-bold text-primary small uppercase border-bottom pb-2 mb-3">
+                        <i className="bi bi-clipboard me-2"></i>Project Details
+                      </h6>
+                    </div>
+                    <div className="col-12">
+                      <FormField label="Client Requirements" name="client_requirements" type="textarea" value={values.client_requirements} onChange={handleChange} placeholder="Describe client's requirements" rows={3} />
+                    </div>
+                    <div className="col-12">
+                      <FormField label="Details Given" name="details_given" type="textarea" value={values.details_given} onChange={handleChange} placeholder="Details provided by client" rows={3} />
+                    </div>
+                    <div className="col-12">
+                      <FormField label="Competitor Websites" name="competitor_websites" type="textarea" value={values.competitor_websites} onChange={handleChange} placeholder="List competitor or reference websites" rows={3} />
+                    </div>
+
+                    {/* DOCUMENTS & CREDENTIALS SECTION */}
+                    <div className="col-12 mt-3">
+                      <h6 className="fw-bold text-primary small uppercase border-bottom pb-2 mb-3">
+                        <i className="bi bi-file-earmark me-2"></i>Documents & Credentials
+                      </h6>
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label small fw-bold mb-2">Documents Given</label>
+                      <div className="row g-2">
+                        {['Logo', 'Brochures', 'Content', 'Drawings'].map(doc => (
+                          <div key={doc} className="col-md-3">
+                            <div className="form-check">
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                id={`doc_${doc}`}
+                                checked={values.documents_given.includes(doc)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setValues({ ...values, documents_given: [...values.documents_given, doc] });
+                                  } else {
+                                    setValues({ ...values, documents_given: values.documents_given.filter(d => d !== doc) });
+                                  }
+                                }}
+                              />
+                              <label className="form-check-label small" htmlFor={`doc_${doc}`}>{doc}</label>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label small fw-bold mb-2">Login Credentials</label>
+                      <div className="row g-2">
+                        {['Website', 'Facebook', 'Instagram', 'LinkedIn', 'Google Ads', 'Meta Business Suite'].map(cred => (
+                          <div key={cred} className="col-md-4">
+                            <div className="form-check">
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                id={`cred_${cred}`}
+                                checked={values.login_credentials.includes(cred)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setValues({ ...values, login_credentials: [...values.login_credentials, cred] });
+                                  } else {
+                                    setValues({ ...values, login_credentials: values.login_credentials.filter(c => c !== cred) });
+                                  }
+                                }}
+                              />
+                              <label className="form-check-label small" htmlFor={`cred_${cred}`}>{cred}</label>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* LEAD STATUS SECTION (Edit Only) */}
                     {editingLead && (
                       <>
-                        <div className="col-md-6">
-                          <FormField
-                            label="Status"
-                            name="status"
-                            type="select"
-                            value={values.status}
-                            onChange={handleChange}
-                            options={[
-                              { label: 'New', value: 'new' },
-                              { label: 'Contacted', value: 'contacted' },
-                              { label: 'Qualified', value: 'qualified' },
-                              { label: 'Converted', value: 'converted' },
-                              { label: 'Lost', value: 'lost' }
-                            ]}
-                          />
+                        <div className="col-12 mt-3">
+                          <h6 className="fw-bold text-primary small uppercase border-bottom pb-2 mb-3">
+                            <i className="bi bi-check-circle me-2"></i>Lead Status
+                          </h6>
                         </div>
                         <div className="col-md-6">
-                          <FormField
-                            label="Converted Project ID"
-                            name="converted_project_id"
-                            type="number"
-                            value={values.converted_project_id}
-                            onChange={handleChange}
-                            placeholder="Project ID"
-                          />
+                          <FormField label="Status" name="status" type="select" value={values.status} onChange={handleChange} options={[
+                            { label: 'New', value: 'new' },
+                            { label: 'Contacted', value: 'contacted' },
+                            { label: 'Qualified', value: 'qualified' },
+                            { label: 'Converted', value: 'converted' },
+                            { label: 'Lost', value: 'lost' }
+                          ]} />
+                        </div>
+                        <div className="col-md-6">
+                          <FormField label="Converted Project ID" name="converted_project_id" type="number" value={values.converted_project_id} onChange={handleChange} placeholder="Project ID" />
                         </div>
                       </>
                     )}
                   </div>
                 </div>
-                <div className="modal-footer border-0 bg-white pb-4 px-4 gap-2">
+                <div className="modal-footer border-0 bg-white pb-4 px-4 gap-2 flex-shrink-0">
                   <button type="button" className="btn btn-light fw-bold px-4" onClick={() => setModalOpen(false)}>Discard</button>
                   <button type="submit" className="btn btn-primary fw-bold px-4 shadow-sm" disabled={isSubmitting}>
-                    {isSubmitting ? (
-                      <><span className="spinner-border spinner-border-sm me-2"></span>Saving...</>
-                    ) : (
-                      editingLead ? 'Save Changes' : 'Confirm Registration'
-                    )}
+                    {isSubmitting ? <><span className="spinner-border spinner-border-sm me-2"></span>Saving...</> : (editingLead ? 'Save Changes' : 'Confirm Registration')}
                   </button>
                 </div>
               </form>
@@ -676,24 +837,110 @@ const formatPhoneForWhatsApp = (phone: string) => {
         </div>
       )}
 
-      {/* Lead Details Modal (Assignments & Followups) */}
+      {/* Lead Details Modal - ENHANCED WITH NEW SECTIONS */}
       {isDetailsModalOpen && selectedLead && (
-        <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
-          <div className="modal-dialog modal-xl modal-dialog-centered">
-            <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
-              <div className="modal-header border-0 bg-white pt-4 px-4">
+        <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100vh', position: 'fixed', top: 0, left: 0 }}>
+          <div className="modal-dialog modal-xl" style={{ maxHeight: '95vh', display: 'flex', margin: 'auto' }}>
+            <div className="modal-content border-0 rounded-4 shadow-lg d-flex flex-column" style={{ maxHeight: '95vh', overflow: 'hidden' }}>
+              <div className="modal-header border-0 bg-white pt-4 px-4 flex-shrink-0">
                 <div>
                   <h5 className="modal-title fw-bold text-dark">{selectedLead.name}</h5>
                   <p className="text-secondary smaller mb-0">{selectedLead.email} | {selectedLead.phone}</p>
                 </div>
                 <button type="button" className="btn-close" onClick={() => setDetailsModalOpen(false)}></button>
               </div>
-              <div className="modal-body p-4 bg-light">
+              <div className="modal-body p-4 bg-light" style={{ flex: '1 1 auto', overflowY: 'auto', minHeight: 0 }}>
                 <div className="row g-4">
-                  <div className="col-lg-4">
+                  {/* LEAD INFO SECTION */}
+                  <div className="col-12">
+                    <div className="card border-0 shadow-sm p-3">
+                      <h6 className="fw-bold mb-3"><i className="bi bi-person-circle me-2 text-primary"></i>Lead Information</h6>
+                      <div className="row g-3">
+                        <div className="col-md-6"><div className="small text-muted">Full Name</div><div className="fw-bold text-dark">{selectedLead.name}</div></div>
+                        <div className="col-md-6"><div className="small text-muted">Email</div><div className="fw-bold text-dark">{selectedLead.email}</div></div>
+                        <div className="col-md-6"><div className="small text-muted">Phone</div><div className="fw-bold text-dark">{selectedLead.phone || 'N/A'}</div></div>
+                        <div className="col-md-6"><div className="small text-muted">Company</div><div className="fw-bold text-dark">{selectedLead.company_name || 'N/A'}</div></div>
+                        <div className="col-md-6"><div className="small text-muted">Status</div><span className={`badge rounded-pill ${selectedLead.status === 'converted' ? 'bg-success' : 'bg-primary'}`}>{selectedLead.status}</span></div>
+                        <div className="col-md-6"><div className="small text-muted">Source</div><span className="badge bg-light text-dark border fw-normal">{selectedLead.source}</span></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SOURCE INFO SECTION */}
+                  {(selectedLead.enquiry_from || selectedLead.how_contacted || selectedLead.contacted_person || selectedLead.reference_person) && (
+                    <div className="col-12">
+                      <div className="card border-0 shadow-sm p-3">
+                        <h6 className="fw-bold mb-3"><i className="bi bi-funnel me-2 text-primary"></i>Enquiry Source</h6>
+                        <div className="row g-3">
+                          {selectedLead.enquiry_from && <div className="col-md-6"><div className="small text-muted">Enquiry From</div><div className="fw-bold text-dark">{selectedLead.enquiry_from}</div></div>}
+                          {selectedLead.how_contacted && <div className="col-md-6"><div className="small text-muted">How Contacted</div><div className="fw-bold text-dark">{selectedLead.how_contacted}</div></div>}
+                          {selectedLead.contacted_person && <div className="col-md-6"><div className="small text-muted">Contacted Person</div><div className="fw-bold text-dark">{selectedLead.contacted_person}</div></div>}
+                          {selectedLead.reference_person && <div className="col-md-6"><div className="small text-muted">Reference Person</div><div className="fw-bold text-dark">{selectedLead.reference_person}</div></div>}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SERVICES SECTION */}
+                  {selectedLead.service_required && selectedLead.service_required.length > 0 && (
+                    <div className="col-12">
+                      <div className="card border-0 shadow-sm p-3">
+                        <h6 className="fw-bold mb-3"><i className="bi bi-gear me-2 text-primary"></i>Services Required</h6>
+                        <div className="d-flex flex-wrap gap-2">
+                          {selectedLead.service_required.map(service => (
+                            <span key={service} className="badge bg-primary-subtle text-primary border border-primary">{service}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* PROJECT DETAILS SECTION */}
+                  {(selectedLead.client_requirements || selectedLead.details_given || selectedLead.competitor_websites) && (
+                    <div className="col-12">
+                      <div className="card border-0 shadow-sm p-3">
+                        <h6 className="fw-bold mb-3"><i className="bi bi-clipboard me-2 text-primary"></i>Project Details</h6>
+                        <div className="row g-3">
+                          {selectedLead.client_requirements && <div className="col-12"><div className="small text-muted">Client Requirements</div><div className="text-dark bg-white p-2 rounded border-start border-3 border-primary">{selectedLead.client_requirements}</div></div>}
+                          {selectedLead.details_given && <div className="col-12"><div className="small text-muted">Details Given</div><div className="text-dark bg-white p-2 rounded border-start border-3 border-primary">{selectedLead.details_given}</div></div>}
+                          {selectedLead.competitor_websites && <div className="col-12"><div className="small text-muted">Competitor/Reference Websites</div><div className="text-dark bg-white p-2 rounded border-start border-3 border-primary">{selectedLead.competitor_websites}</div></div>}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* DOCUMENTS SECTION */}
+                  {selectedLead.documents_given && selectedLead.documents_given.length > 0 && (
+                    <div className="col-12">
+                      <div className="card border-0 shadow-sm p-3">
+                        <h6 className="fw-bold mb-3"><i className="bi bi-file-earmark me-2 text-primary"></i>Documents Given</h6>
+                        <div className="d-flex flex-wrap gap-2">
+                          {selectedLead.documents_given.map(doc => (
+                            <span key={doc} className="badge bg-success-subtle text-success border border-success"><i className="bi bi-file-earmark me-1"></i>{doc}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* LOGIN CREDENTIALS SECTION */}
+                  {selectedLead.login_credentials && selectedLead.login_credentials.length > 0 && (
+                    <div className="col-12">
+                      <div className="card border-0 shadow-sm p-3">
+                        <h6 className="fw-bold mb-3"><i className="bi bi-key me-2 text-primary"></i>Login Credentials</h6>
+                        <div className="d-flex flex-wrap gap-2">
+                          {selectedLead.login_credentials.map(cred => (
+                            <span key={cred} className="badge bg-warning-subtle text-warning border border-warning"><i className="bi bi-lock me-1"></i>{cred}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ASSIGNMENTS SECTION */}
+                  <div className="col-lg-6">
                     <div className="card border-0 shadow-sm h-100 p-3">
-                      <h6 className="fw-bold mb-3 d-flex align-items-center"><i className="bi bi-person-badge me-2 text-primary"></i>Assignments</h6>
-                      
+                      <h6 className="fw-bold mb-3"><i className="bi bi-person-badge me-2 text-primary"></i>Assignments</h6>
                       <form onSubmit={handleAssignExec} className="mb-3">
                         <div className="input-group input-group-sm">
                           <select name="sales_exec_id" className="form-select bg-light border-0" required>
@@ -703,46 +950,30 @@ const formatPhoneForWhatsApp = (phone: string) => {
                           <button type="submit" className="btn btn-primary"><i className="bi bi-plus"></i></button>
                         </div>
                       </form>
-
                       {assignments.length === 0 ? (
                         <p className="text-muted smaller italic">No executives assigned yet.</p>
                       ) : (
                         <ul className="list-group list-group-flush">
                           {Array.isArray(assignments) && assignments.map(a => (
- <li
-  key={a.id}
-  className="list-group-item bg-transparent px-0 py-2 border-0 d-flex justify-content-between align-items-start"
->
-  {/* LEFT SIDE */}
-  <div>
-    <div className="fw-bold small">
-      {a.sales_exec_details?.name || 'Unknown'}
-    </div>
-    <div className="smaller text-muted">
-      Assigned: {new Date(a.assigned_at).toLocaleDateString()}
-    </div>
-  </div>
-
-  {/* RIGHT SIDE (DELETE BUTTON) */}
-  <button
-    className="btn btn-sm text-danger p-0 ms-2"
-    onClick={() => handleDeleteAssignmentClick(a)}
-    title="Remove Assignment"
-  >
-    <i className="bi bi-x-circle"></i>
-  </button>
-</li>
-
- 
-  
-))}
+                            <li key={a.id} className="list-group-item bg-transparent px-0 py-2 border-0 d-flex justify-content-between align-items-start">
+                              <div>
+                                <div className="fw-bold small">{a.sales_exec_details?.name || 'Unknown'}</div>
+                                <div className="smaller text-muted">Assigned: {new Date(a.assigned_at).toLocaleDateString()}</div>
+                              </div>
+                              <button className="btn btn-sm text-danger p-0 ms-2" onClick={() => handleDeleteAssignmentClick(a)} title="Remove Assignment">
+                                <i className="bi bi-x-circle"></i>
+                              </button>
+                            </li>
+                          ))}
                         </ul>
                       )}
                     </div>
                   </div>
-                  <div className="col-lg-8">
+
+                  {/* FOLLOW-UPS SECTION */}
+                  <div className="col-lg-6">
                     <div className="card border-0 shadow-sm p-3 mb-4">
-                      <h6 className="fw-bold mb-3 d-flex align-items-center"><i className="bi bi-chat-dots me-2 text-primary"></i>Follow-up History</h6>
+                      <h6 className="fw-bold mb-3"><i className="bi bi-chat-dots me-2 text-primary"></i>Follow-up History</h6>
                       <div className="overflow-auto" style={{ maxHeight: '300px' }}>
                         {followups.length === 0 ? (
                           <p className="text-muted smaller italic text-center py-4">No follow-up history found.</p>
@@ -762,9 +993,8 @@ const formatPhoneForWhatsApp = (phone: string) => {
                         )}
                       </div>
                     </div>
-
                     <div className="card border-0 shadow-sm p-3">
-                      <h6 className="fw-bold mb-3 d-flex align-items-center"><i className="bi bi-plus-circle me-2 text-success"></i>New Follow-up</h6>
+                      <h6 className="fw-bold mb-3"><i className="bi bi-plus-circle me-2 text-success"></i>New Follow-up</h6>
                       <form onSubmit={handleAddFollowup}>
                         <div className="row g-2">
                           <div className="col-md-4">
@@ -796,8 +1026,8 @@ const formatPhoneForWhatsApp = (phone: string) => {
       )}
       {/* Convert Lead Modal */}
       {isConvertModalOpen && convertingLead && (
-        <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1} style={{ zIndex: 1060 }}>
-          <div className="modal-dialog modal-lg modal-dialog-centered">
+        <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 1060 }}>
+          <div className="modal-dialog modal-lg" style={{ display: 'flex', margin: 'auto' }}>
             <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
               <form onSubmit={convertForm.handleSubmit} noValidate>
                 <div className="modal-header border-0 bg-white pt-4 px-4">
