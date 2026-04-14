@@ -1,4 +1,5 @@
 import os
+from turtle import width
 
 from rest_framework import viewsets, filters
 from django.conf import settings
@@ -247,13 +248,22 @@ def generate_invoice_pdf(invoice):
     y -= 15
     p.drawString(50,y,"IFSC Code : SBIN0018060")
 
+    # -----------------------------
+    # QR CODE (SCAN & PAY)
+    # -----------------------------
+    qr_path = os.path.join(settings.MEDIA_ROOT, "scanpay.jpeg")
 
+    try:
+        qr = ImageReader(qr_path)
+        p.drawImage(qr, width - 180, 120, width=120, height=160)  
+    except Exception as e:
+        print("QR image error:", e)
     # -----------------------------
     # FOOTER
     # -----------------------------
     p.setFont("Helvetica",9)
     p.drawCentredString(width/2, 40, "Thank you for doing business with GREHASOFT")
-
+ 
 
     p.save()
 

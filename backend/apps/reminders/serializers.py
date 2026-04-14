@@ -7,5 +7,5 @@ class ReminderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Reminder
         fields = "__all__"
-        read_only_fields = ["user", "created_at"]
+        read_only_fields = ["user", "created_at", "email_sent_created", "email_sent_reminder"]
 

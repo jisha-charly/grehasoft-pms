@@ -1,0 +1,240 @@
+INFO 2026-04-14 10:15:11,257 views    Reminder: ue date, Due Date: 2026-04-14, Type: invoice
+ERROR 2026-04-14 10:15:14,034 utils Email Config - HOST: smtp.gmail.com, PORT: 587, USER: jisha.charly@gmail.com
+INFO 2026-04-14 10:19:15,290 views [REMINDER] Attempting to send creation email for Reminder ID 19
+INFO 2026-04-14 10:19:15,291 views    Title: meet, Due: 2026-04-14, Type: general
+ERROR 2026-04-14 10:19:17,544 utils [SMTP ERROR] SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2b46ceca0d3sm9287635ad.28 - gsmtp')
+ERROR 2026-04-14 10:19:17,545 utils Email Config - HOST: smtp.gmail.com, PORT: 587, USER: jisha.charly@gmail.com
+ERROR 2026-04-14 10:19:17,546 utils [ERROR] SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2b46ceca0d3sm9287635ad.28 - gsmtp')
+Traceback (most recent call last):
+  File "D:\grehasoft pms 28_3_26\jisha\grehasoftnew\backend\apps\reminders\utils.py", line 40, in send_reminder_email
+    send_mail(
+    ~~~~~~~~~^
+        subject=subject,
+        ^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        fail_silently=False,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\grehasoft pms 28_3_26\jisha\grehasoftnew\backend\venv\Lib\site-packages\django\utils\deprecation.py", line 268, in wrapper
+    return func(*args, **kwargs)
+  File "D:\grehasoft pms 28_3_26\jisha\grehasoftnew\backend\venv\Lib\site-packages\django\core\mail\__init__.py", line 108, in send_mail
+    return mail.send()
+           ~~~~~~~~~^^
+  File "D:\grehasoft pms 28_3_26\jisha\grehasoftnew\backend\venv\Lib\site-packages\django\core\mail\message.py", line 358, in send
+    return self.get_connection(fail_silently).send_messages([self])
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "D:\grehasoft pms 28_3_26\jisha\grehasoftnew\backend\venv\Lib\site-packages\django\core\mail\backends\smtp.py", line 130, in send_messages
+    new_conn_created = self.open()
+  File "D:\grehasoft pms 28_3_26\jisha\grehasoftnew\backend\venv\Lib\site-packages\django\core\mail\backends\smtp.py", line 97, in open
+    self.connection.login(self.username, self.password)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\smtplib.py", line 750, in login
+    raise last_exception
+  File "C:\Python313\Lib\smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ~~~~~~~~~^
+        authmethod, getattr(self, method_name),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        initial_response_ok=initial_response_ok)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2b46ceca0d3sm9287635ad.28 - gsmtp')
+WARNING 2026-04-14 10:19:17,560 views [WARNING] Email function returned False for Reminder ID 19
+INFO 2026-04-14 10:21:34,934 views [REMINDER] Attempting to send creation email for Reminder ID 20
+INFO 2026-04-14 10:21:34,935 views    Title: meeting, Due: 2026-04-14, Type: general
+ERROR 2026-04-14 10:21:37,204 utils [SMTP ERROR] SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-82f51284a18sm1924768b3a.46 - gsmtp')
+ERROR 2026-04-14 10:21:37,205 utils Email Config - HOST: smtp.gmail.com, PORT: 587, USER: jisha.charly@gmail.com
+ERROR 2026-04-14 10:21:37,206 utils [ERROR] SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-82f51284a18sm1924768b3a.46 - gsmtp')
+Traceback (most recent call last):
+  File "D:\grehasoft pms 28_3_26\jisha\grehasoftnew\backend\apps\reminders\utils.py", line 40, in send_reminder_email
+    send_mail(
+    ~~~~~~~~~^
+        subject=subject,
+        ^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        fail_silently=False,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\grehasoft pms 28_3_26\jisha\grehasoftnew\backend\venv\Lib\site-packages\django\utils\deprecation.py", line 268, in wrapper
+    return func(*args, **kwargs)
+  File "D:\grehasoft pms 28_3_26\jisha\grehasoftnew\backend\venv\Lib\site-packages\django\core\mail\__init__.py", line 108, in send_mail
+    return mail.send()
+           ~~~~~~~~~^^
+  File "D:\grehasoft pms 28_3_26\jisha\grehasoftnew\backend\venv\Lib\site-packages\django\core\mail\message.py", line 358, in send
+    return self.get_connection(fail_silently).send_messages([self])
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "D:\grehasoft pms 28_3_26\jisha\grehasoftnew\backend\venv\Lib\site-packages\django\core\mail\backends\smtp.py", line 130, in send_messages
+    new_conn_created = self.open()
+  File "D:\grehasoft pms 28_3_26\jisha\grehasoftnew\backend\venv\Lib\site-packages\django\core\mail\backends\smtp.py", line 97, in open
+    self.connection.login(self.username, self.password)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\smtplib.py", line 750, in login
+    raise last_exception
+  File "C:\Python313\Lib\smtplib.py", line 739, in login
+    (code, resp) = self.auth(
+                   ~~~~~~~~~^
+        authmethod, getattr(self, method_name),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        initial_response_ok=initial_response_ok)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\smtplib.py", line 662, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-82f51284a18sm1924768b3a.46 - gsmtp')
+WARNING 2026-04-14 10:21:37,211 views [WARNING] Email function returned False for Reminder ID 20
+INFO 2026-04-14 10:28:24,544 views [REMINDER] Attempting to send creation email for Reminder ID 21
+INFO 2026-04-14 10:28:24,544 views    Title: meet, Due: 2026-04-14, Type: general
+INFO 2026-04-14 10:28:27,946 utils [SUCCESS] Sent Created reminder email for Reminder ID 21 to 2 admins: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:28:27,952 views [SUCCESS] Email flag updated for Reminder ID 21
+INFO 2026-04-14 10:33:21,648 views [REMINDER] Attempting to send creation email for Reminder ID 22
+INFO 2026-04-14 10:33:21,648 views    Title: today, Due: 2026-04-14, Type: invoice
+INFO 2026-04-14 10:33:25,421 utils [SUCCESS] Sent Created reminder email for Reminder ID 22 to 2 admins: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:33:25,430 views [SUCCESS] Email flag updated for Reminder ID 22
+INFO 2026-04-14 10:36:33,417 views [REMINDER] Attempting to send creation email for Reminder ID 23
+INFO 2026-04-14 10:36:33,417 views    Title: paymeny, Due: 2026-04-22, Type: payment
+INFO 2026-04-14 10:36:36,825 utils [SUCCESS] Sent Created reminder email for Reminder ID 23 to 2 admins: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:36:36,831 views [SUCCESS] Email flag updated for Reminder ID 23
+INFO 2026-04-14 10:45:13,201 tasks [REMINDER TASK] Started: check_and_create_reminder_notifications
+INFO 2026-04-14 10:45:13,201 tasks [DATE] Today's date: 2026-04-14
+INFO 2026-04-14 10:45:13,203 tasks [TODAY] Reminders due today: 8 found
+INFO 2026-04-14 10:45:13,208 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: today
+INFO 2026-04-14 10:45:13,208 signals 📧 [SIGNAL] Sending email for Notification ID 12
+INFO 2026-04-14 10:45:13,208 utils 📩 [EMAIL] Starting email send for notification 12
+INFO 2026-04-14 10:45:13,209 utils 🔍 [EMAIL] Notification found: Reminder Due: today
+INFO 2026-04-14 10:45:13,211 utils 👥 [EMAIL] Found 2 admin users
+INFO 2026-04-14 10:45:13,212 utils 📬 [EMAIL] Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:45:13,212 utils 📋 [EMAIL] Email details:
+INFO 2026-04-14 10:45:13,212 utils    📧 From: Grehasoft PMS <noreply@grehasoft.com>
+INFO 2026-04-14 10:45:13,213 utils    📋 Subject: Alert: Reminder Due: today
+INFO 2026-04-14 10:45:13,213 utils    🌐 Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:45:13,213 utils 📤 [EMAIL] Sending email via SMTP...
+INFO 2026-04-14 10:45:48,663 tasks [REMINDER TASK] Started: check_and_create_reminder_notifications
+INFO 2026-04-14 10:45:48,663 tasks [DATE] Today's date: 2026-04-14
+INFO 2026-04-14 10:45:48,665 tasks [TODAY] Reminders due today: 8 found
+INFO 2026-04-14 10:45:48,671 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: urgent
+INFO 2026-04-14 10:45:48,671 signals 📧 [SIGNAL] Sending email for Notification ID 13
+INFO 2026-04-14 10:45:48,672 utils 📩 [EMAIL] Starting email send for notification 13
+INFO 2026-04-14 10:45:48,673 utils 🔍 [EMAIL] Notification found: Reminder Due: urgent
+INFO 2026-04-14 10:45:48,673 utils 👥 [EMAIL] Found 2 admin users
+INFO 2026-04-14 10:45:48,674 utils 📬 [EMAIL] Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:45:48,674 utils 📋 [EMAIL] Email details:
+INFO 2026-04-14 10:45:48,674 utils    📧 From: Grehasoft PMS <noreply@grehasoft.com>
+INFO 2026-04-14 10:45:48,675 utils    📋 Subject: Alert: Reminder Due: urgent
+INFO 2026-04-14 10:45:48,675 utils    🌐 Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:45:48,675 utils 📤 [EMAIL] Sending email via SMTP...
+INFO 2026-04-14 10:45:52,311 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: urgent
+INFO 2026-04-14 10:45:52,311 signals ⏩ [SIGNAL] Email already sent for notification 13
+INFO 2026-04-14 10:45:52,311 utils ✅ [EMAIL] Email sent successfully and marked as sent in DB for notification 13
+INFO 2026-04-14 10:45:52,311 signals ✅ [SIGNAL] Email sent successfully
+INFO 2026-04-14 10:45:52,315 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: meet
+INFO 2026-04-14 10:45:52,316 signals 📧 [SIGNAL] Sending email for Notification ID 14
+INFO 2026-04-14 10:45:52,316 utils 📩 [EMAIL] Starting email send for notification 14
+INFO 2026-04-14 10:45:52,316 utils 🔍 [EMAIL] Notification found: Reminder Due: meet
+INFO 2026-04-14 10:45:52,317 utils 👥 [EMAIL] Found 2 admin users
+INFO 2026-04-14 10:45:52,318 utils 📬 [EMAIL] Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:45:52,318 utils 📋 [EMAIL] Email details:
+INFO 2026-04-14 10:45:52,319 utils    📧 From: Grehasoft PMS <noreply@grehasoft.com>
+INFO 2026-04-14 10:45:52,319 utils    📋 Subject: Alert: Reminder Due: meet
+INFO 2026-04-14 10:45:52,319 utils    🌐 Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:45:52,319 utils 📤 [EMAIL] Sending email via SMTP...
+INFO 2026-04-14 10:45:58,076 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: meet
+INFO 2026-04-14 10:45:58,077 signals ⏩ [SIGNAL] Email already sent for notification 14
+INFO 2026-04-14 10:45:58,077 utils ✅ [EMAIL] Email sent successfully and marked as sent in DB for notification 14
+INFO 2026-04-14 10:45:58,077 signals ✅ [SIGNAL] Email sent successfully
+INFO 2026-04-14 10:45:58,081 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: meeting
+INFO 2026-04-14 10:45:58,081 signals 📧 [SIGNAL] Sending email for Notification ID 15
+INFO 2026-04-14 10:45:58,081 utils 📩 [EMAIL] Starting email send for notification 15
+INFO 2026-04-14 10:45:58,082 utils 🔍 [EMAIL] Notification found: Reminder Due: meeting
+INFO 2026-04-14 10:45:58,083 utils 👥 [EMAIL] Found 2 admin users
+INFO 2026-04-14 10:45:58,084 utils 📬 [EMAIL] Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:45:58,084 utils 📋 [EMAIL] Email details:
+INFO 2026-04-14 10:45:58,084 utils    📧 From: Grehasoft PMS <noreply@grehasoft.com>
+INFO 2026-04-14 10:45:58,084 utils    📋 Subject: Alert: Reminder Due: meeting
+INFO 2026-04-14 10:45:58,085 utils    🌐 Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:45:58,085 utils 📤 [EMAIL] Sending email via SMTP...
+INFO 2026-04-14 10:46:01,555 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: meeting
+INFO 2026-04-14 10:46:01,556 signals ⏩ [SIGNAL] Email already sent for notification 15
+INFO 2026-04-14 10:46:01,557 utils ✅ [EMAIL] Email sent successfully and marked as sent in DB for notification 15
+INFO 2026-04-14 10:46:01,557 signals ✅ [SIGNAL] Email sent successfully
+INFO 2026-04-14 10:46:01,566 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: meeting
+INFO 2026-04-14 10:46:01,567 signals 📧 [SIGNAL] Sending email for Notification ID 16
+INFO 2026-04-14 10:46:01,567 utils 📩 [EMAIL] Starting email send for notification 16
+INFO 2026-04-14 10:46:01,569 utils 🔍 [EMAIL] Notification found: Reminder Due: meeting
+INFO 2026-04-14 10:46:01,571 utils 👥 [EMAIL] Found 2 admin users
+INFO 2026-04-14 10:46:01,572 utils 📬 [EMAIL] Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:46:01,573 utils 📋 [EMAIL] Email details:
+INFO 2026-04-14 10:46:01,573 utils    📧 From: Grehasoft PMS <noreply@grehasoft.com>
+INFO 2026-04-14 10:46:01,573 utils    📋 Subject: Alert: Reminder Due: meeting
+INFO 2026-04-14 10:46:01,573 utils    🌐 Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:46:01,573 utils 📤 [EMAIL] Sending email via SMTP...
+INFO 2026-04-14 10:46:05,156 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: meeting
+INFO 2026-04-14 10:46:05,156 signals ⏩ [SIGNAL] Email already sent for notification 16
+INFO 2026-04-14 10:46:05,157 utils ✅ [EMAIL] Email sent successfully and marked as sent in DB for notification 16
+INFO 2026-04-14 10:46:05,157 signals ✅ [SIGNAL] Email sent successfully
+INFO 2026-04-14 10:46:05,160 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: meeting
+INFO 2026-04-14 10:46:05,160 signals 📧 [SIGNAL] Sending email for Notification ID 17
+INFO 2026-04-14 10:46:05,160 utils 📩 [EMAIL] Starting email send for notification 17
+INFO 2026-04-14 10:46:05,161 utils 🔍 [EMAIL] Notification found: Reminder Due: meeting
+INFO 2026-04-14 10:46:05,162 utils 👥 [EMAIL] Found 2 admin users
+INFO 2026-04-14 10:46:05,163 utils 📬 [EMAIL] Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:46:05,163 utils 📋 [EMAIL] Email details:
+INFO 2026-04-14 10:46:05,163 utils    📧 From: Grehasoft PMS <noreply@grehasoft.com>
+INFO 2026-04-14 10:46:05,164 utils    📋 Subject: Alert: Reminder Due: meeting
+INFO 2026-04-14 10:46:05,164 utils    🌐 Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:46:05,164 utils 📤 [EMAIL] Sending email via SMTP...
+INFO 2026-04-14 10:46:08,485 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: meeting
+INFO 2026-04-14 10:46:08,486 signals ⏩ [SIGNAL] Email already sent for notification 17
+INFO 2026-04-14 10:46:08,486 utils ✅ [EMAIL] Email sent successfully and marked as sent in DB for notification 17
+INFO 2026-04-14 10:46:08,486 signals ✅ [SIGNAL] Email sent successfully
+INFO 2026-04-14 10:46:08,490 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: meeting
+INFO 2026-04-14 10:46:08,490 signals 📧 [SIGNAL] Sending email for Notification ID 18
+INFO 2026-04-14 10:46:08,491 utils 📩 [EMAIL] Starting email send for notification 18
+INFO 2026-04-14 10:46:08,491 utils 🔍 [EMAIL] Notification found: Reminder Due: meeting
+INFO 2026-04-14 10:46:08,492 utils 👥 [EMAIL] Found 2 admin users
+INFO 2026-04-14 10:46:08,493 utils 📬 [EMAIL] Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:46:08,493 utils 📋 [EMAIL] Email details:
+INFO 2026-04-14 10:46:08,494 utils    📧 From: Grehasoft PMS <noreply@grehasoft.com>
+INFO 2026-04-14 10:46:08,494 utils    📋 Subject: Alert: Reminder Due: meeting
+INFO 2026-04-14 10:46:08,494 utils    🌐 Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:46:08,494 utils 📤 [EMAIL] Sending email via SMTP...
+INFO 2026-04-14 10:46:11,875 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: meeting
+INFO 2026-04-14 10:46:11,875 signals ⏩ [SIGNAL] Email already sent for notification 18
+INFO 2026-04-14 10:46:11,876 utils ✅ [EMAIL] Email sent successfully and marked as sent in DB for notification 18
+INFO 2026-04-14 10:46:11,876 signals ✅ [SIGNAL] Email sent successfully
+INFO 2026-04-14 10:46:11,880 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: meeting
+INFO 2026-04-14 10:46:11,880 signals 📧 [SIGNAL] Sending email for Notification ID 19
+INFO 2026-04-14 10:46:11,881 utils 📩 [EMAIL] Starting email send for notification 19
+INFO 2026-04-14 10:46:11,881 utils 🔍 [EMAIL] Notification found: Reminder Due: meeting
+INFO 2026-04-14 10:46:11,882 utils 👥 [EMAIL] Found 2 admin users
+INFO 2026-04-14 10:46:11,883 utils 📬 [EMAIL] Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:46:11,883 utils 📋 [EMAIL] Email details:
+INFO 2026-04-14 10:46:11,883 utils    📧 From: Grehasoft PMS <noreply@grehasoft.com>
+INFO 2026-04-14 10:46:11,883 utils    📋 Subject: Alert: Reminder Due: meeting
+INFO 2026-04-14 10:46:11,883 utils    🌐 Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:46:11,884 utils 📤 [EMAIL] Sending email via SMTP...
+INFO 2026-04-14 10:46:15,360 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: meeting
+INFO 2026-04-14 10:46:15,360 signals ⏩ [SIGNAL] Email already sent for notification 19
+INFO 2026-04-14 10:46:15,361 utils ✅ [EMAIL] Email sent successfully and marked as sent in DB for notification 19
+INFO 2026-04-14 10:46:15,361 signals ✅ [SIGNAL] Email sent successfully
+INFO 2026-04-14 10:46:15,363 tasks [OVERDUE] Overdue reminders: 1 found
+INFO 2026-04-14 10:46:15,369 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Overdue: 🧪 TEST REMINDER - DUE TODAY
+INFO 2026-04-14 10:46:15,370 signals 📧 [SIGNAL] Sending email for Notification ID 20
+INFO 2026-04-14 10:46:15,370 utils 📩 [EMAIL] Starting email send for notification 20
+INFO 2026-04-14 10:46:15,371 utils 🔍 [EMAIL] Notification found: Reminder Overdue: 🧪 TEST REMINDER - DUE TODAY
+INFO 2026-04-14 10:46:15,372 utils 👥 [EMAIL] Found 2 admin users
+INFO 2026-04-14 10:46:15,374 utils 📬 [EMAIL] Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:46:15,374 utils 📋 [EMAIL] Email details:
+INFO 2026-04-14 10:46:15,374 utils    📧 From: Grehasoft PMS <noreply@grehasoft.com>
+INFO 2026-04-14 10:46:15,375 utils    📋 Subject: Alert: Reminder Overdue: 🧪 TEST REMINDER - DUE TODAY
+INFO 2026-04-14 10:46:15,375 utils    🌐 Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:46:15,375 utils 📤 [EMAIL] Sending email via SMTP...
+INFO 2026-04-14 10:46:18,880 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Overdue: 🧪 TEST REMINDER - DUE TODAY
+INFO 2026-04-14 10:46:18,881 signals ⏩ [SIGNAL] Email already sent for notification 20
+INFO 2026-04-14 10:46:18,881 utils ✅ [EMAIL] Email sent successfully and marked as sent in DB for notification 20
+INFO 2026-04-14 10:46:18,881 signals ✅ [SIGNAL] Email sent successfully
+INFO 2026-04-14 10:46:18,881 tasks [EMAIL] Sending overdue reminder email for Reminder ID 8: 🧪 TEST REMINDER - DUE TODAY
+INFO 2026-04-14 10:46:22,312 utils [SUCCESS] Sent Overdue reminder email for Reminder ID 8 to 2 admins: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-04-14 10:46:22,321 tasks [SUCCESS] Email sent for overdue Reminder ID 8
+INFO 2026-04-14 10:46:22,322 tasks [TASK] Reminder task completed successfully

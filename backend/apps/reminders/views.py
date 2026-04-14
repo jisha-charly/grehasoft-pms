@@ -18,13 +18,6 @@ class ReminderViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         reminder = serializer.save(user=self.request.user)
-        # Send email on creation if not already sent
-        if not reminder.email_sent_created:
-            from .utils import send_reminder_email
-            success = send_reminder_email(reminder.id, "Created")
-            if success:
-                reminder.email_sent_created = True
-                reminder.save(update_fields=['email_sent_created'])
 
 
 # DASHBOARD API (OUTSIDE THE CLASS)
@@ -56,3 +49,40 @@ def reminder_dashboard_summary(request):
         "completed": completed,
         "overdue": overdue
     })
+
+
+# TEST EMAIL ENDPOINT
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def test_reminder_email(request):
+    """Test endpoint to verify reminder email sending works"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Get all reminders for the user
+    reminder = Reminder.objects.filter(user=request.user).first()
+    
+    if not reminder:
+        return Response({
+            "success": False,
+            "message": "No reminders found to test email"
+        }, status=400)
+    
+    from .utils import send_reminder_email
+    
+    logger.info(f"🧪 Testing email send for Reminder ID {reminder.id}")
+    
+    try:
+        success = send_reminder_email(reminder.id, "Test Alert")
+        return Response({
+            "success": success,
+            "message": f"Email test {'successful' if success else 'failed'} for Reminder: {reminder.title}",
+            "reminder_id": reminder.id,
+            "reminder_title": reminder.title
+        })
+    except Exception as e:
+        logger.error(f"❌ Email test error: {type(e).__name__}: {str(e)}", exc_info=True)
+        return Response({
+            "success": False,
+            "message": f"Email test failed: {type(e).__name__}: {str(e)}"
+        }, status=500)

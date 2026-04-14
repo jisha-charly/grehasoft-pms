@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
     'django_rest_passwordreset',
+    'django_celery_beat',  # Celery Beat Scheduler
     # Local apps
     'apps.users',
     'apps.projects',
@@ -174,18 +175,80 @@ DEFAULT_FROM_EMAIL = 'Grehasoft PMS <noreply@grehasoft.com>'
 # ==============================
 # Celery Configuration
 # ==============================
-CELERY_BROKER_URL = "redis://localhost:6379/0"
+# Use memory broker for development (no Redis needed)
+# For production, use: CELERY_BROKER_URL = "redis://localhost:6379/0"
+CELERY_BROKER_URL = "memory://"
+CELERY_RESULT_BACKEND = "cache+memory://"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = 'UTC'
+CELERY_ENABLE_UTC = True
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes hard limit
+CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 25 minutes soft limit
+# Use 'solo' pool for Windows (prefork doesn't work on Windows)
+CELERY_WORKER_POOL = 'solo'
+# IMPORTANT: For development/testing, execute tasks immediately (synchronously)
+# This allows testing without needing a running worker
+CELERY_ALWAYS_EAGER = True
+CELERY_EAGER_PROPAGATES_EXCEPTIONS = True
 
 from celery.schedules import crontab
 CELERY_BEAT_SCHEDULE = {
     'send_daily_reminders': {
         'task': 'apps.reminders.tasks.check_and_create_reminder_notifications',
-         'schedule': crontab(minute='*/1'),
+        'schedule': crontab(minute='*/5'),  # Every 5 minutes (changed from */1)
     },
     'send_domain_alerts': {
         'task': 'apps.infrastructure.tasks.check_and_create_domain_notifications',
-        'schedule': crontab(hour=9, minute=30),
+        'schedule': crontab(hour=9, minute=30),  # Daily at 9:30 AM UTC
     },
 }
+
+# ==============================
+# Logging Configuration
+# ==============================
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs/debug.log'),
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'apps': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'django.core.mail': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
+

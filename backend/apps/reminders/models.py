@@ -24,6 +24,8 @@ class Reminder(models.Model):
         default=ReminderType.GENERAL
     )
     is_completed = models.BooleanField(default=False)
+    email_sent_created = models.BooleanField(default=False)
+    email_sent_reminder = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
