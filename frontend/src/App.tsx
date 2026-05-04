@@ -50,6 +50,7 @@ import ServersPage from "./pages/infrastructure/ServersPage";
 import CredentialsPage from "./pages/infrastructure/CredentialsPage";
 import DomainsPage from "./pages/infrastructure/DomainsPage";
 import SEOWebsitesPage from "./pages/seo/SEOWebsitesPage";
+import WorkTrackingDashboard from "./components/WorkTrackingDashboard";
 
 const App: React.FC = () => {
   const { isAuthenticated, loading, user } = useAuth();
@@ -396,6 +397,16 @@ const App: React.FC = () => {
           }
         />
 
+        <Route
+          path="/admin/tracking"
+          element={
+            <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
+              <Layout>
+                <WorkTrackingDashboard />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
 
       <Route
   path="*"

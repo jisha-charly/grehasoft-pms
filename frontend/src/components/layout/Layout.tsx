@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Permission, UserRole } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import useHeartbeat from '../../hooks/useHeartbeat';
+import TrackingAPI from '../../api/trackingAPI';
 import './Layout.css';
 import { useNotifications } from "../../context/NotificationContext";
 
@@ -14,7 +16,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
- 
+
   if (!user) return null;
 
   type NavChild = { label: string; path: string; permission?: Permission };
@@ -83,16 +85,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       permission: Permission.GENERATE_HR_DOCS,
     },
     {
-     label: "Infrastructure",
-     icon: "bi-hdd-network",
-     permission: Permission.MANAGE_INFRASTRUCTURE,
-     children: [
-    { label: "Servers", path: "/admin/servers", permission: Permission.MANAGE_INFRASTRUCTURE },
-    { label: "Domains", path: "/infrastructure/domains", permission: Permission.MANAGE_INFRASTRUCTURE },
-    { label: "Credentials", path: "/infrastructure/credentials", permission: Permission.MANAGE_INFRASTRUCTURE }
-  ]
-  },
-   ];
+      label: "Infrastructure",
+      icon: "bi-hdd-network",
+      permission: Permission.MANAGE_INFRASTRUCTURE,
+      children: [
+        { label: "Servers", path: "/admin/servers", permission: Permission.MANAGE_INFRASTRUCTURE },
+        { label: "Domains", path: "/infrastructure/domains", permission: Permission.MANAGE_INFRASTRUCTURE },
+        { label: "Credentials", path: "/infrastructure/credentials", permission: Permission.MANAGE_INFRASTRUCTURE }
+      ]
+    },
+    {
+      label: "Work Tracking",
+      path: "/admin/tracking",
+      icon: "bi-clock-history",
+      permission: Permission.MANAGE_SETTINGS,
+    },
+  ];
 
   const hasAccess = (permission?: Permission) => {
     return !!(permission && hasPermission(permission));
@@ -100,7 +108,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const accessibleNavConfig = navigationConfig.map(item => {
     if (item.children) {
-      const accessibleChildren = item.children.filter(child => 
+      const accessibleChildren = item.children.filter(child =>
         hasAccess(child.permission || item.permission)
       );
       if (accessibleChildren.length > 0 || hasAccess(item.permission)) {
@@ -123,34 +131,62 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
     return item.path
       ? [
-          {
-            label: item.label,
-            path: item.path,
-            icon: item.icon,
-            permission: item.permission,
-          },
-        ]
+        {
+          label: item.label,
+          path: item.path,
+          icon: item.icon,
+          permission: item.permission,
+        },
+      ]
       : [];
   });
 
   const adminItems = [
-  { label: 'Users', path: '/admin/users', icon: 'bi-people' },
-  { label: 'Roles', path: '/admin/roles', icon: 'bi-person-badge' },
-  { label: 'Departments', path: '/admin/departments', icon: 'bi-diagram-3' },
-  { label: 'Task Types', path: '/admin/task-types', icon: 'bi-list-task' },
- 
-];
+    { label: 'Users', path: '/admin/users', icon: 'bi-people' },
+    { label: 'Roles', path: '/admin/roles', icon: 'bi-person-badge' },
+    { label: 'Departments', path: '/admin/departments', icon: 'bi-diagram-3' },
+    { label: 'Task Types', path: '/admin/task-types', icon: 'bi-list-task' },
 
- const handleLogout = () => {
-  // 🔥 clean overlays before leaving
-  document.querySelectorAll(".modal-backdrop, .layout-backdrop")
-    .forEach(el => el.remove());
+  ];
 
-  document.body.classList.remove("modal-open");
+  const handleLogout = () => {
+    // 🔥 clean overlays before leaving
+    document.querySelectorAll(".modal-backdrop, .layout-backdrop")
+      .forEach(el => el.remove());
 
-  logout();
-  navigate('/login');
-};
+    document.body.classList.remove("modal-open");
+
+    // Stop heartbeat before logout
+    heartbeat.stopHeartbeat();
+
+    logout();
+    navigate('/login');
+  };
+
+  // Initialize heartbeat tracking
+  const [isTrackingEnabled, setIsTrackingEnabled] = useState(false);
+  const trackingAPI = new TrackingAPI();
+
+  const heartbeat = useHeartbeat({
+    isTrackingEnabled,
+    token: localStorage.getItem('access') || '',
+  });
+
+  // Check tracking status on mount
+  useEffect(() => {
+    const checkTrackingStatus = async () => {
+      try {
+        const profile = await trackingAPI.getCurrentUserStatus();
+        setIsTrackingEnabled(profile.is_tracking_enabled);
+      } catch (error) {
+        console.warn('Could not fetch tracking status:', error);
+      }
+    };
+
+    if (user) {
+      checkTrackingStatus();
+    }
+  }, [user]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -162,32 +198,32 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
 
   const { notifications } = useNotifications();
-const [showDropdown, setShowDropdown] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
 
-useEffect(() => {
-  const handleClick = () => setShowDropdown(false);
-  document.addEventListener("click", handleClick);
-  return () => document.removeEventListener("click", handleClick);
-}, []);
+  useEffect(() => {
+    const handleClick = () => setShowDropdown(false);
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, []);
 
 
-useEffect(() => {
-  // close sidebar on route change
-  setSidebarOpen(false);
+  useEffect(() => {
+    // close sidebar on route change
+    setSidebarOpen(false);
 
-  // 🔥 remove any leftover backdrop
-  document
-    .querySelectorAll(".layout-backdrop, .modal-backdrop")
-    .forEach((el) => el.remove());
-}, [location.pathname]);
-
-useEffect(() => {
-  return () => {
+    // 🔥 remove any leftover backdrop
     document
       .querySelectorAll(".layout-backdrop, .modal-backdrop")
       .forEach((el) => el.remove());
-  };
-}, []);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    return () => {
+      document
+        .querySelectorAll(".layout-backdrop, .modal-backdrop")
+        .forEach((el) => el.remove());
+    };
+  }, []);
   return (
     <>
       <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top shadow-sm app-navbar">
@@ -198,7 +234,7 @@ useEffect(() => {
           </Link>
 
           {/* Desktop nav (>=992px) */}
-         <div className="d-none d-lg-flex align-items-center flex-grow-1 justify-content-between">
+          <div className="d-none d-lg-flex align-items-center flex-grow-1 justify-content-between">
             <ul className="navbar-nav mb-0 ms-lg-4 flex-nowrap">
               {accessibleNavConfig
                 .map((item) => {
@@ -211,11 +247,10 @@ useEffect(() => {
                     return (
                       <li className="nav-item dropdown" key={item.label}>
                         <button
-                          className={`nav-link dropdown-toggle px-3 d-flex align-items-center ${
-                            isActiveGroup
+                          className={`nav-link dropdown-toggle px-3 d-flex align-items-center ${isActiveGroup
                               ? "active text-primary fw-bold"
                               : "text-secondary"
-                          }`}
+                            }`}
                           type="button"
                           data-bs-toggle="dropdown"
                         >
@@ -228,9 +263,8 @@ useEffect(() => {
                             return (
                               <li key={child.path}>
                                 <Link
-                                  className={`dropdown-item py-2 small fw-medium d-flex align-items-center ${
-                                    active ? "active fw-bold" : ""
-                                  }`}
+                                  className={`dropdown-item py-2 small fw-medium d-flex align-items-center ${active ? "active fw-bold" : ""
+                                    }`}
                                   to={child.path}
                                 >
                                   {child.label}
@@ -248,11 +282,10 @@ useEffect(() => {
                     return (
                       <li className="nav-item" key={item.path}>
                         <Link
-                          className={`nav-link px-3 d-flex align-items-center ${
-                            active
+                          className={`nav-link px-3 d-flex align-items-center ${active
                               ? "active text-primary fw-bold"
                               : "text-secondary"
-                          }`}
+                            }`}
                           to={item.path}
                         >
                           <i className={`bi ${item.icon} me-2`}></i>
@@ -265,89 +298,87 @@ useEffect(() => {
                   return null;
                 })}
             </ul>
-<div className="position-relative me-3">
-  <button
-    className="btn btn-light position-relative"
-    onClick={(e) => {
-      e.stopPropagation();
-      setShowDropdown(!showDropdown);
-    }}
-  >
-    <i className="bi bi-bell"></i>
+            <div className="position-relative me-3">
+              <button
+                className="btn btn-light position-relative"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDropdown(!showDropdown);
+                }}
+              >
+                <i className="bi bi-bell"></i>
 
-    {notifications.length > 0 && (
-     <span
-  className={`position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger ${
-    notifications.some(n => n.type === "domain") ? "blink-alert" : ""
-  }`}
->
-  {notifications.length}
-</span>
-    )}
-  </button>
+                {notifications.length > 0 && (
+                  <span
+                    className={`position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger ${notifications.some(n => n.type === "domain") ? "blink-alert" : ""
+                      }`}
+                  >
+                    {notifications.length}
+                  </span>
+                )}
+              </button>
 
-  {showDropdown && (
-    <div
-      className="position-absolute end-0 mt-2 bg-white shadow rounded-3 p-3"
-      style={{ width: "300px", zIndex: 1000 }}
-    >
-      <h6 className="fw-bold mb-2">Notifications</h6>
+              {showDropdown && (
+                <div
+                  className="position-absolute end-0 mt-2 bg-white shadow rounded-3 p-3"
+                  style={{ width: "300px", zIndex: 1000 }}
+                >
+                  <h6 className="fw-bold mb-2">Notifications</h6>
 
-      {notifications.length === 0 ? (
-        <div className="text-muted small">No alerts</div>
-      ) : (
-       notifications.slice(0, 5).map((n, i) => (
-  <div
-    key={i}
-    className="border-bottom py-2 small cursor-pointer"
-    style={{ cursor: "pointer" }}
-    onClick={(e) => {
-      e.stopPropagation();
-      
-  // ✅ Only store domain dismiss
-  if (n.type === "domain" || n.type === "expired") {
-    const dismissedDomains = JSON.parse(
-      localStorage.getItem("dismissedDomains") || "[]"
-    );
+                  {notifications.length === 0 ? (
+                    <div className="text-muted small">No alerts</div>
+                  ) : (
+                    notifications.slice(0, 5).map((n, i) => (
+                      <div
+                        key={i}
+                        className="border-bottom py-2 small cursor-pointer"
+                        style={{ cursor: "pointer" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
 
-    const domainName = n.message.split(": ")[1]; // extract grehasoft.com
+                          // ✅ Only store domain dismiss
+                          if (n.type === "domain" || n.type === "expired") {
+                            const dismissedDomains = JSON.parse(
+                              localStorage.getItem("dismissedDomains") || "[]"
+                            );
 
-    if (!dismissedDomains.includes(domainName)) {
-      dismissedDomains.push(domainName);
-      localStorage.setItem(
-        "dismissedDomains",
-        JSON.stringify(dismissedDomains)
-      );
-    }
-  }
+                            const domainName = n.message.split(": ")[1]; // extract grehasoft.com
 
-  // navigation
-  if (n.type === "reminder") {
-    navigate("/reminders");
-  } else if (n.type === "domain" || n.type === "expired") {
-    navigate("/infrastructure/domains");
-  }
+                            if (!dismissedDomains.includes(domainName)) {
+                              dismissedDomains.push(domainName);
+                              localStorage.setItem(
+                                "dismissedDomains",
+                                JSON.stringify(dismissedDomains)
+                              );
+                            }
+                          }
 
-  setShowDropdown(false);
-}}
-  >
-            <div
-              className={`fw-semibold ${
-             n.type === "expired"
-    ? "text-danger"
-    : n.type === "domain"
-    ? "text-warning"
-    : "text-primary"
-              }`}
-            >
-              {n.message}
-            </div>
-            <div className="text-muted small">{n.date}</div>
-          </div>
-        ))
-      )}
+                          // navigation
+                          if (n.type === "reminder") {
+                            navigate("/reminders");
+                          } else if (n.type === "domain" || n.type === "expired") {
+                            navigate("/infrastructure/domains");
+                          }
 
-   {/*  <div className="text-center mt-2">
+                          setShowDropdown(false);
+                        }}
+                      >
+                        <div
+                          className={`fw-semibold ${n.type === "expired"
+                              ? "text-danger"
+                              : n.type === "domain"
+                                ? "text-warning"
+                                : "text-primary"
+                            }`}
+                        >
+                          {n.message}
+                        </div>
+                        <div className="text-muted small">{n.date}</div>
+                      </div>
+                    ))
+                  )}
+
+                  {/*  <div className="text-center mt-2">
   <button
     className="btn btn-sm btn-primary w-100"
     onClick={(e) => {
@@ -367,9 +398,9 @@ useEffect(() => {
     View All
   </button>
 </div>*/}
-    </div>
-  )}
-</div>
+                </div>
+              )}
+            </div>
             <div className="d-flex align-items-center">
               {hasAccess(Permission.MANAGE_SETTINGS) && (
                 <div className="dropdown me-3">
@@ -383,20 +414,20 @@ useEffect(() => {
                   <ul className="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3">
                     {adminItems.map(item => (
                       <li key={item.path}>
-                       <Link className="dropdown-item py-2 small fw-medium d-flex align-items-center" to={item.path}>
-  <i className={`bi ${item.icon} me-2`}></i>
-  {item.label}
-</Link>
+                        <Link className="dropdown-item py-2 small fw-medium d-flex align-items-center" to={item.path}>
+                          <i className={`bi ${item.icon} me-2`}></i>
+                          {item.label}
+                        </Link>
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
 
-                    
+
               <div className="dropdown">
                 <button className="btn btn-link text-decoration-none text-dark d-flex align-items-center p-0 border-0" type="button" data-bs-toggle="dropdown"
-                 aria-expanded="false">
+                  aria-expanded="false">
                   {/*<div className="text-end me-2 d-none d-sm-block">
                     <div className="fw-bold small text-dark">{user.name}</div>
                     <div className="text-primary smaller fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.02em' }}>{user.role.replace('_', ' ')}</div>
@@ -428,7 +459,7 @@ useEffect(() => {
                   </li>
                 </ul>
               </div>
-             
+
             </div>
           </div>
 
@@ -445,8 +476,8 @@ useEffect(() => {
             </button>
 
             <div className="dropdown">
-              <button className="btn btn-link text-decoration-none text-dark d-flex align-items-center p-0 border-0" type="button"  data-bs-toggle="dropdown" 
-              aria-expanded="false">
+              <button className="btn btn-link text-decoration-none text-dark d-flex align-items-center p-0 border-0" type="button" data-bs-toggle="dropdown"
+                aria-expanded="false">
                 <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style={{ width: '35px', height: '35px', fontSize: '0.9rem', fontWeight: 'bold' }}>
                   {user.username.charAt(0)}
                 </div>
@@ -511,9 +542,8 @@ useEffect(() => {
                 return (
                   <li key={item.path}>
                     <Link
-                      className={`d-flex align-items-center gap-2 px-3 py-2 rounded text-decoration-none ${
-                        active ? 'text-primary fw-bold bg-primary-subtle' : 'text-secondary'
-                      }`}
+                      className={`d-flex align-items-center gap-2 px-3 py-2 rounded text-decoration-none ${active ? 'text-primary fw-bold bg-primary-subtle' : 'text-secondary'
+                        }`}
                       to={item.path}
                       onClick={() => setSidebarOpen(false)}
                     >
@@ -534,9 +564,8 @@ useEffect(() => {
                   return (
                     <li key={item.path}>
                       <Link
-                        className={`d-flex align-items-center gap-2 px-3 py-2 rounded text-decoration-none ${
-                          active ? 'text-primary fw-bold bg-primary-subtle' : 'text-secondary'
-                        }`}
+                        className={`d-flex align-items-center gap-2 px-3 py-2 rounded text-decoration-none ${active ? 'text-primary fw-bold bg-primary-subtle' : 'text-secondary'
+                          }`}
                         to={item.path}
                         onClick={() => setSidebarOpen(false)}
                       >

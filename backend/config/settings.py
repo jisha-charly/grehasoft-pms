@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'apps.hr_documents.apps.HrDocumentsConfig',
     "apps.infrastructure.apps.InfrastructureConfig",
     'apps.notifications.apps.NotificationsConfig',
+    'apps.tracking',  # Work Tracking System
     'core.apps.CoreConfig',
 ]
 
@@ -203,6 +204,19 @@ CELERY_BEAT_SCHEDULE = {
     'send_domain_alerts': {
         'task': 'apps.infrastructure.tasks.check_and_create_domain_notifications',
         'schedule': crontab(hour=9, minute=30),  # Daily at 9:30 AM UTC
+    },
+    # Work Tracking System
+    'auto-logout-inactive-users': {
+        'task': 'apps.tracking.tasks.auto_logout_inactive',
+        'schedule': 300.0,  # Every 5 minutes
+    },
+    'cleanup-old-sessions': {
+        'task': 'apps.tracking.tasks.cleanup_old_data',
+        'schedule': crontab(hour=2, minute=0),  # Daily at 2:00 AM
+    },
+    'generate-daily-report': {
+        'task': 'apps.tracking.tasks.generate_daily_report',
+        'schedule': crontab(hour=23, minute=55),  # Daily at 11:55 PM
     },
 }
 

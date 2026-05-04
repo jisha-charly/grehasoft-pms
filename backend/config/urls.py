@@ -84,6 +84,7 @@ urlpatterns = [
     path('api/v1/', include(router.urls)),
     path("api/v1/", include("apps.hr_documents.urls")),
     path("api/v1/infrastructure/", include("apps.infrastructure.urls")),
+    path("api/v1/tracking/", include("apps.tracking.urls")),  # Work Tracking System
     path('api/v1/dashboard-summary/', reminder_dashboard_summary),
     path("api/v1/dashboard/", include("apps.dashboard.urls")),
     path('api/v1/dashboard/stats/', DashboardStatsView.as_view(), name='dashboard-stats'),
