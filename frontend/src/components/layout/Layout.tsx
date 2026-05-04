@@ -149,7 +149,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   ];
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     // 🔥 clean overlays before leaving
     document.querySelectorAll(".modal-backdrop, .layout-backdrop")
       .forEach(el => el.remove());
@@ -158,6 +158,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
     // Stop heartbeat before logout
     heartbeat.stopHeartbeat();
+
+    // Call tracking logout endpoint to mark user Offline immediately
+    try {
+      await trackingAPI.logout();
+    } catch (e) {
+      console.warn("Tracking logout failed:", e);
+    }
 
     logout();
     navigate('/login');
@@ -224,81 +231,155 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         .forEach((el) => el.remove());
     };
   }, []);
+
+  // Horizontal scroll state & logic
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  const checkScroll = () => {
+    if (scrollContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 1); // -1 for pixel rounding
+    }
+  };
+
+  useEffect(() => {
+    checkScroll();
+    window.addEventListener("resize", checkScroll);
+    return () => window.removeEventListener("resize", checkScroll);
+  }, [accessibleNavConfig]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        container.scrollLeft += e.deltaY;
+        checkScroll();
+      }
+    };
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    container.addEventListener("scroll", checkScroll);
+    return () => {
+      container.removeEventListener("wheel", handleWheel);
+      container.removeEventListener("scroll", checkScroll);
+    };
+  }, []);
+
+  const scrollBy = (amount: number) => {
+    scrollContainerRef.current?.scrollBy({ left: amount, behavior: "smooth" });
+  };
+
   return (
-    <>
-      <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top shadow-sm app-navbar">
+    <div className="app-layout-wrapper">
+      <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm app-navbar">
         <div className="container-fluid px-4">
-          <Link className="navbar-brand text-primary d-flex align-items-center fw-bold" to="/">
+          {/* nav-left */}
+          <Link className="navbar-brand text-primary d-flex align-items-center fw-bold me-2 nav-left flex-shrink-0" to="/">
             <i className="bi bi-stack me-2"></i>
             GREHASOFT <span className="badge bg-light text-dark ms-2 fw-normal fs-6 border">v2.0</span>
           </Link>
 
           {/* Desktop nav (>=992px) */}
-          <div className="d-none d-lg-flex align-items-center flex-grow-1 justify-content-between">
-            <ul className="navbar-nav mb-0 ms-lg-4 flex-nowrap">
-              {accessibleNavConfig
-                .map((item) => {
-                  const hasChildren = item.children && item.children.length > 0;
+          <div className="d-none d-lg-flex align-items-center flex-grow-1" style={{ minWidth: 0 }}>
+            {canScrollLeft && (
+              <button 
+                className="btn btn-sm btn-white bg-white border shadow-sm rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center ms-3" 
+                style={{ width: '32px', height: '32px' }}
+                onClick={() => scrollBy(-200)}
+                aria-label="Scroll left"
+              >
+                 <i className="bi bi-chevron-left text-secondary"></i>
+              </button>
+            )}
 
-                  if (hasChildren) {
-                    const isActiveGroup = item.children!.some(
-                      (child) => location.pathname === child.path
-                    );
-                    return (
-                      <li className="nav-item dropdown" key={item.label}>
-                        <button
-                          className={`nav-link dropdown-toggle px-3 d-flex align-items-center ${isActiveGroup
-                              ? "active text-primary fw-bold"
-                              : "text-secondary"
-                            }`}
-                          type="button"
-                          data-bs-toggle="dropdown"
-                        >
-                          <i className={`bi ${item.icon} me-2`} />
-                          {item.label}
-                        </button>
-                        <ul className="dropdown-menu shadow border-0 mt-2 rounded-3">
-                          {item.children!.map((child) => {
-                            const active = location.pathname === child.path;
-                            return (
-                              <li key={child.path}>
-                                <Link
-                                  className={`dropdown-item py-2 small fw-medium d-flex align-items-center ${active ? "active fw-bold" : ""
-                                    }`}
-                                  to={child.path}
-                                >
-                                  {child.label}
-                                </Link>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </li>
-                    );
-                  }
+            {/* nav-center (scrollable) */}
+            <div className={`nav-center nav-scroll-container flex-grow-1 mx-2 ${!canScrollLeft ? 'ms-lg-3' : ''}`} ref={scrollContainerRef}>
+              <ul className="navbar-nav mb-0 flex-nowrap h-100 align-items-center px-1">
+                {accessibleNavConfig
+                  .map((item) => {
+                    const hasChildren = item.children && item.children.length > 0;
 
-                  if (item.path) {
-                    const active = location.pathname === item.path;
-                    return (
-                      <li className="nav-item" key={item.path}>
-                        <Link
-                          className={`nav-link px-3 d-flex align-items-center ${active
-                              ? "active text-primary fw-bold"
-                              : "text-secondary"
-                            }`}
-                          to={item.path}
-                        >
-                          <i className={`bi ${item.icon} me-2`}></i>
-                          {item.label}
-                        </Link>
-                      </li>
-                    );
-                  }
+                    if (hasChildren) {
+                      const isActiveGroup = item.children!.some(
+                        (child) => location.pathname === child.path
+                      );
+                      return (
+                        <li className="nav-item dropdown h-100 d-flex align-items-center" key={item.label}>
+                          <button
+                            className={`nav-link dropdown-toggle px-3 d-flex align-items-center border-0 bg-transparent ${isActiveGroup
+                                ? "active text-primary fw-bold"
+                                : "text-secondary"
+                              }`}
+                            type="button"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false"
+                          >
+                            <i className={`bi ${item.icon} me-2`} />
+                            {item.label}
+                          </button>
+                          <ul className="dropdown-menu shadow border-0 mt-2 rounded-3">
+                            {item.children!.map((child) => {
+                              const active = location.pathname === child.path;
+                              return (
+                                <li key={child.path}>
+                                  <Link
+                                    className={`dropdown-item py-2 small fw-medium d-flex align-items-center ${active ? "active fw-bold" : ""
+                                      }`}
+                                    to={child.path}
+                                  >
+                                    {child.label}
+                                  </Link>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </li>
+                      );
+                    }
 
-                  return null;
-                })}
-            </ul>
-            <div className="position-relative me-3">
+                    if (item.path) {
+                      const active = location.pathname === item.path;
+                      return (
+                        <li className="nav-item h-100 d-flex align-items-center" key={item.path}>
+                          <Link
+                            className={`nav-link px-3 d-flex align-items-center ${active
+                                ? "active text-primary fw-bold"
+                                : "text-secondary"
+                              }`}
+                            to={item.path}
+                          >
+                            <i className={`bi ${item.icon} me-2`}></i>
+                            {item.label}
+                          </Link>
+                        </li>
+                      );
+                    }
+
+                    return null;
+                  })}
+              </ul>
+            </div>
+
+            {canScrollRight && (
+              <button 
+                className="btn btn-sm btn-white bg-white border shadow-sm rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center me-2" 
+                style={{ width: '32px', height: '32px' }}
+                onClick={() => scrollBy(200)}
+                aria-label="Scroll right"
+              >
+                 <i className="bi bi-chevron-right text-secondary"></i>
+              </button>
+            )}
+
+            {/* nav-right */}
+            <div className="nav-right d-flex align-items-center flex-shrink-0 ms-3 ps-3 border-start">
+              <div className="position-relative me-3">
               <button
                 className="btn btn-light position-relative"
                 onClick={(e) => {
@@ -460,6 +541,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </ul>
               </div>
 
+              </div>
             </div>
           </div>
 
@@ -581,10 +663,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </nav>
       </aside>
 
-      <div className="container-fluid py-4 px-4">
-        {children}
-      </div>
-    </>
+      <main className="app-main-content">
+        <div className="container-fluid py-4 px-4">
+          {children}
+        </div>
+      </main>
+    </div>
   );
 };
 
