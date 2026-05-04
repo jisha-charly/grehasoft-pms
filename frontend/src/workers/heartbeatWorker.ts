@@ -5,14 +5,21 @@
  * 
  * Features:
  * - Runs in background even when tab is minimized
- * - Respects tracking enabled/disabled state
+ * - Uses Axios for consistent API requests
+ * - Exponential backoff retry logic for failed pings
+ * - Offline queueing for missed heartbeats
  * - Handles multi-tab synchronization via BroadcastChannel
  * - Automatic cleanup on message
  */
 
+import axios from 'axios';
+
 // Configuration
 const HEARTBEAT_INTERVAL = 60000; // 60 seconds
+const MAX_RETRIES = 3;
+const RETRY_DELAYS = [5000, 10000, 20000]; // 5s, 10s, 20s
 const CHANNEL_NAME = 'tracking_heartbeat';
+
 const MESSAGE_TYPES = {
   START: 'START',
   STOP: 'STOP',
@@ -20,6 +27,7 @@ const MESSAGE_TYPES = {
   STATUS: 'STATUS',
   TRACKING_ENABLED: 'TRACKING_ENABLED',
   TRACKING_DISABLED: 'TRACKING_DISABLED',
+  FORCE_PING: 'FORCE_PING',
 };
 
 // State
@@ -29,6 +37,14 @@ let isTrackingEnabled = false;
 let apiToken: string | null = null;
 let apiUrl: string | null = null;
 let isMasterTab = false;
+
+// Offline queueing
+let missedHeartbeats: string[] = [];
+
+// Worker Axios Instance
+const workerAxios = axios.create({
+  timeout: 30000, // 30s timeout handles Render cold starts
+});
 
 // BroadcastChannel for multi-tab synchronization
 let channel: BroadcastChannel | null = null;
@@ -56,24 +72,27 @@ function handleChannelMessage(event: MessageEvent) {
       break;
 
     case MESSAGE_TYPES.STOP:
-      // Another tab stopped
       if (!isRunning && data?.isExplicit) {
         // Only stop if explicitly stopped
       }
       break;
 
     case MESSAGE_TYPES.TRACKING_DISABLED:
-      // Tracking disabled globally
       if (isRunning) {
         stopHeartbeat('Tracking disabled');
       }
       break;
 
     case MESSAGE_TYPES.TRACKING_ENABLED:
-      // Tracking enabled globally
       updateTrackingState(true);
       if (!isRunning) {
         startHeartbeat();
+      }
+      break;
+
+    case MESSAGE_TYPES.FORCE_PING:
+      if (isRunning && isMasterTab) {
+        sendHeartbeat();
       }
       break;
 
@@ -152,50 +171,84 @@ function stopHeartbeat(reason = 'User request') {
   });
 }
 
+// Axios Request with Exponential Backoff
+async function axiosWithRetry(config: any, retries = 0): Promise<any> {
+  try {
+    return await workerAxios(config);
+  } catch (error: any) {
+    // Abort retry if unauthorized (tracking disabled or token invalid)
+    if (error.response?.status === 403 || error.response?.status === 401) {
+      throw error;
+    }
+
+    if (retries >= MAX_RETRIES) {
+      throw error;
+    }
+
+    const delay = RETRY_DELAYS[retries] || 30000;
+    console.warn(`[Worker] Heartbeat failed. Retrying in ${delay / 1000}s...`);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    
+    return axiosWithRetry(config, retries + 1);
+  }
+}
+
 // Send heartbeat ping to server
 async function sendHeartbeat() {
   if (!isTrackingEnabled || !apiToken || !apiUrl) {
     return;
   }
 
+  const currentPingTime = new Date().toISOString();
+
   try {
-    const response = await fetch(`${apiUrl}/tracking/heartbeat/`, {
+    const payload = {
+      timestamp: currentPingTime,
+      missed_heartbeats: missedHeartbeats, // Send any queued offline pings
+    };
+
+    const response = await axiosWithRetry({
+      url: `${apiUrl}/tracking/heartbeat/`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiToken}`,
       },
-      body: JSON.stringify({
-        timestamp: new Date().toISOString(),
-      }),
+      data: payload,
     });
 
-    if (!response.ok) {
-      if (response.status === 403) {
-        // Tracking disabled on server
-        updateTrackingState(false);
-        stopHeartbeat('Tracking disabled on server');
-        broadcastMessage(MESSAGE_TYPES.TRACKING_DISABLED);
-      } else {
-        console.warn('Heartbeat failed:', response.statusText);
-      }
-      return;
-    }
-
-    const data = await response.json();
+    // Success! Clear the offline queue
+    missedHeartbeats = [];
 
     self.postMessage({
       type: 'HEARTBEAT_SENT',
-      success: data.success,
-      status: data.status,
-      sessionId: data.session_id,
-      timestamp: new Date().toISOString(),
+      success: response.data.success,
+      status: response.data.status,
+      sessionId: response.data.session_id,
+      timestamp: currentPingTime,
     });
-  } catch (error) {
-    console.error('Heartbeat error:', error);
+  } catch (error: any) {
+    console.error('[Worker] Heartbeat error after retries:', error);
+
+    if (error.response?.status === 403 || error.response?.status === 401) {
+      updateTrackingState(false);
+      stopHeartbeat(error.response.status === 401 ? 'Token expired' : 'Tracking disabled on server');
+      broadcastMessage(MESSAGE_TYPES.TRACKING_DISABLED);
+      
+      self.postMessage({
+        type: error.response.status === 401 ? 'TOKEN_EXPIRED' : 'TRACKING_DISABLED',
+        error: error.message,
+      });
+    } else {
+      // Network or 5xx error: Queue this heartbeat for later recovery
+      console.warn('[Worker] Queuing failed heartbeat for later recovery');
+      missedHeartbeats.push(currentPingTime);
+    }
+
     self.postMessage({
       type: 'HEARTBEAT_ERROR',
       error: error instanceof Error ? error.message : String(error),
+      queuedCount: missedHeartbeats.length,
     });
   }
 }
@@ -213,6 +266,10 @@ self.onmessage = (event) => {
       self.postMessage({ type: 'READY' });
       break;
 
+    case 'UPDATE_TOKEN':
+      apiToken = payload.token;
+      break;
+
     case 'START':
       isTrackingEnabled = payload.isTrackingEnabled || isTrackingEnabled;
       startHeartbeat();
@@ -220,6 +277,14 @@ self.onmessage = (event) => {
 
     case 'STOP':
       stopHeartbeat();
+      break;
+
+    case 'FORCE_PING':
+      // Trigger immediate ping if active (used for Page Visibility API)
+      if (isRunning && isMasterTab) {
+        sendHeartbeat();
+        broadcastMessage(MESSAGE_TYPES.FORCE_PING);
+      }
       break;
 
     case 'TRACKING_ENABLED':

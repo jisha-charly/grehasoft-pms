@@ -158,6 +158,16 @@ export const useHeartbeat = (options: UseHeartbeatOptions) => {
     workerRef.current?.postMessage({ type: 'STATUS' });
   }, []);
 
+  // Keep worker token synced when it refreshes
+  useEffect(() => {
+    if (workerRef.current && token) {
+      workerRef.current.postMessage({
+        type: 'UPDATE_TOKEN',
+        payload: { token },
+      });
+    }
+  }, [token]);
+
   // Handle tracking state changes
   useEffect(() => {
     if (!workerRef.current) {
@@ -177,8 +187,8 @@ export const useHeartbeat = (options: UseHeartbeatOptions) => {
       if (document.hidden) {
         console.log('[Heartbeat] Tab moved to background. Web worker will continue pinging.');
       } else {
-        console.log('[Heartbeat] Tab active. Web worker pinging normally.');
-        // Optionally get latest status or sync when returning to foreground
+        console.log('[Heartbeat] Tab active. Forcing immediate ping to sync.');
+        workerRef.current?.postMessage({ type: 'FORCE_PING' });
         getStatus();
       }
     };
