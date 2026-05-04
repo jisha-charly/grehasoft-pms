@@ -1,14 +1,15 @@
 /**
  * CUSTOM HOOK: useHeartbeat
  * 
- * Purpose: Manage work session tracking via Web Worker
+ * Purpose: Manage work session tracking via Web Worker with a safe main-thread fallback
  * 
  * Features:
- * - Initialize and manage heartbeat worker
+ * - Initialize and manage heartbeat worker from /public folder
+ * - Safe fallback to main thread if worker fails
  * - Handle tracking enabled/disabled state
  * - Clean up on unmount
  * - Expose status and control methods
- * - Handle errors gracefully
+ * - Handle errors gracefully (401, 403)
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -31,6 +32,9 @@ export const useHeartbeat = (options: UseHeartbeatOptions) => {
   const { isTrackingEnabled, apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1', token = '' } = options;
 
   const workerRef = useRef<Worker | null>(null);
+  const fallbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [fallbackActive, setFallbackActive] = useState(false);
+
   const [status, setStatus] = useState<HeartbeatStatus>({
     isRunning: false,
     isTrackingEnabled,
@@ -41,14 +45,13 @@ export const useHeartbeat = (options: UseHeartbeatOptions) => {
 
   // Initialize worker
   const initializeWorker = useCallback(() => {
-    if (workerRef.current) {
+    if (workerRef.current || fallbackActive) {
       return;
     }
 
     try {
-      // Create worker from imported script
-      const workerScript = new URL('../workers/heartbeatWorker.ts', import.meta.url);
-      workerRef.current = new Worker(workerScript, { type: 'module' });
+      // Use public folder path (production safe)
+      workerRef.current = new Worker('/heartbeatWorker.js');
 
       // Listen for worker messages
       workerRef.current.onmessage = (event) => {
@@ -84,6 +87,17 @@ export const useHeartbeat = (options: UseHeartbeatOptions) => {
             setStatus((prev) => ({ ...prev, error }));
             break;
 
+          case 'TOKEN_EXPIRED':
+            console.error('[Heartbeat Worker] Token Expired');
+            setStatus((prev) => ({ ...prev, error: 'TOKEN_EXPIRED' }));
+            // Implement logout or refresh logic here if needed globally
+            break;
+
+          case 'TRACKING_DISABLED':
+            console.warn('[Heartbeat Worker] Tracking disabled by server');
+            setStatus((prev) => ({ ...prev, error: 'TRACKING_DISABLED', isTrackingEnabled: false }));
+            break;
+
           case 'STATUS_RESPONSE':
             setStatus((prev) => ({
               ...prev,
@@ -98,10 +112,13 @@ export const useHeartbeat = (options: UseHeartbeatOptions) => {
         }
       };
 
-      // Handle worker errors
+      // Handle worker fatal errors -> Trigger fallback
       workerRef.current.onerror = (error) => {
         console.error('[Heartbeat Worker] Fatal error:', error);
-        setStatus((prev) => ({ ...prev, error: error.message }));
+        workerRef.current?.terminate();
+        workerRef.current = null;
+        setFallbackActive(true);
+        setStatus((prev) => ({ ...prev, error: 'Worker crashed. Fallback active.' }));
       };
 
       // Initialize worker with config
@@ -115,62 +132,116 @@ export const useHeartbeat = (options: UseHeartbeatOptions) => {
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create worker';
-      console.error('[Heartbeat] Worker initialization failed:', errorMessage);
+      console.error('[Heartbeat Worker] Initialization failed:', errorMessage);
+      setFallbackActive(true);
       setStatus((prev) => ({ ...prev, error: errorMessage }));
     }
-  }, [apiUrl, token, isTrackingEnabled]);
+  }, [apiUrl, token, isTrackingEnabled, fallbackActive]);
+
+  // Main Thread Fallback Ping
+  const fallbackPing = useCallback(async () => {
+    if (!isTrackingEnabled || !token || !apiUrl) return;
+
+    try {
+      const response = await fetch(`${apiUrl}/tracking/heartbeat/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          timestamp: new Date().toISOString(),
+          missed_heartbeats: [],
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) setStatus((prev) => ({ ...prev, error: 'TOKEN_EXPIRED' }));
+        if (response.status === 403) setStatus((prev) => ({ ...prev, error: 'TRACKING_DISABLED', isTrackingEnabled: false }));
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      console.log('[Heartbeat Fallback] Ping sent successfully');
+      setStatus((prev) => ({ ...prev, lastPing: new Date(), isMasterTab: true, error: null }));
+    } catch (error) {
+      console.error('[Heartbeat Fallback] Ping failed:', error);
+    }
+  }, [isTrackingEnabled, token, apiUrl]);
 
   // Start heartbeat
   const startHeartbeat = useCallback(() => {
+    if (fallbackActive) {
+      if (!fallbackIntervalRef.current) {
+        console.log('[Heartbeat Fallback] Starting interval');
+        fallbackPing(); // Send immediately
+        fallbackIntervalRef.current = setInterval(fallbackPing, 60000);
+        setStatus((prev) => ({ ...prev, isRunning: true }));
+      }
+      return;
+    }
+
     if (!workerRef.current) {
       initializeWorker();
     }
 
     workerRef.current?.postMessage({
       type: 'START',
-      payload: {
-        isTrackingEnabled,
-      },
+      payload: { isTrackingEnabled },
     });
-  }, [isTrackingEnabled, initializeWorker]);
+  }, [isTrackingEnabled, initializeWorker, fallbackActive, fallbackPing]);
 
   // Stop heartbeat
   const stopHeartbeat = useCallback(() => {
+    if (fallbackActive && fallbackIntervalRef.current) {
+      clearInterval(fallbackIntervalRef.current);
+      fallbackIntervalRef.current = null;
+      setStatus((prev) => ({ ...prev, isRunning: false }));
+      return;
+    }
     workerRef.current?.postMessage({ type: 'STOP' });
-  }, []);
+  }, [fallbackActive]);
 
   // Enable tracking
   const enableTracking = useCallback(() => {
     setStatus((prev) => ({ ...prev, isTrackingEnabled: true }));
-    workerRef.current?.postMessage({ type: 'TRACKING_ENABLED' });
-    startHeartbeat();
-  }, [startHeartbeat]);
+    if (fallbackActive) {
+      startHeartbeat();
+    } else {
+      workerRef.current?.postMessage({ type: 'TRACKING_ENABLED' });
+      startHeartbeat();
+    }
+  }, [startHeartbeat, fallbackActive]);
 
   // Disable tracking
   const disableTracking = useCallback(() => {
     setStatus((prev) => ({ ...prev, isTrackingEnabled: false }));
-    workerRef.current?.postMessage({ type: 'TRACKING_DISABLED' });
-    stopHeartbeat();
-  }, [stopHeartbeat]);
+    if (fallbackActive) {
+      stopHeartbeat();
+    } else {
+      workerRef.current?.postMessage({ type: 'TRACKING_DISABLED' });
+      stopHeartbeat();
+    }
+  }, [stopHeartbeat, fallbackActive]);
 
   // Get worker status
   const getStatus = useCallback(() => {
+    if (fallbackActive) return;
     workerRef.current?.postMessage({ type: 'STATUS' });
-  }, []);
+  }, [fallbackActive]);
 
   // Keep worker token synced when it refreshes
   useEffect(() => {
-    if (workerRef.current && token) {
+    if (workerRef.current && token && !fallbackActive) {
       workerRef.current.postMessage({
         type: 'UPDATE_TOKEN',
         payload: { token },
       });
     }
-  }, [token]);
+  }, [token, fallbackActive]);
 
   // Handle tracking state changes
   useEffect(() => {
-    if (!workerRef.current) {
+    if (!fallbackActive && !workerRef.current) {
       initializeWorker();
     }
 
@@ -179,16 +250,27 @@ export const useHeartbeat = (options: UseHeartbeatOptions) => {
     } else if (!isTrackingEnabled && status.isTrackingEnabled) {
       disableTracking();
     }
-  }, [isTrackingEnabled, status.isTrackingEnabled, enableTracking, disableTracking, initializeWorker]);
+  }, [isTrackingEnabled, status.isTrackingEnabled, enableTracking, disableTracking, initializeWorker, fallbackActive]);
+
+  // Handle Fallback activation dynamically
+  useEffect(() => {
+    if (fallbackActive && isTrackingEnabled && !status.isRunning) {
+      startHeartbeat();
+    }
+  }, [fallbackActive, isTrackingEnabled, status.isRunning, startHeartbeat]);
 
   // Page Visibility API to ensure background pinging
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        console.log('[Heartbeat] Tab moved to background. Web worker will continue pinging.');
+        console.log('[Heartbeat] Tab moved to background.');
       } else {
         console.log('[Heartbeat] Tab active. Forcing immediate ping to sync.');
-        workerRef.current?.postMessage({ type: 'FORCE_PING' });
+        if (fallbackActive) {
+          fallbackPing();
+        } else {
+          workerRef.current?.postMessage({ type: 'FORCE_PING' });
+        }
         getStatus();
       }
     };
@@ -198,15 +280,17 @@ export const useHeartbeat = (options: UseHeartbeatOptions) => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [getStatus]);
+  }, [getStatus, fallbackActive, fallbackPing]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (workerRef.current) {
         stopHeartbeat();
-        // Don't terminate worker, let it persist across re-renders
-        // workerRef.current.terminate();
+        // Do NOT terminate worker to allow background tracking to continue across re-renders
+      }
+      if (fallbackIntervalRef.current) {
+        clearInterval(fallbackIntervalRef.current);
       }
     };
   }, [stopHeartbeat]);

@@ -5,14 +5,12 @@
  * 
  * Features:
  * - Runs in background even when tab is minimized
- * - Uses Axios for consistent API requests
+ * - Uses native Fetch API (no bundler dependencies)
  * - Exponential backoff retry logic for failed pings
  * - Offline queueing for missed heartbeats
  * - Handles multi-tab synchronization via BroadcastChannel
  * - Automatic cleanup on message
  */
-
-import axios from 'axios';
 
 // Configuration
 const HEARTBEAT_INTERVAL = 60000; // 60 seconds
@@ -32,7 +30,7 @@ const MESSAGE_TYPES = {
 
 // State
 let isRunning = false;
-let intervalId: ReturnType<typeof setInterval> | null = null;
+let intervalId: any = null;
 let isTrackingEnabled = false;
 let apiToken: string | null = null;
 let apiUrl: string | null = null;
@@ -40,11 +38,6 @@ let isMasterTab = false;
 
 // Offline queueing
 let missedHeartbeats: string[] = [];
-
-// Worker Axios Instance
-const workerAxios = axios.create({
-  timeout: 30000, // 30s timeout handles Render cold starts
-});
 
 // BroadcastChannel for multi-tab synchronization
 let channel: BroadcastChannel | null = null;
@@ -55,7 +48,7 @@ function initChannel() {
     channel = new BroadcastChannel(CHANNEL_NAME);
     channel.onmessage = handleChannelMessage;
   } catch (error) {
-    console.warn('BroadcastChannel not supported, multi-tab sync disabled:', error);
+    console.warn('[Worker] BroadcastChannel not supported, multi-tab sync disabled:', error);
   }
 }
 
@@ -65,14 +58,13 @@ function handleChannelMessage(event: MessageEvent) {
 
   switch (type) {
     case MESSAGE_TYPES.START:
-      // Another tab started, stop this one
       if (isRunning && !isMasterTab) {
         stopHeartbeat('Another tab started');
       }
       break;
 
     case MESSAGE_TYPES.STOP:
-      if (!isRunning && data?.isExplicit) {
+      if (!isRunning && data && data.isExplicit) {
         // Only stop if explicitly stopped
       }
       break;
@@ -113,7 +105,7 @@ function broadcastMessage(type: string, data: any = {}) {
     try {
       channel.postMessage({ type, data });
     } catch (error) {
-      console.warn('Failed to broadcast message:', error);
+      console.warn('[Worker] Failed to broadcast message:', error);
     }
   }
 }
@@ -150,7 +142,7 @@ function startHeartbeat() {
 }
 
 // Stop heartbeat
-function stopHeartbeat(reason = 'User request') {
+function stopHeartbeat(reason: string = 'User request') {
   if (!isRunning) {
     return;
   }
@@ -171,25 +163,46 @@ function stopHeartbeat(reason = 'User request') {
   });
 }
 
-// Axios Request with Exponential Backoff
-async function axiosWithRetry(config: any, retries = 0): Promise<any> {
+// Fetch with Exponential Backoff
+async function fetchWithRetry(url: string, options: any, retries: number = 0): Promise<any> {
   try {
-    return await workerAxios(config);
-  } catch (error: any) {
-    // Abort retry if unauthorized (tracking disabled or token invalid)
-    if (error.response?.status === 403 || error.response?.status === 401) {
-      throw error;
+    // Add timeout logic for fetch (Render cold starts)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+    
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      // Don't retry on 401/403 auth errors
+      if (response.status === 401 || response.status === 403) {
+        const error: any = new Error(`Auth Error: ${response.status}`);
+        error.status = response.status;
+        throw error;
+      }
+      throw new Error(`Server error: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (err: any) {
+    // Check auth explicitly
+    if (err.status === 401 || err.status === 403) {
+      throw err;
     }
 
     if (retries >= MAX_RETRIES) {
-      throw error;
+      throw err;
     }
 
     const delay = RETRY_DELAYS[retries] || 30000;
-    console.warn(`[Worker] Heartbeat failed. Retrying in ${delay / 1000}s...`);
-    await new Promise((resolve) => setTimeout(resolve, delay));
+    console.warn(`[Worker] Request failed. Retrying in ${delay / 1000}s...`);
     
-    return axiosWithRetry(config, retries + 1);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    return fetchWithRetry(url, options, retries + 1);
   }
 }
 
@@ -204,17 +217,16 @@ async function sendHeartbeat() {
   try {
     const payload = {
       timestamp: currentPingTime,
-      missed_heartbeats: missedHeartbeats, // Send any queued offline pings
+      missed_heartbeats: missedHeartbeats,
     };
 
-    const response = await axiosWithRetry({
-      url: `${apiUrl}/tracking/heartbeat/`,
+    const data = await fetchWithRetry(`${apiUrl}/tracking/heartbeat/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiToken}`,
+        'Authorization': `Bearer ${apiToken}`,
       },
-      data: payload,
+      body: JSON.stringify(payload),
     });
 
     // Success! Clear the offline queue
@@ -222,39 +234,39 @@ async function sendHeartbeat() {
 
     self.postMessage({
       type: 'HEARTBEAT_SENT',
-      success: response.data.success,
-      status: response.data.status,
-      sessionId: response.data.session_id,
+      success: data.success,
+      status: data.status,
+      sessionId: data.session_id,
       timestamp: currentPingTime,
     });
-  } catch (error: any) {
-    console.error('[Worker] Heartbeat error after retries:', error);
+  } catch (err: any) {
+    console.error('[Worker] Heartbeat error after retries:', err);
 
-    if (error.response?.status === 403 || error.response?.status === 401) {
+    if (err.status === 401 || err.status === 403) {
       updateTrackingState(false);
-      stopHeartbeat(error.response.status === 401 ? 'Token expired' : 'Tracking disabled on server');
+      stopHeartbeat(err.status === 401 ? 'Token expired' : 'Tracking disabled on server');
       broadcastMessage(MESSAGE_TYPES.TRACKING_DISABLED);
       
       self.postMessage({
-        type: error.response.status === 401 ? 'TOKEN_EXPIRED' : 'TRACKING_DISABLED',
-        error: error.message,
+        type: err.status === 401 ? 'TOKEN_EXPIRED' : 'TRACKING_DISABLED',
+        error: err.message,
       });
     } else {
-      // Network or 5xx error: Queue this heartbeat for later recovery
+      // Network or timeout error: Queue this heartbeat for later recovery
       console.warn('[Worker] Queuing failed heartbeat for later recovery');
       missedHeartbeats.push(currentPingTime);
     }
 
     self.postMessage({
       type: 'HEARTBEAT_ERROR',
-      error: error instanceof Error ? error.message : String(error),
+      error: err.message || String(err),
       queuedCount: missedHeartbeats.length,
     });
   }
 }
 
 // Main message handler
-self.onmessage = (event) => {
+self.onmessage = (event: MessageEvent) => {
   const { type, payload } = event.data;
 
   switch (type) {
@@ -280,7 +292,6 @@ self.onmessage = (event) => {
       break;
 
     case 'FORCE_PING':
-      // Trigger immediate ping if active (used for Page Visibility API)
       if (isRunning && isMasterTab) {
         sendHeartbeat();
         broadcastMessage(MESSAGE_TYPES.FORCE_PING);
@@ -313,7 +324,7 @@ self.onmessage = (event) => {
       break;
 
     default:
-      console.warn('Unknown message type:', type);
+      console.warn('[Worker] Unknown message type:', type);
   }
 };
 

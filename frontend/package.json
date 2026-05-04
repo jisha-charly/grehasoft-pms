@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build:worker": "npx esbuild src/workers/heartbeatWorker.ts --outfile=public/heartbeatWorker.js --minify",
+    "build": "npm run build:worker && tsc && vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit"
   },
