@@ -4,17 +4,18 @@ TESTING GUIDE FOR WORK TRACKING SYSTEM
 This module provides test cases for the tracking system.
 """
 
-import pytest
 from django.test import TestCase, Client
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework.test import APITestCase
 from rest_framework import status
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.tracking.models import UserProfile, WorkSession, ActivityLog
-from apps.tracking.utils import (
+User = get_user_model()
+
+from .models import UserProfile, WorkSession, ActivityLog
+from .utils import (
     get_or_create_user_profile,
     is_tracking_enabled,
     get_or_create_active_session,
@@ -39,6 +40,7 @@ class UserProfileModelTest(TestCase):
 
     def test_create_user_profile(self):
         """Test creating a user profile."""
+        UserProfile.objects.filter(user=self.user).delete()
         profile = UserProfile.objects.create(
             user=self.user,
             is_tracking_enabled=True
@@ -48,11 +50,13 @@ class UserProfileModelTest(TestCase):
 
     def test_user_profile_default_tracking_disabled(self):
         """Test that tracking is disabled by default."""
+        UserProfile.objects.filter(user=self.user).delete()
         profile = UserProfile.objects.create(user=self.user)
         self.assertFalse(profile.is_tracking_enabled)
 
     def test_unique_one_to_one_relationship(self):
         """Test OneToOne constraint."""
+        UserProfile.objects.filter(user=self.user).delete()
         UserProfile.objects.create(user=self.user)
         with self.assertRaises(Exception):
             UserProfile.objects.create(user=self.user)
@@ -83,10 +87,12 @@ class WorkSessionModelTest(TestCase):
         now = timezone.now()
         session = WorkSession.objects.create(
             user=self.user,
-            login_time=now - timedelta(hours=2),
             last_ping=now,
             is_active_session=True
         )
+        # Bypass auto_now_add on login_time
+        WorkSession.objects.filter(id=session.id).update(login_time=now - timedelta(hours=2))
+        session.refresh_from_db()
         duration = session.calculate_duration()
         self.assertAlmostEqual(duration.total_seconds(), 7200, delta=10)
 
@@ -95,7 +101,7 @@ class WorkSessionModelTest(TestCase):
         now = timezone.now()
         session = WorkSession.objects.create(
             user=self.user,
-            login_time=now - timedelta(minutes=1),
+            last_desktop_ping=now,
             last_ping=now,
             is_active_session=True
         )
@@ -106,19 +112,32 @@ class WorkSessionModelTest(TestCase):
         now = timezone.now()
         session = WorkSession.objects.create(
             user=self.user,
-            login_time=now - timedelta(minutes=10),
-            last_ping=now - timedelta(minutes=5),
+            last_desktop_ping=now - timedelta(minutes=3),
+            last_ping=now - timedelta(minutes=3),
             is_active_session=True
         )
         self.assertEqual(session.get_status(), 'Idle')
+
+        # Delete the previous active session to avoid unique constraint violation
+        session.delete()
+
+        # Test status when is_desktop_idle is explicitly True
+        session2 = WorkSession.objects.create(
+            user=self.user,
+            last_desktop_ping=now,
+            last_ping=now,
+            is_desktop_idle=True,
+            is_active_session=True
+        )
+        self.assertEqual(session2.get_status(), 'Idle')
 
     def test_get_status_offline(self):
         """Test status when offline."""
         now = timezone.now()
         session = WorkSession.objects.create(
             user=self.user,
-            login_time=now - timedelta(hours=1),
-            last_ping=now - timedelta(minutes=20),
+            last_desktop_ping=now - timedelta(minutes=6),
+            last_ping=now - timedelta(minutes=6),
             is_active_session=True
         )
         self.assertEqual(session.get_status(), 'Offline')
@@ -128,8 +147,8 @@ class WorkSessionModelTest(TestCase):
         now = timezone.now()
         session = WorkSession.objects.create(
             user=self.user,
-            login_time=now - timedelta(hours=1),
-            logout_time=now - timedelta(minutes=30),
+            last_desktop_ping=now,
+            last_ping=now,
             is_active_session=False
         )
         self.assertEqual(session.get_status(), 'Offline')
@@ -207,21 +226,26 @@ class UtilityFunctionsTest(TestCase):
     def test_calculate_daily_working_time(self):
         """Test daily work time calculation."""
         today = timezone.now().date()
-        now = timezone.now()
+        # Set now to noon to ensure now - 8 hours is still within today's date
+        now = timezone.now().replace(hour=12, minute=0, second=0, microsecond=0)
 
         # Create multiple sessions
         session1 = WorkSession.objects.create(
             user=self.user,
-            login_time=now - timedelta(hours=8),
-            logout_time=now - timedelta(hours=4),
             is_active_session=False
+        )
+        WorkSession.objects.filter(id=session1.id).update(
+            login_time=now - timedelta(hours=8),
+            logout_time=now - timedelta(hours=4)
         )
 
         session2 = WorkSession.objects.create(
             user=self.user,
-            login_time=now - timedelta(hours=3),
-            logout_time=now - timedelta(hours=1),
             is_active_session=False
+        )
+        WorkSession.objects.filter(id=session2.id).update(
+            login_time=now - timedelta(hours=3),
+            logout_time=now - timedelta(hours=1)
         )
 
         total = calculate_daily_working_time(self.user, date=today)
@@ -250,6 +274,7 @@ class UtilityFunctionsTest(TestCase):
 
         session = WorkSession.objects.create(
             user=self.user,
+            last_desktop_ping=timezone.now(),
             is_active_session=True
         )
 
@@ -266,9 +291,12 @@ class UtilityFunctionsTest(TestCase):
         now = timezone.now()
         session = WorkSession.objects.create(
             user=self.user,
-            login_time=now - timedelta(minutes=20),
-            last_ping=now - timedelta(minutes=20),
             is_active_session=True
+        )
+        WorkSession.objects.filter(id=session.id).update(
+            login_time=now - timedelta(minutes=20),
+            last_desktop_ping=now - timedelta(minutes=20),
+            last_ping=now - timedelta(minutes=20)
         )
 
         # Auto logout with 15 minute timeout
@@ -289,16 +317,17 @@ class HeartbeatAPITest(APITestCase):
             email='test@example.com',
             password='testpass123'
         )
+        UserProfile.objects.filter(user=self.user).delete()
         self.profile = UserProfile.objects.create(
             user=self.user,
             is_tracking_enabled=True
         )
-        self.token = Token.objects.create(user=self.user)
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        refresh = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
 
     def test_heartbeat_creates_session(self):
         """Test that heartbeat creates a session."""
-        response = self.client.post('/api/tracking/heartbeat/')
+        response = self.client.post('/api/v1/tracking/heartbeat/')
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['success'])
@@ -315,7 +344,7 @@ class HeartbeatAPITest(APITestCase):
         import time
         time.sleep(0.1)
 
-        response = self.client.post('/api/tracking/heartbeat/')
+        response = self.client.post('/api/v1/tracking/heartbeat/')
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
@@ -327,7 +356,7 @@ class HeartbeatAPITest(APITestCase):
         self.profile.is_tracking_enabled = False
         self.profile.save()
 
-        response = self.client.post('/api/tracking/heartbeat/')
+        response = self.client.post('/api/v1/tracking/heartbeat/')
         
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertFalse(response.data['success'])
@@ -342,23 +371,24 @@ class EmployeeStatusAPITest(APITestCase):
             email='test@example.com',
             password='testpass123'
         )
+        UserProfile.objects.filter(user=self.user).delete()
         self.profile = UserProfile.objects.create(
             user=self.user,
             is_tracking_enabled=True
         )
-        self.token = Token.objects.create(user=self.user)
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        refresh = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
 
     def test_get_all_employee_status(self):
         """Test getting all employee status."""
-        response = self.client.get('/api/tracking/employee-status/')
+        response = self.client.get('/api/v1/tracking/employee-status/')
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsInstance(response.data, list)
 
     def test_get_single_employee_status(self):
         """Test getting single employee status."""
-        response = self.client.get(f'/api/tracking/employee-status/{self.user.id}/')
+        response = self.client.get(f'/api/v1/tracking/employee-status/{self.user.id}/')
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['user_id'], self.user.id)
@@ -374,17 +404,18 @@ class ToggleTrackingAPITest(APITestCase):
             email='test@example.com',
             password='testpass123'
         )
+        UserProfile.objects.filter(user=self.user).delete()
         self.profile = UserProfile.objects.create(
             user=self.user,
             is_tracking_enabled=False
         )
-        self.token = Token.objects.create(user=self.user)
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        refresh = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
 
     def test_toggle_tracking_on(self):
         """Test enabling tracking."""
         response = self.client.post(
-            f'/api/tracking/toggle-tracking/{self.user.id}/',
+            f'/api/v1/tracking/toggle-tracking/{self.user.id}/',
             {'enabled': True},
             format='json'
         )
@@ -395,7 +426,7 @@ class ToggleTrackingAPITest(APITestCase):
     def test_toggle_tracking_off(self):
         """Test disabling tracking."""
         response = self.client.post(
-            f'/api/tracking/toggle-tracking/{self.user.id}/',
+            f'/api/v1/tracking/toggle-tracking/{self.user.id}/',
             {'enabled': False},
             format='json'
         )

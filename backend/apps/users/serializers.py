@@ -32,8 +32,9 @@ class UserSerializer(serializers.ModelSerializer):
 class UserCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['name', 'username', 'email', 'password', 'role', 'department', 'status','position', 'joining_date', 'salary_monthly','address']
+        fields = ['id', 'name', 'username', 'email', 'password', 'role', 'department', 'status','position', 'joining_date', 'salary_monthly','address']
         extra_kwargs = {'password': {'write_only': True}}
+        read_only_fields = ['id']
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
@@ -54,7 +55,7 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
         if request and 'email' in validated_data and validated_data['email'] != instance.email:
             req_user = request.user
             req_is_super = req_user.is_superuser or (req_user.role and req_user.role.name == 'SUPER_ADMIN')
-            tgt_is_super = instance.is_superuser or (instance.role and instance.role.name == 'SUPER_ADMIN')
+            tgt_is_super = instance.role and instance.role.name == 'SUPER_ADMIN'
             
             if not req_is_super:
                 raise serializers.ValidationError({"email": "You do not have permission to change this user's email."})

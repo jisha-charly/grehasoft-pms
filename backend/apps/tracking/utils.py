@@ -158,13 +158,24 @@ def get_employee_status(user):
     daily_working_time = calculate_daily_working_time(user)
     formatted_time = format_duration(daily_working_time)
     
+    # Calculate full_name using user.name or first_name + last_name
+    full_name = getattr(user, 'name', '').strip()
+    if not full_name:
+        full_name = f"{user.first_name} {user.last_name}".strip()
+    
+    # Calculate employee_code
+    employee_code = f"GS-26-{str(user.id).zfill(3)}"
+    
     return {
         'user_id': user.id,
         'username': user.username,
         'first_name': user.first_name or '',
         'last_name': user.last_name or '',
+        'full_name': full_name,
         'email': user.email,
+        'employee_code': employee_code,
         'is_tracking_enabled': profile.is_tracking_enabled,
+        'screenshots_enabled': profile.screenshots_enabled,
         'status': status,
         'login_time': login_time,
         'first_login_time': first_login_time,
@@ -222,7 +233,7 @@ def toggle_tracking(user, enable=None):
 
 def auto_logout_inactive_users(timeout_minutes=15):
     """
-    Auto logout users who haven't pinged in timeout_minutes.
+    Auto logout users who haven't sent any ping (browser or desktop) in timeout_minutes.
     
     Args:
         timeout_minutes: Time in minutes before marking as offline
@@ -232,15 +243,24 @@ def auto_logout_inactive_users(timeout_minutes=15):
     """
     timeout = timezone.now() - timedelta(minutes=timeout_minutes)
     
-    # Find all active sessions with last_ping older than timeout
+    # Find active sessions where:
+    # 1. last_ping is older than timeout OR
+    # 2. last_ping is null and login_time is older than timeout
     inactive_sessions = WorkSession.objects.filter(
-        is_active_session=True,
-        last_ping__lt=timeout
+        is_active_session=True
+    ).filter(
+        Q(last_ping__lt=timeout) | 
+        Q(last_ping__isnull=True, login_time__lt=timeout)
     )
     
     count = 0
     for session in inactive_sessions:
-        close_session(session)
+        # Use the most recent activity time (either last_desktop_ping or last_ping or login_time)
+        logout_time = session.last_desktop_ping or session.last_ping or session.login_time or timezone.now()
+        session.logout_time = logout_time
+        session.is_active_session = False
+        session.total_duration = session.calculate_duration()
+        session.save(update_fields=['logout_time', 'is_active_session', 'total_duration', 'updated_at'])
         count += 1
     
     return count

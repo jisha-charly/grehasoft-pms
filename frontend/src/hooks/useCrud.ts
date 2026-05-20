@@ -5,17 +5,35 @@ import axiosInstance from "../api/axiosInstance";
 function normalizeListResponse(res: any): { results: any[]; count: number } {
   const data = res?.data;
   if (!data) return { results: [], count: 0 };
-  if (Array.isArray(data)) return { results: data, count: data.length };
-  const results = data.results ?? data.data ?? (Array.isArray(data) ? data : []);
+  
+  let results = data.results ?? data.data ?? (Array.isArray(data) ? data : []);
   const count = typeof data.count === "number" ? data.count : (results?.length ?? 0);
-  return { results: Array.isArray(results) ? results : [], count };
+  
+  const normalizedResults = (Array.isArray(results) ? results : []).map((item: any) => {
+    if (item && typeof item === 'object') {
+      return {
+        ...item,
+        id: item.id ?? item.user_id,
+      };
+    }
+    return item;
+  });
+  
+  return { results: normalizedResults, count };
 }
 
 /** Normalize single item from POST/PATCH response */
 function normalizeItemResponse(res: any): any {
   const data = res?.data;
   if (!data) return data;
-  return data.data ?? data;
+  const item = data.data ?? data;
+  if (item && typeof item === 'object') {
+    return {
+      ...item,
+      id: item.id ?? item.user_id,
+    };
+  }
+  return item;
 }
 
 export interface UseCrudOptions<T> {
@@ -144,6 +162,9 @@ export function useCrud<T extends { id?: number | string }>(options: UseCrudOpti
     async (payload: Partial<T> | Record<string, unknown>): Promise<T> => {
       const res = await axiosInstance.post(`${base}/`, payload);
       const newItem = normalizeItemResponse(res) as T;
+      if (newItem && !newItem.id && (newItem as any).user_id) {
+        newItem.id = (newItem as any).user_id;
+      }
       setItems((prev) => [...prev, newItem]);
       setTotalCount((c) => c + 1);
       return newItem;
@@ -155,8 +176,14 @@ export function useCrud<T extends { id?: number | string }>(options: UseCrudOpti
     async (id: number | string, payload: Partial<T> | Record<string, unknown>): Promise<T> => {
       const res = await axiosInstance.patch(`${base}/${id}/`, payload);
       const updated = normalizeItemResponse(res) as T;
+      if (updated && !updated.id) {
+        updated.id = id;
+      }
       setItems((prev) =>
-        prev.map((i) => (String(i.id) === String(id) ? updated : i))
+        prev.map((i) => {
+          const currentId = i.id ?? (i as any).user_id;
+          return String(currentId) === String(id) ? { ...i, ...updated } : i;
+        })
       );
       return updated;
     },
@@ -166,7 +193,10 @@ export function useCrud<T extends { id?: number | string }>(options: UseCrudOpti
   const remove = useCallback(
     async (id: number | string): Promise<void> => {
       await axiosInstance.delete(`${base}/${id}/`);
-      setItems((prev) => prev.filter((i) => String(i.id) !== String(id)));
+      setItems((prev) => prev.filter((i) => {
+        const currentId = i.id ?? (i as any).user_id;
+        return String(currentId) !== String(id);
+      }));
       setTotalCount((c) => Math.max(0, c - 1));
     },
     [base]

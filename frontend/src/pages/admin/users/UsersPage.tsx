@@ -71,74 +71,94 @@ const UsersPage: React.FC<UsersPageProps> = ({ roles, departments }) => {
 },
     validationSchema,
     onSubmit: async (formValues) => {
- const data: any = {
-  name: formValues.name,
-  username: formValues.username,
-  email: formValues.email,
-  role: Number(formValues.role),
-  department: Number(formValues.departmentId),
-  status: formValues.status,
-  position: formValues.position || null,
-  joining_date: formValues.joining_date || null,
-  salary_monthly: formValues.salary_monthly
-    ? Number(formValues.salary_monthly)
-    : null,
-  address: formValues.address || null,
-};
+      const data: any = {
+        name: formValues.name,
+        username: formValues.username,
+        role: Number(formValues.role),
+        department: Number(formValues.departmentId),
+        status: formValues.status,
+        position: formValues.position || null,
+        joining_date: formValues.joining_date || null,
+        salary_monthly: formValues.salary_monthly
+          ? Number(formValues.salary_monthly)
+          : null,
+        address: formValues.address || null,
+      };
 
-  // Only send password if entered
-  if (formValues.password) {
-    data.password = formValues.password;
-  }
+      // Only send email if new user or modified
+      if (!editingUser || formValues.email !== editingUser.email) {
+        data.email = formValues.email;
+      }
 
-  if (editingUser) {
-    await update(editingUser.id!, data);
-  } else {
-    await add(data);
-  }
+      // Only send password if entered
+      if (formValues.password) {
+        data.password = formValues.password;
+      }
 
-  handleCloseModal();
-}
+      if (editingUser) {
+        // Improve Debugging
+        console.log("Selected User:", editingUser);
+
+        // Defensive Validation
+        const userId = editingUser.id || (editingUser as any).user_id;
+        if (!userId) {
+          console.error("User ID missing");
+          return;
+        }
+
+        await update(userId, data);
+      } else {
+        await add(data);
+      }
+
+      handleCloseModal();
+    }
   });
 
- useEffect(() => {
-  if (!isModalOpen) return;
+  useEffect(() => {
+    if (!isModalOpen) return;
 
-  if (editingUser) {
- setValues({
-  name: editingUser.name || '',
-  username: editingUser.username || '',
-  email: editingUser.email || '',
-  password: '',
-  role: editingUser.role ? String(editingUser.role) : '',
-  departmentId: editingUser.department ? String(editingUser.department) : '',
-  status: editingUser.status || 'active',
-  position: editingUser.position || '',
-  joining_date: editingUser.joining_date || '',
-  salary_monthly: editingUser.salary_monthly
-    ? String(editingUser.salary_monthly)
-    : '',
-  address: editingUser.address || "",
-});
-  } else {
-    resetForm();
-  }
-}, [isModalOpen, editingUser]);
+    if (editingUser) {
+      setValues({
+        name: editingUser.name || '',
+        username: editingUser.username || '',
+        email: editingUser.email || '',
+        password: '',
+        role: editingUser.role ? String(editingUser.role) : '',
+        departmentId: editingUser.department ? String(editingUser.department) : '',
+        status: editingUser.status || 'active',
+        position: editingUser.position || '',
+        joining_date: editingUser.joining_date || '',
+        salary_monthly: editingUser.salary_monthly
+          ? String(editingUser.salary_monthly)
+          : '',
+        address: editingUser.address || "",
+      });
+    } else {
+      resetForm();
+    }
+  }, [isModalOpen, editingUser]);
 
   const handleCloseModal = () => {
     setModalOpen(false);
     setEditingUser(null);
     resetForm();
   };
-const filteredUsers = useMemo(() => {
-  return users.filter(u =>
-    u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-}, [users, searchTerm]);
+  const filteredUsers = useMemo(() => {
+    return users.filter(u =>
+      u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [users, searchTerm]);
   const handleEdit = (user: User) => {
-    setEditingUser(user);
+    // Normalize User Object
+    const normalizedUser = {
+      ...user,
+      id: user.id ?? (user as any).user_id
+    };
+    console.log("Edit User Selected:", normalizedUser);
+    setEditingUser(normalizedUser);
     setModalOpen(true);
   };
 
@@ -291,7 +311,7 @@ const filteredUsers = useMemo(() => {
         <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
           <div className="modal-dialog modal-lg modal-dialog-centered">
             <div className="modal-content border-0 rounded-4 overflow-hidden shadow-lg">
-              <form onSubmit={handleSubmit} noValidate>
+              <form onSubmit={handleSubmit} noValidate autoComplete="off">
                 <div className="modal-header border-0 pt-4 px-4 bg-white">
                   <h5 className="modal-title fw-bold text-dark">
                     {editingUser ? <><i className="bi bi-person-gear me-2"></i>Update User Account</> : <><i className="bi bi-person-plus me-2"></i>Provision New Account</>}
@@ -334,6 +354,7 @@ const filteredUsers = useMemo(() => {
                           value={values.email} 
                           onChange={(e) => handleChange('email', e.target.value)}
                           placeholder="alex@grehasoft.com" 
+                          autoComplete="off"
                         />
                       </FormField>
                     </div>
@@ -346,6 +367,7 @@ const filteredUsers = useMemo(() => {
                           value={values.password} 
                           onChange={(e) => handleChange('password', e.target.value)}
                           placeholder="••••••••" 
+                          autoComplete="new-password"
                         />
                       </FormField>
                     </div>
@@ -485,7 +507,13 @@ const filteredUsers = useMemo(() => {
           <button 
             className="btn btn-danger"
             onClick={async () => {
-              await deleteUser(userToDelete.id);
+              const userId = userToDelete.id || (userToDelete as any).user_id;
+              if (!userId) {
+                console.error("User ID missing for deletion");
+                setUserToDelete(null);
+                return;
+              }
+              await deleteUser(userId);
               setUserToDelete(null);
             }}
           >

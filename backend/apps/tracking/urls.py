@@ -25,4 +25,8 @@ urlpatterns = [
     # Tracking toggle
     path('toggle-tracking/<int:user_id>/', views.toggle_user_tracking, name='toggle_tracking'),
     path('set-track-enable/', views.set_track_enable, name='set_track_enable'),
+    
+    # Batch syncing & Screenshot upload
+    path('activity-batch-sync/', views.activity_batch_sync, name='activity_batch_sync'),
+    path('screenshot-upload/', views.ScreenshotUploadView.as_view(), name='screenshot_upload'),
 ]

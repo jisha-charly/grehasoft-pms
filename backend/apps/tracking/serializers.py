@@ -1,13 +1,13 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import UserProfile, WorkSession, ActivityLog
+from .models import UserProfile, WorkSession, ActivityLog, AppActivity, Screenshot
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
     """Serializer for UserProfile."""
     class Meta:
         model = UserProfile
-        fields = ['id', 'user_id', 'is_tracking_enabled', 'created_at', 'updated_at']
+        fields = ['id', 'user_id', 'is_tracking_enabled', 'screenshots_enabled', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
@@ -38,14 +38,17 @@ class EmployeeStatusSerializer(serializers.Serializer):
     """Serializer for employee status overview."""
     user_id = serializers.IntegerField()
     username = serializers.CharField()
-    first_name = serializers.CharField()
-    last_name = serializers.CharField()
+    first_name = serializers.CharField(allow_blank=True, required=False)
+    last_name = serializers.CharField(allow_blank=True, required=False)
+    full_name = serializers.CharField(allow_blank=True, required=False)
     email = serializers.EmailField()
+    employee_code = serializers.CharField(allow_blank=True, required=False)
     is_tracking_enabled = serializers.BooleanField()
+    screenshots_enabled = serializers.BooleanField()
     status = serializers.CharField()
-    login_time = serializers.DateTimeField()
+    login_time = serializers.DateTimeField(allow_null=True, required=False)
     first_login_time = serializers.DateTimeField(allow_null=True, required=False)
-    last_ping = serializers.DateTimeField()
+    last_ping = serializers.DateTimeField(allow_null=True, required=False)
     total_work_time = serializers.CharField()  # HH:MM:SS format
     session_id = serializers.IntegerField(allow_null=True)
 
@@ -55,6 +58,22 @@ class ActivityLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = ActivityLog
         fields = ['id', 'user_id', 'session_id', 'activity_type', 'timestamp']
+        read_only_fields = ['id', 'timestamp']
+
+
+class AppActivitySerializer(serializers.ModelSerializer):
+    """Serializer for AppActivity."""
+    class Meta:
+        model = AppActivity
+        fields = ['id', 'user_id', 'session_id', 'app_name', 'window_title', 'duration_seconds', 'timestamp', 'is_productive']
+        read_only_fields = ['id', 'timestamp']
+
+
+class ScreenshotSerializer(serializers.ModelSerializer):
+    """Serializer for Screenshot."""
+    class Meta:
+        model = Screenshot
+        fields = ['id', 'user_id', 'session_id', 'image', 'timestamp', 'is_idle']
         read_only_fields = ['id', 'timestamp']
 
 

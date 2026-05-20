@@ -238,3 +238,15 @@ INFO 2026-04-14 10:46:18,881 tasks [EMAIL] Sending overdue reminder email for Re
 INFO 2026-04-14 10:46:22,312 utils [SUCCESS] Sent Overdue reminder email for Reminder ID 8 to 2 admins: ['admin@gmail.com', 'jisha.charly@gmail.com']
 INFO 2026-04-14 10:46:22,321 tasks [SUCCESS] Email sent for overdue Reminder ID 8
 INFO 2026-04-14 10:46:22,322 tasks [TASK] Reminder task completed successfully
+INFO 2026-05-20 12:08:40,966 utils 📩 [EMAIL] Starting email send for notification 12
+INFO 2026-05-20 12:08:40,967 utils 🔍 [EMAIL] Notification found: Reminder Due: today
+INFO 2026-05-20 12:08:40,968 utils 👥 [EMAIL] Found 2 admin users
+INFO 2026-05-20 12:08:40,969 utils 📬 [EMAIL] Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-05-20 12:08:40,969 utils 📋 [EMAIL] Email details:
+INFO 2026-05-20 12:08:40,969 utils    📧 From: Grehasoft PMS <noreply@grehasoft.com>
+INFO 2026-05-20 12:08:40,969 utils    📋 Subject: Alert: Reminder Due: today
+INFO 2026-05-20 12:08:40,969 utils    🌐 Recipients: ['admin@gmail.com', 'jisha.charly@gmail.com']
+INFO 2026-05-20 12:08:40,969 utils 📤 [EMAIL] Sending email via SMTP...
+INFO 2026-05-20 12:08:40,987 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: today
+INFO 2026-05-20 12:08:40,987 signals ⏩ [SIGNAL] Email already sent for notification 12
+INFO 2026-05-20 12:08:40,987 utils ✅ [EMAIL] Email sent successfully and marked as sent in DB for notification 12

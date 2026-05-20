@@ -10,22 +10,27 @@ from django.db.models import Prefetch
 
 User = get_user_model()
 
-from .models import UserProfile, WorkSession, ActivityLog
+from .models import UserProfile, WorkSession, ActivityLog, AppActivity, Screenshot
 from .serializers import (
     UserProfileSerializer,
     WorkSessionSerializer,
     EmployeeStatusSerializer,
     HeartbeatRequestSerializer,
     HeartbeatResponseSerializer,
+    AppActivitySerializer,
+    ScreenshotSerializer,
 )
 from .utils import (
     is_tracking_enabled,
+    get_or_create_user_profile,
     get_or_create_active_session,
     update_session_ping,
     close_session,
     get_employee_status,
     get_all_employees_status,
     toggle_tracking,
+    calculate_daily_working_time,
+    format_duration,
 )
 
 
@@ -43,6 +48,7 @@ def heartbeat(request):
     
     Updates last_ping for user's active session if tracking is enabled.
     Creates new session if none exists.
+    Supports app activity duration aggregation to minimize database writes.
     """
     user = request.user
     
@@ -65,8 +71,45 @@ def heartbeat(request):
         # Update last_ping
         session = update_session_ping(session)
         
-        # Get current status
+        # Check source header or request data parameters
+        client_source = request.META.get('HTTP_X_CLIENT_SOURCE')
+        app_name = request.data.get('app_name')
+        window_title = request.data.get('window_title', '')
+        duration_seconds = request.data.get('duration_seconds', 10)
+        is_idle = request.data.get('is_idle', False)
+        
+        is_desktop = (client_source == 'desktop') or (app_name is not None) or ('is_idle' in request.data)
+        
+        if is_desktop:
+            session.last_desktop_ping = timezone.now()
+            session.is_desktop_idle = is_idle
+            session.save(update_fields=['last_desktop_ping', 'is_desktop_idle', 'updated_at'])
+
+            profile = get_or_create_user_profile(user)
+
+            if app_name and not is_idle:
+                # Aggregate duration if the active app/window has not changed
+                last_activity = AppActivity.objects.filter(session=session).order_by('-timestamp').first()
+                if last_activity and last_activity.app_name == app_name and last_activity.window_title == window_title:
+                    last_activity.duration_seconds += duration_seconds
+                    last_activity.timestamp = timezone.now()
+                    last_activity.save(update_fields=['duration_seconds', 'timestamp'])
+                else:
+                    AppActivity.objects.create(
+                        user=user,
+                        session=session,
+                        app_name=app_name,
+                        window_title=window_title,
+                        duration_seconds=duration_seconds,
+                        timestamp=timezone.now()
+                    )
+        else:
+            profile = get_or_create_user_profile(user)
+        
+        # Get current status after desktop tracker fields have been updated
         current_status = session.get_status()
+        
+        daily_time = calculate_daily_working_time(user)
         
         return Response(
             {
@@ -74,6 +117,8 @@ def heartbeat(request):
                 'message': 'Heartbeat recorded' if not created else 'New session created',
                 'session_id': session.id,
                 'status': current_status,
+                'screenshots_enabled': profile.screenshots_enabled,
+                'total_work_time': format_duration(daily_time),
             },
             status=status.HTTP_200_OK
         )
@@ -308,3 +353,88 @@ class WorkSessionViewSet(viewsets.ReadOnlyModelViewSet):
         
         serializer = self.get_serializer(sessions, many=True)
         return Response(serializer.data)
+
+
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework import serializers as drf_serializers
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def activity_batch_sync(request):
+    """
+    Sync queued offline activities with duration aggregation.
+    """
+    user = request.user
+    if not is_tracking_enabled(user):
+        return Response({'success': False, 'message': 'Tracking is disabled'}, status=status.HTTP_403_FORBIDDEN)
+        
+    session, _ = get_or_create_active_session(user)
+    activities = request.data.get('activities', [])
+    
+    # Sort activities by timestamp to aggregate in order
+    activities = sorted(activities, key=lambda x: x.get('timestamp', ''))
+    
+    synced_count = 0
+    for act in activities:
+        app_name = act.get('app_name')
+        window_title = act.get('window_title', '')
+        duration_seconds = act.get('duration_seconds', 10)
+        timestamp_str = act.get('timestamp')
+        
+        if not app_name:
+            continue
+            
+        timestamp = timezone.now()
+        if timestamp_str:
+            try:
+                timestamp = timezone.datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+            except Exception:
+                pass
+                
+        # Aggregate duration if active app/window hasn't changed
+        last_activity = AppActivity.objects.filter(session=session).order_by('-timestamp').first()
+        if last_activity and last_activity.app_name == app_name and last_activity.window_title == window_title:
+            last_activity.duration_seconds += duration_seconds
+            last_activity.timestamp = timestamp
+            last_activity.save(update_fields=['duration_seconds', 'timestamp'])
+        else:
+            AppActivity.objects.create(
+                user=user,
+                session=session,
+                app_name=app_name,
+                window_title=window_title,
+                duration_seconds=duration_seconds,
+                timestamp=timestamp
+            )
+        synced_count += 1
+        
+    update_session_ping(session)
+    daily_time = calculate_daily_working_time(user)
+        
+    return Response({
+        'success': True,
+        'synced_count': synced_count,
+        'total_work_time': format_duration(daily_time)
+    }, status=status.HTTP_200_OK)
+
+
+class ScreenshotUploadView(generics.CreateAPIView):
+    """
+    API endpoint to upload screenshots from Electron.
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+    serializer_class = ScreenshotSerializer
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        profile = get_or_create_user_profile(user)
+        if not profile.screenshots_enabled:
+            raise drf_serializers.ValidationError("Screenshots are disabled for this user.")
+            
+        session, _ = get_or_create_active_session(user)
+        serializer.save(
+            user=user,
+            session=session,
+            is_idle=self.request.data.get('is_idle', 'false').lower() == 'true'
+        )

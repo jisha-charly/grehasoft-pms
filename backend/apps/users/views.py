@@ -96,7 +96,7 @@ class UserViewSet(viewsets.ModelViewSet):
         if 'email' in request.data and request.data['email'] != instance.email:
             req_user = request.user
             req_is_super = req_user.is_superuser or (req_user.role and req_user.role.name == 'SUPER_ADMIN')
-            tgt_is_super = instance.is_superuser or (instance.role and instance.role.name == 'SUPER_ADMIN')
+            tgt_is_super = instance.role and instance.role.name == 'SUPER_ADMIN'
             
             if not req_is_super:
                 return False
@@ -104,17 +104,35 @@ class UserViewSet(viewsets.ModelViewSet):
                 return False
         return True
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        
+        # Return read representation
+        read_serializer = UserSerializer(serializer.instance, context=self.get_serializer_context())
+        return Response(read_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
     def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
         instance = self.get_object()
         if not self.check_email_permission(request, instance):
             return Response({"email": ["You do not have permission to change this user's email."]}, status=status.HTTP_403_FORBIDDEN)
-        return super().update(request, *args, **kwargs)
+        
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        if getattr(instance, '_prefetched_objects_cache', None):
+            instance._prefetched_objects_cache = {}
+            
+        read_serializer = UserSerializer(instance, context=self.get_serializer_context())
+        return Response(read_serializer.data)
 
     def partial_update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        if not self.check_email_permission(request, instance):
-            return Response({"email": ["You do not have permission to change this user's email."]}, status=status.HTTP_403_FORBIDDEN)
-        return super().partial_update(request, *args, **kwargs)
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
 
 
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])

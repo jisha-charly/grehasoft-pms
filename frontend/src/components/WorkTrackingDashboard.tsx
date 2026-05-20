@@ -80,14 +80,19 @@ const WorkTrackingDashboard: React.FC = () => {
   const processedEmployees = useMemo(() => {
     return state.employees
       .filter((emp) => {
-        const matchesSearch = `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchQuery.toLowerCase());
+        const empName = emp.full_name || `${emp.first_name} ${emp.last_name}`.trim() || emp.email;
+        const matchesSearch = empName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                             emp.email.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesStatus = filterStatus === 'All' || emp.status === filterStatus;
         return matchesSearch && matchesStatus;
       })
       .sort((a, b) => {
         switch (sortBy) {
-          case 'name':
-            return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+          case 'name': {
+            const nameA = a.full_name || `${a.first_name} ${a.last_name}`.trim() || a.email;
+            const nameB = b.full_name || `${b.first_name} ${b.last_name}`.trim() || b.email;
+            return nameA.localeCompare(nameB);
+          }
           case 'status': {
             const statusOrder = { Active: 0, Idle: 1, Offline: 2 };
             return (statusOrder[a.status as keyof typeof statusOrder] ?? 3) -
@@ -100,6 +105,30 @@ const WorkTrackingDashboard: React.FC = () => {
         }
       });
   }, [state.employees, searchQuery, filterStatus, sortBy]);
+
+  const getInitials = (fullName: string | undefined, email: string) => {
+    if (fullName && fullName.trim()) {
+      const parts = fullName.trim().split(/\s+/);
+      if (parts.length > 1) {
+        return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
+      }
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    return email.substring(0, 2).toUpperCase();
+  };
+
+  const getAvatarColor = (userId: number) => {
+    const colors = [
+      '#4f46e5', // indigo
+      '#10b981', // emerald
+      '#f59e0b', // amber
+      '#3b82f6', // blue
+      '#ec4899', // pink
+      '#8b5cf6', // violet
+      '#06b6d4'  // cyan
+    ];
+    return colors[userId % colors.length];
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -242,8 +271,33 @@ const WorkTrackingDashboard: React.FC = () => {
                 processedEmployees.map(emp => (
                   <tr key={emp.user_id}>
                     <td>
-                      <div className="fw-bold">{emp.first_name} {emp.last_name}</div>
-                      <div className="small text-muted">{emp.email}</div>
+                      <div className="d-flex align-items-center">
+                        <div 
+                          className="rounded-circle text-white d-flex align-items-center justify-content-center fw-bold me-3 shadow-sm"
+                          style={{ 
+                            width: '38px', 
+                            height: '38px', 
+                            backgroundColor: getAvatarColor(emp.user_id),
+                            fontSize: '0.85rem',
+                            flexShrink: 0
+                          }}
+                        >
+                          {getInitials(emp.full_name, emp.email)}
+                        </div>
+                        <div>
+                          <div className="fw-semibold text-dark mb-0" style={{ fontSize: '0.9rem' }}>
+                            {emp.full_name || emp.email}
+                          </div>
+                          <div className="d-flex align-items-center gap-2 mt-1" style={{ fontSize: '0.75rem' }}>
+                            <span className="badge bg-light text-secondary border px-2 py-0.5 rounded-pill fw-medium">
+                              {emp.employee_code || `GS-26-${String(emp.user_id).padStart(3, '0')}`}
+                            </span>
+                            {emp.full_name && (
+                              <span className="text-muted">{emp.email}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </td>
                     <td>{getStatusBadge(emp.status)}</td>
                     <td>

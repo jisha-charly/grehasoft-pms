@@ -11,7 +11,9 @@ export interface EmployeeStatus {
   username: string;
   first_name: string;
   last_name: string;
+  full_name?: string;
   email: string;
+  employee_code?: string;
   is_tracking_enabled: boolean;
   status: 'Active' | 'Idle' | 'Offline';
   login_time: string | null;

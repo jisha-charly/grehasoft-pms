@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Permission, UserRole } from '../../types';
 import { useAuth } from '../../context/AuthContext';
-import useHeartbeat from '../../hooks/useHeartbeat';
 import TrackingAPI from '../../api/trackingAPI';
 import './Layout.css';
 import { useNotifications } from "../../context/NotificationContext";
@@ -65,8 +64,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     {
       label: "Finance",
       icon: "bi-cash-stack",
-      permission: Permission.MANAGE_PROJECTS,
-      children: [{ label: "Invoices", path: "/invoices", permission: Permission.MANAGE_PROJECTS }],
+      permission: Permission.VIEW_LEADS,
+      children: [{ label: "Invoices", path: "/invoices", permission: Permission.VIEW_LEADS }],
     },
     {
       label: "Operations",
@@ -156,11 +155,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
     document.body.classList.remove("modal-open");
 
-    // Stop heartbeat before logout
-    heartbeat.stopHeartbeat();
-
     // Call tracking logout endpoint to mark user Offline immediately
     try {
+      const trackingAPI = new TrackingAPI();
       await trackingAPI.logout();
     } catch (e) {
       console.warn("Tracking logout failed:", e);
@@ -170,31 +167,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     navigate('/login');
   };
 
-  // Initialize heartbeat tracking
-  const [isTrackingEnabled, setIsTrackingEnabled] = useState(false);
-  const trackingAPI = new TrackingAPI();
-
-  const heartbeat = useHeartbeat({
-    isTrackingEnabled,
-    token: localStorage.getItem('access') || '',
-  });
-
-  // Check tracking status on mount
-  useEffect(() => {
-    const checkTrackingStatus = async () => {
-      try {
-        const profile = await trackingAPI.getCurrentUserStatus();
-        setIsTrackingEnabled(profile.is_tracking_enabled);
-      } catch (error) {
-        console.warn('Could not fetch tracking status:', error);
-      }
-    };
-
-    if (user) {
-      checkTrackingStatus();
-    }
-  }, [user]);
-
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setSidebarOpen(false);
@@ -202,6 +174,27 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (sidebarOpen) window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [sidebarOpen]);
+
+  // Simple browser heartbeat to keep the user's session active if they are browsing
+  useEffect(() => {
+    if (!user) return;
+
+    const trackingAPI = new TrackingAPI();
+
+    const sendPing = () => {
+      trackingAPI.sendHeartbeat().catch((err) => {
+        console.warn('Browser heartbeat failed:', err);
+      });
+    };
+
+    // Send initial ping
+    sendPing();
+
+    // Set interval for every 30 seconds
+    const interval = setInterval(sendPing, 30000);
+
+    return () => clearInterval(interval);
+  }, [user]);
 
 
   const { notifications } = useNotifications();
@@ -288,13 +281,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           {/* Desktop nav (>=992px) */}
           <div className="d-none d-lg-flex align-items-center flex-grow-1" style={{ minWidth: 0 }}>
             {canScrollLeft && (
-              <button 
-                className="btn btn-sm btn-white bg-white border shadow-sm rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center ms-3" 
+              <button
+                className="btn btn-sm btn-white bg-white border shadow-sm rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center ms-3"
                 style={{ width: '32px', height: '32px' }}
                 onClick={() => scrollBy(-200)}
                 aria-label="Scroll left"
               >
-                 <i className="bi bi-chevron-left text-secondary"></i>
+                <i className="bi bi-chevron-left text-secondary"></i>
               </button>
             )}
 
@@ -313,8 +306,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         <li className="nav-item dropdown h-100 d-flex align-items-center" key={item.label}>
                           <button
                             className={`nav-link dropdown-toggle px-3 d-flex align-items-center border-0 bg-transparent ${isActiveGroup
-                                ? "active text-primary fw-bold"
-                                : "text-secondary"
+                              ? "active text-primary fw-bold"
+                              : "text-secondary"
                               }`}
                             type="button"
                             data-bs-toggle="dropdown"
@@ -349,8 +342,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         <li className="nav-item h-100 d-flex align-items-center" key={item.path}>
                           <Link
                             className={`nav-link px-3 d-flex align-items-center ${active
-                                ? "active text-primary fw-bold"
-                                : "text-secondary"
+                              ? "active text-primary fw-bold"
+                              : "text-secondary"
                               }`}
                             to={item.path}
                           >
@@ -367,99 +360,99 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
 
             {canScrollRight && (
-              <button 
-                className="btn btn-sm btn-white bg-white border shadow-sm rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center me-2" 
+              <button
+                className="btn btn-sm btn-white bg-white border shadow-sm rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center me-2"
                 style={{ width: '32px', height: '32px' }}
                 onClick={() => scrollBy(200)}
                 aria-label="Scroll right"
               >
-                 <i className="bi bi-chevron-right text-secondary"></i>
+                <i className="bi bi-chevron-right text-secondary"></i>
               </button>
             )}
 
             {/* nav-right */}
             <div className="nav-right d-flex align-items-center flex-shrink-0 ms-3 ps-3 border-start">
               <div className="position-relative me-3">
-              <button
-                className="btn btn-light position-relative"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowDropdown(!showDropdown);
-                }}
-              >
-                <i className="bi bi-bell"></i>
-
-                {notifications.length > 0 && (
-                  <span
-                    className={`position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger ${notifications.some(n => n.type === "domain") ? "blink-alert" : ""
-                      }`}
-                  >
-                    {notifications.length}
-                  </span>
-                )}
-              </button>
-
-              {showDropdown && (
-                <div
-                  className="position-absolute end-0 mt-2 bg-white shadow rounded-3 p-3"
-                  style={{ width: "300px", zIndex: 1000 }}
+                <button
+                  className="btn btn-light position-relative"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDropdown(!showDropdown);
+                  }}
                 >
-                  <h6 className="fw-bold mb-2">Notifications</h6>
+                  <i className="bi bi-bell"></i>
 
-                  {notifications.length === 0 ? (
-                    <div className="text-muted small">No alerts</div>
-                  ) : (
-                    notifications.slice(0, 5).map((n, i) => (
-                      <div
-                        key={i}
-                        className="border-bottom py-2 small cursor-pointer"
-                        style={{ cursor: "pointer" }}
-                        onClick={(e) => {
-                          e.stopPropagation();
+                  {notifications.length > 0 && (
+                    <span
+                      className={`position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger ${notifications.some(n => n.type === "domain") ? "blink-alert" : ""
+                        }`}
+                    >
+                      {notifications.length}
+                    </span>
+                  )}
+                </button>
 
-                          // ✅ Only store domain dismiss
-                          if (n.type === "domain" || n.type === "expired") {
-                            const dismissedDomains = JSON.parse(
-                              localStorage.getItem("dismissedDomains") || "[]"
-                            );
+                {showDropdown && (
+                  <div
+                    className="position-absolute end-0 mt-2 bg-white shadow rounded-3 p-3"
+                    style={{ width: "300px", zIndex: 1000 }}
+                  >
+                    <h6 className="fw-bold mb-2">Notifications</h6>
 
-                            const domainName = n.message.split(": ")[1]; // extract grehasoft.com
-
-                            if (!dismissedDomains.includes(domainName)) {
-                              dismissedDomains.push(domainName);
-                              localStorage.setItem(
-                                "dismissedDomains",
-                                JSON.stringify(dismissedDomains)
-                              );
-                            }
-                          }
-
-                          // navigation
-                          if (n.type === "reminder") {
-                            navigate("/reminders");
-                          } else if (n.type === "domain" || n.type === "expired") {
-                            navigate("/infrastructure/domains");
-                          }
-
-                          setShowDropdown(false);
-                        }}
-                      >
+                    {notifications.length === 0 ? (
+                      <div className="text-muted small">No alerts</div>
+                    ) : (
+                      notifications.slice(0, 5).map((n, i) => (
                         <div
-                          className={`fw-semibold ${n.type === "expired"
+                          key={i}
+                          className="border-bottom py-2 small cursor-pointer"
+                          style={{ cursor: "pointer" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+
+                            // ✅ Only store domain dismiss
+                            if (n.type === "domain" || n.type === "expired") {
+                              const dismissedDomains = JSON.parse(
+                                localStorage.getItem("dismissedDomains") || "[]"
+                              );
+
+                              const domainName = n.message.split(": ")[1]; // extract grehasoft.com
+
+                              if (!dismissedDomains.includes(domainName)) {
+                                dismissedDomains.push(domainName);
+                                localStorage.setItem(
+                                  "dismissedDomains",
+                                  JSON.stringify(dismissedDomains)
+                                );
+                              }
+                            }
+
+                            // navigation
+                            if (n.type === "reminder") {
+                              navigate("/reminders");
+                            } else if (n.type === "domain" || n.type === "expired") {
+                              navigate("/infrastructure/domains");
+                            }
+
+                            setShowDropdown(false);
+                          }}
+                        >
+                          <div
+                            className={`fw-semibold ${n.type === "expired"
                               ? "text-danger"
                               : n.type === "domain"
                                 ? "text-warning"
                                 : "text-primary"
-                            }`}
-                        >
-                          {n.message}
+                              }`}
+                          >
+                            {n.message}
+                          </div>
+                          <div className="text-muted small">{n.date}</div>
                         </div>
-                        <div className="text-muted small">{n.date}</div>
-                      </div>
-                    ))
-                  )}
+                      ))
+                    )}
 
-                  {/*  <div className="text-center mt-2">
+                    {/*  <div className="text-center mt-2">
   <button
     className="btn btn-sm btn-primary w-100"
     onClick={(e) => {
@@ -479,67 +472,67 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     View All
   </button>
 </div>*/}
-                </div>
-              )}
-            </div>
-            <div className="d-flex align-items-center">
-              {hasAccess(Permission.MANAGE_SETTINGS) && (
-                <div className="dropdown me-3">
-                  <button
-                    className="btn btn-light dropdown-toggle btn-sm fw-bold border-0"
-                    type="button"
-                    data-bs-toggle="dropdown"
-                  >
-                    Admin
-                  </button>
-                  <ul className="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3">
-                    {adminItems.map(item => (
-                      <li key={item.path}>
-                        <Link className="dropdown-item py-2 small fw-medium d-flex align-items-center" to={item.path}>
-                          <i className={`bi ${item.icon} me-2`}></i>
-                          {item.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
+              <div className="d-flex align-items-center">
+                {hasAccess(Permission.MANAGE_SETTINGS) && (
+                  <div className="dropdown me-3">
+                    <button
+                      className="btn btn-light dropdown-toggle btn-sm fw-bold border-0"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                    >
+                      Admin
+                    </button>
+                    <ul className="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3">
+                      {adminItems.map(item => (
+                        <li key={item.path}>
+                          <Link className="dropdown-item py-2 small fw-medium d-flex align-items-center" to={item.path}>
+                            <i className={`bi ${item.icon} me-2`}></i>
+                            {item.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
 
-              <div className="dropdown">
-                <button className="btn btn-link text-decoration-none text-dark d-flex align-items-center p-0 border-0" type="button" data-bs-toggle="dropdown"
-                  aria-expanded="false">
-                  {/*<div className="text-end me-2 d-none d-sm-block">
+                <div className="dropdown">
+                  <button className="btn btn-link text-decoration-none text-dark d-flex align-items-center p-0 border-0" type="button" data-bs-toggle="dropdown"
+                    aria-expanded="false">
+                    {/*<div className="text-end me-2 d-none d-sm-block">
                     <div className="fw-bold small text-dark">{user.name}</div>
                     <div className="text-primary smaller fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.02em' }}>{user.role.replace('_', ' ')}</div>
                   </div>*/}
-                  <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style={{ width: '35px', height: '35px', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                    {user.username.charAt(0)}
-                  </div>
-                </button>
-                <ul className="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3">
-                  <li className="px-3 py-2 d-sm-none border-bottom mb-2">
-                    <div className="fw-bold small">{user.name}</div>
-                    <div className="text-primary smaller" style={{ fontSize: '0.7rem', textTransform: 'uppercase' }}>{user.role_name || user.role}</div>
-                  </li>
-                  <li>
-                    <Link className="dropdown-item d-flex align-items-center py-2 small fw-medium" to="/profile">
-                      <i className="bi bi-person-circle me-2 text-primary"></i> My Profile
-                    </Link>
-                  </li>
-                  <li>
-                    <Link className="dropdown-item d-flex align-items-center py-2 small fw-medium" to="/profile">
-                      <i className="bi bi-key me-2 text-warning"></i> Change Password
-                    </Link>
-                  </li>
-                  <li><hr className="dropdown-divider" /></li>
-                  <li>
-                    <button className="dropdown-item d-flex align-items-center py-2 small fw-medium text-danger" onClick={handleLogout}>
-                      <i className="bi bi-box-arrow-right me-2"></i> Logout
-                    </button>
-                  </li>
-                </ul>
-              </div>
+                    <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style={{ width: '35px', height: '35px', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                      {user.username.charAt(0)}
+                    </div>
+                  </button>
+                  <ul className="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3">
+                    <li className="px-3 py-2 d-sm-none border-bottom mb-2">
+                      <div className="fw-bold small">{user.name}</div>
+                      <div className="text-primary smaller" style={{ fontSize: '0.7rem', textTransform: 'uppercase' }}>{user.role_name || user.role}</div>
+                    </li>
+                    <li>
+                      <Link className="dropdown-item d-flex align-items-center py-2 small fw-medium" to="/profile">
+                        <i className="bi bi-person-circle me-2 text-primary"></i> My Profile
+                      </Link>
+                    </li>
+                    <li>
+                      <Link className="dropdown-item d-flex align-items-center py-2 small fw-medium" to="/profile">
+                        <i className="bi bi-key me-2 text-warning"></i> Change Password
+                      </Link>
+                    </li>
+                    <li><hr className="dropdown-divider" /></li>
+                    <li>
+                      <button className="dropdown-item d-flex align-items-center py-2 small fw-medium text-danger" onClick={handleLogout}>
+                        <i className="bi bi-box-arrow-right me-2"></i> Logout
+                      </button>
+                    </li>
+                  </ul>
+                </div>
 
               </div>
             </div>
