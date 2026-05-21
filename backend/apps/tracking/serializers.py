@@ -98,8 +98,125 @@ class EmployeeDetailedStatusSerializer(EmployeeStatusSerializer):
 
 class HeartbeatRequestSerializer(serializers.Serializer):
     """Serializer for heartbeat API request."""
-    user_id = serializers.IntegerField()
+    app_name = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    current_app = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    window_title = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    current_window = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    duration_seconds = serializers.IntegerField(required=False, default=10)
+    is_idle = serializers.BooleanField(required=False, default=False)
+    mouse_moves = serializers.IntegerField(required=False, default=0)
+    key_presses = serializers.IntegerField(required=False, default=0)
+    clicks = serializers.IntegerField(required=False, default=0)
+    productive_seconds = serializers.IntegerField(required=False, default=0)
+    idle_seconds = serializers.IntegerField(required=False, default=0)
     timestamp = serializers.DateTimeField(required=False)
+    user_id = serializers.IntegerField(required=False)
+
+    def save(self, user):
+        from django.utils import timezone
+        from .utils import get_or_create_active_session, update_session_ping
+        from .models import AppActivity
+
+        validated_data = self.validated_data
+        
+        # Get or create active session
+        session, created = get_or_create_active_session(user)
+        
+        # Update last_ping
+        session = update_session_ping(session)
+        
+        # Extract telemetry fields with clean fallbacks
+        app_name = validated_data.get('app_name') or validated_data.get('current_app')
+        window_title = validated_data.get('window_title') or validated_data.get('current_window') or ''
+        duration_seconds = validated_data.get('duration_seconds', 10)
+        is_idle = validated_data.get('is_idle', False)
+        mouse_moves = validated_data.get('mouse_moves', 0)
+        key_presses = validated_data.get('key_presses', 0)
+        clicks = validated_data.get('clicks', 0)
+
+        # Log details inside DB update context
+        print("DATABASE SAVE - Telemetry:", {
+            "app_name": app_name,
+            "window_title": window_title,
+            "mouse_moves": mouse_moves,
+            "key_presses": key_presses,
+            "clicks": clicks,
+            "is_idle": is_idle
+        })
+
+        is_desktop = (app_name is not None) or ('is_idle' in validated_data) or (mouse_moves > 0 or key_presses > 0 or clicks > 0)
+        
+        if is_desktop:
+            # Refresh session from database before incrementing fields to prevent race conditions
+            session.refresh_from_db()
+            
+            from .reports import classify_app_activity
+            category = classify_app_activity(app_name or "", window_title or "")
+            is_productive_app = (category != 'non_productive')
+            
+            is_productive_tick = (not is_idle) and (mouse_moves > 0 or key_presses > 0 or clicks > 0)
+            if is_productive_tick:
+                tick_productive_seconds = duration_seconds
+                tick_idle_seconds = 0
+            else:
+                tick_productive_seconds = 0
+                tick_idle_seconds = duration_seconds
+            
+            session.last_desktop_ping = timezone.now()
+            session.is_desktop_idle = is_idle
+            session.mouse_moves += mouse_moves
+            session.key_presses += key_presses
+            session.clicks += clicks
+            session.productive_seconds += tick_productive_seconds
+            session.idle_seconds += tick_idle_seconds
+            session.tracked_seconds = session.productive_seconds + session.idle_seconds
+            
+            if session.tracked_seconds > 0:
+                session.activity_percentage = min(100.0, (session.productive_seconds / session.tracked_seconds) * 100.0)
+            else:
+                session.activity_percentage = 0.0
+                
+            from .reports import detect_breaks_and_gaps
+            today = timezone.now().date()
+            break_analysis = detect_breaks_and_gaps(user, today, today, sessions_list=[session])
+            session.break_count = break_analysis['break_count']
+                
+            session.save(update_fields=[
+                'last_desktop_ping', 'is_desktop_idle', 'mouse_moves', 
+                'key_presses', 'clicks', 'productive_seconds', 'idle_seconds', 
+                'tracked_seconds', 'break_count', 'activity_percentage', 'updated_at'
+            ])
+  
+            session.refresh_from_db()
+
+            if app_name:
+                # Aggregate duration if the active app/window has not changed
+                last_activity = AppActivity.objects.filter(session=session).order_by('-timestamp').first()
+                if last_activity and last_activity.app_name == app_name and last_activity.window_title == window_title:
+                    last_activity.duration_seconds += duration_seconds
+                    last_activity.mouse_moves += mouse_moves
+                    last_activity.key_presses += key_presses
+                    last_activity.clicks += clicks
+                    last_activity.productive_seconds += tick_productive_seconds
+                    last_activity.productive_duration += tick_productive_seconds
+                    last_activity.timestamp = timezone.now()
+                    last_activity.save(update_fields=['duration_seconds', 'mouse_moves', 'key_presses', 'clicks', 'productive_seconds', 'productive_duration', 'timestamp'])
+                else:
+                    AppActivity.objects.create(
+                        user=user,
+                        session=session,
+                        app_name=app_name,
+                        window_title=window_title,
+                        duration_seconds=duration_seconds,
+                        mouse_moves=mouse_moves,
+                        key_presses=key_presses,
+                        clicks=clicks,
+                        productive_seconds=tick_productive_seconds,
+                        productive_duration=tick_productive_seconds,
+                        timestamp=timezone.now()
+                    )
+        
+        return session, created
 
 
 class HeartbeatResponseSerializer(serializers.Serializer):

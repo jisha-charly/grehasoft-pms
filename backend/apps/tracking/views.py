@@ -61,7 +61,7 @@ def heartbeat(request):
     Supports app activity duration aggregation to minimize database writes.
     """
     user = request.user
-    print("Incoming activity:", request.data)
+    print("HEARTBEAT REQUEST DATA =", request.data)
     
     # Check if tracking is enabled
     if not is_tracking_enabled(user):
@@ -75,141 +75,30 @@ def heartbeat(request):
             status=status.HTTP_403_FORBIDDEN
         )
     
+    # Validate payload via Serializer
+    serializer = HeartbeatRequestSerializer(data=request.data)
+    if not serializer.is_valid():
+        print("HEARTBEAT SERIALIZER ERRORS =", serializer.errors)
+        return Response(
+            {
+                'success': False,
+                'message': 'Validation failed',
+                'errors': serializer.errors,
+                'session_id': None,
+                'status': 'Offline',
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
     try:
-        # Get or create active session
-        session, created = get_or_create_active_session(user)
-        
-        # Update last_ping
-        session = update_session_ping(session)
-        
-        # Check source header or request data parameters
-        client_source = request.META.get('HTTP_X_CLIENT_SOURCE')
-        app_name = request.data.get('app_name')
-        window_title = request.data.get('window_title', '')
-        duration_seconds = request.data.get('duration_seconds', 10)
-        is_idle = request.data.get('is_idle', False)
-        mouse_moves = request.data.get('mouse_moves', 0)
-        key_presses = request.data.get('key_presses', 0)
-        clicks = request.data.get('clicks', 0)
-
-        # Sanitize/Convert types to ensure robustness
-        try:
-            duration_seconds = int(duration_seconds)
-        except (ValueError, TypeError):
-            duration_seconds = 10
-        try:
-            mouse_moves = int(mouse_moves)
-        except (ValueError, TypeError):
-            mouse_moves = 0
-        try:
-            key_presses = int(key_presses)
-        except (ValueError, TypeError):
-            key_presses = 0
-        try:
-            clicks = int(clicks)
-        except (ValueError, TypeError):
-            clicks = 0
-        is_idle = bool(is_idle)
-        
-        # Log task items
-        print("SESSION ID:", session.id)
-        print("is_idle:", is_idle)
-        print("mouse_moves:", mouse_moves)
-        print("key_presses:", key_presses)
-        print("clicks:", clicks)
-        
-        is_desktop = (client_source == 'desktop') or (app_name is not None) or ('is_idle' in request.data)
-        
-        if is_desktop:
-            # Refresh session from database before incrementing fields to prevent race conditions
-            session.refresh_from_db()
-            
-            print(f"Productive seconds BEFORE save: {session.productive_seconds}")
-            print(f"Idle seconds BEFORE save: {session.idle_seconds}")
-            
-            from .reports import classify_app_activity
-            category = classify_app_activity(app_name or "", window_title or "")
-            is_productive_app = (category != 'non_productive')
-            print("app_name:", app_name)
-            print("is_productive_app:", is_productive_app)
-            
-            is_productive_tick = (not is_idle) and (mouse_moves > 0 or key_presses > 0 or clicks > 0)
-            if is_productive_tick:
-                print("ENTERED PRODUCTIVE BRANCH")
-                print("ADDING TO PRODUCTIVE SECONDS:", duration_seconds)
-                tick_productive_seconds = duration_seconds
-                tick_idle_seconds = 0
-            else:
-                print("ENTERED IDLE BRANCH")
-                print("ADDING TO IDLE SECONDS:", duration_seconds)
-                tick_productive_seconds = 0
-                tick_idle_seconds = duration_seconds
-            
-            session.last_desktop_ping = timezone.now()
-            session.is_desktop_idle = is_idle
-            session.mouse_moves += mouse_moves
-            session.key_presses += key_presses
-            session.clicks += clicks
-            session.productive_seconds += tick_productive_seconds
-            session.idle_seconds += tick_idle_seconds
-            session.tracked_seconds = session.productive_seconds + session.idle_seconds
-            
-            if session.tracked_seconds > 0:
-                session.activity_percentage = min(100.0, (session.productive_seconds / session.tracked_seconds) * 100.0)
-            else:
-                session.activity_percentage = 0.0
-                
-            from .reports import detect_breaks_and_gaps
-            today = timezone.now().date()
-            break_analysis = detect_breaks_and_gaps(user, today, today, sessions_list=[session])
-            session.break_count = break_analysis['break_count']
-                
-            session.save(update_fields=[
-                'last_desktop_ping', 'is_desktop_idle', 'mouse_moves', 
-                'key_presses', 'clicks', 'productive_seconds', 'idle_seconds', 
-                'tracked_seconds', 'break_count', 'activity_percentage', 'updated_at'
-            ])
- 
-            session.refresh_from_db()
-            print(f"Productive seconds AFTER save: {session.productive_seconds}")
-            print(f"Idle seconds AFTER save: {session.idle_seconds}")
-            print("DB activity_percentage:", session.activity_percentage)
-
-            profile = get_or_create_user_profile(user)
-
-            if app_name:
-                # Aggregate duration if the active app/window has not changed
-                last_activity = AppActivity.objects.filter(session=session).order_by('-timestamp').first()
-                if last_activity and last_activity.app_name == app_name and last_activity.window_title == window_title:
-                    last_activity.duration_seconds += duration_seconds
-                    last_activity.mouse_moves += mouse_moves
-                    last_activity.key_presses += key_presses
-                    last_activity.clicks += clicks
-                    last_activity.productive_seconds += tick_productive_seconds
-                    last_activity.productive_duration += tick_productive_seconds
-                    last_activity.timestamp = timezone.now()
-                    last_activity.save(update_fields=['duration_seconds', 'mouse_moves', 'key_presses', 'clicks', 'productive_seconds', 'productive_duration', 'timestamp'])
-                else:
-                    AppActivity.objects.create(
-                        user=user,
-                        session=session,
-                        app_name=app_name,
-                        window_title=window_title,
-                        duration_seconds=duration_seconds,
-                        mouse_moves=mouse_moves,
-                        key_presses=key_presses,
-                        clicks=clicks,
-                        productive_seconds=tick_productive_seconds,
-                        productive_duration=tick_productive_seconds,
-                        timestamp=timezone.now()
-                    )
-        else:
-            profile = get_or_create_user_profile(user)
+        # Save telemetry and update active session
+        session, created = serializer.save(user=user)
         
         # Get current status after desktop tracker fields have been updated
         current_status = session.get_status()
         
         daily_time = calculate_daily_working_time(user)
+        profile = get_or_create_user_profile(user)
         
         return Response(
             {
@@ -225,6 +114,9 @@ def heartbeat(request):
             status=status.HTTP_200_OK
         )
     except Exception as e:
+        import traceback
+        print("HEARTBEAT SAVE EXCEPTION =", str(e))
+        traceback.print_exc()
         return Response(
             {
                 'success': False,

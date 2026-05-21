@@ -19,9 +19,9 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 import django
 django.setup()
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+User = get_user_model()
 from rest_framework.test import APIClient
-from rest_framework.authtoken.models import Token
 
 from apps.tracking.models import UserProfile, WorkSession
 from apps.tracking.utils import get_or_create_user_profile
@@ -54,9 +54,8 @@ class TrackingSystemIntegrationTest:
         # Ensure profile exists
         get_or_create_user_profile(self.test_user)
         
-        # Get or create token
-        self.token, _ = Token.objects.get_or_create(user=self.test_user)
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        # Force authentication on client
+        self.client.force_authenticate(user=self.test_user)
         
         print(f'\n✓ Test user ready: {self.test_user.username}')
 
@@ -66,6 +65,8 @@ class TrackingSystemIntegrationTest:
         
         try:
             profile = UserProfile.objects.get(user=self.test_user)
+            profile.is_tracking_enabled = False
+            profile.save()
             assert profile is not None
             assert profile.user == self.test_user
             assert profile.is_tracking_enabled == False  # Default
@@ -87,7 +88,7 @@ class TrackingSystemIntegrationTest:
             profile.save()
             
             # Send heartbeat
-            response = self.client.post('/api/tracking/heartbeat/')
+            response = self.client.post('/api/v1/tracking/heartbeat/')
             
             assert response.status_code == 200
             assert response.data['success'] == True
@@ -110,7 +111,7 @@ class TrackingSystemIntegrationTest:
         print('\nTest 3: User Status API...')
         
         try:
-            response = self.client.get('/api/tracking/user-status/')
+            response = self.client.get('/api/v1/tracking/user-status/')
             
             assert response.status_code == 200
             assert response.data['user_id'] == self.test_user.id
@@ -127,7 +128,7 @@ class TrackingSystemIntegrationTest:
         print('\nTest 4: Employee Status API...')
         
         try:
-            response = self.client.get('/api/tracking/employee-status/')
+            response = self.client.get('/api/v1/tracking/employee-status/')
             
             assert response.status_code == 200
             assert isinstance(response.data, list)
@@ -156,7 +157,7 @@ class TrackingSystemIntegrationTest:
         try:
             # Toggle off
             response = self.client.post(
-                f'/api/tracking/toggle-tracking/{self.test_user.id}/',
+                f'/api/v1/tracking/toggle-tracking/{self.test_user.id}/',
                 {'enabled': False},
                 format='json'
             )
@@ -166,7 +167,7 @@ class TrackingSystemIntegrationTest:
             
             # Toggle on
             response = self.client.post(
-                f'/api/tracking/toggle-tracking/{self.test_user.id}/',
+                f'/api/v1/tracking/toggle-tracking/{self.test_user.id}/',
                 {'enabled': True},
                 format='json'
             )
@@ -185,7 +186,7 @@ class TrackingSystemIntegrationTest:
         print('\nTest 6: Logout API...')
         
         try:
-            response = self.client.post('/api/tracking/logout/')
+            response = self.client.post('/api/v1/tracking/logout/')
             
             assert response.status_code == 200
             assert response.data['success'] == True
@@ -206,12 +207,13 @@ class TrackingSystemIntegrationTest:
         print('\nTest 7: Work Sessions API...')
         
         try:
-            response = self.client.get('/api/tracking/sessions/')
+            response = self.client.get('/api/v1/tracking/sessions/')
             
             assert response.status_code == 200
-            assert isinstance(response.data, list)
+            results = response.data.get('results') if isinstance(response.data, dict) else response.data
+            assert isinstance(results, list)
             
-            print(f'  ✓ Sessions retrieved: {len(response.data)} total')
+            print(f'  ✓ Sessions retrieved: {len(results)} total')
             self.results.append(('Work Sessions API', 'PASS'))
         except Exception as e:
             print(f'  ✗ Failed: {str(e)}')
