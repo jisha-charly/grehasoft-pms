@@ -34,6 +34,14 @@ class WorkSession(models.Model):
     total_duration = models.DurationField(null=True, blank=True)  # Cached duration
     last_desktop_ping = models.DateTimeField(null=True, blank=True)
     is_desktop_idle = models.BooleanField(default=False)
+    mouse_moves = models.IntegerField(default=0)
+    key_presses = models.IntegerField(default=0)
+    clicks = models.IntegerField(default=0)
+    productive_seconds = models.IntegerField(default=0)
+    idle_seconds = models.IntegerField(default=0)
+    tracked_seconds = models.IntegerField(default=0)
+    break_count = models.IntegerField(default=0)
+    activity_percentage = models.FloatField(default=0.0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -132,6 +140,11 @@ class AppActivity(models.Model):
     app_name = models.CharField(max_length=255)
     window_title = models.CharField(max_length=500, blank=True)
     duration_seconds = models.IntegerField(default=0)  # active tracking duration in seconds
+    mouse_moves = models.IntegerField(default=0)
+    key_presses = models.IntegerField(default=0)
+    clicks = models.IntegerField(default=0)
+    productive_seconds = models.IntegerField(default=0)
+    productive_duration = models.IntegerField(default=0)
     timestamp = models.DateTimeField(default=timezone.now)
     is_productive = models.BooleanField(default=True)  # Can be categorized by admin later
 

@@ -361,6 +361,72 @@ class HeartbeatAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertFalse(response.data['success'])
 
+    def test_heartbeat_activity_productive(self):
+        """Test heartbeat with sufficient input activity updates productive time."""
+        response = self.client.post('/api/v1/tracking/heartbeat/', {
+            'app_name': 'VS Code',
+            'window_title': 'main.py',
+            'duration_seconds': 60,
+            'mouse_moves': 10,
+            'key_presses': 5,
+            'clicks': 3
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        session = WorkSession.objects.get(user=self.user)
+        self.assertEqual(session.mouse_moves, 10)
+        self.assertEqual(session.key_presses, 5)
+        self.assertEqual(session.clicks, 3)
+        self.assertEqual(session.productive_seconds, 60)
+        self.assertGreater(session.activity_percentage, 0.0)
+
+    def test_heartbeat_activity_non_productive(self):
+        """Test heartbeat with low/insufficient input activity registers 0 productive time."""
+        response = self.client.post('/api/v1/tracking/heartbeat/', {
+            'app_name': 'VS Code',
+            'window_title': 'main.py',
+            'duration_seconds': 60,
+            'mouse_moves': 0,
+            'key_presses': 0,
+            'clicks': 0
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        session = WorkSession.objects.get(user=self.user)
+        self.assertEqual(session.mouse_moves, 0)
+        self.assertEqual(session.key_presses, 0)
+        self.assertEqual(session.clicks, 0)
+        self.assertEqual(session.productive_seconds, 0)
+
+    def test_batch_sync_activity_processing(self):
+        """Test batch sync processing activity counts and updating metrics."""
+        response = self.client.post('/api/v1/tracking/activity-batch-sync/', {
+            'activities': [
+                {
+                    'app_name': 'VS Code',
+                    'window_title': 'main.py',
+                    'duration_seconds': 60,
+                    'mouse_moves': 10,
+                    'key_presses': 5,
+                    'clicks': 3,
+                    'timestamp': '2026-05-20T12:00:00Z'
+                },
+                {
+                    'app_name': 'Chrome',
+                    'window_title': 'Google Search',
+                    'duration_seconds': 60,
+                    'mouse_moves': 0,
+                    'key_presses': 0,
+                    'clicks': 0,
+                    'timestamp': '2026-05-20T12:00:10Z'
+                }
+            ]
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        session = WorkSession.objects.get(user=self.user)
+        self.assertEqual(session.mouse_moves, 10)
+        self.assertEqual(session.key_presses, 5)
+        self.assertEqual(session.clicks, 3)
+        self.assertEqual(session.productive_seconds, 60) # Chrome tick was not productive
+
 
 class EmployeeStatusAPITest(APITestCase):
     """Test Employee Status endpoint."""

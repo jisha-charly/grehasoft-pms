@@ -51,6 +51,7 @@ import CredentialsPage from "./pages/infrastructure/CredentialsPage";
 import DomainsPage from "./pages/infrastructure/DomainsPage";
 import SEOWebsitesPage from "./pages/seo/SEOWebsitesPage";
 import WorkTrackingDashboard from "./components/WorkTrackingDashboard";
+import WorkReportsPage from "./pages/admin/reports/WorkReportsPage";
 
 const App: React.FC = () => {
   const { isAuthenticated, loading, user } = useAuth();
@@ -403,6 +404,17 @@ const App: React.FC = () => {
             <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
               <Layout>
                 <WorkTrackingDashboard />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/reports"
+          element={
+            <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
+              <Layout>
+                <WorkReportsPage />
               </Layout>
             </ProtectedRoute>
           }

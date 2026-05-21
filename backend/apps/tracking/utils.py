@@ -2,7 +2,7 @@ from datetime import timedelta
 from django.utils import timezone
 from django.db.models import Q
 from django.contrib.auth import get_user_model
-from .models import UserProfile, WorkSession
+from .models import UserProfile, WorkSession, AppActivity
 
 
 def get_or_create_user_profile(user):
@@ -88,6 +88,66 @@ def format_duration(duration):
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 
+def calculate_daily_metrics(user, date=None):
+    """
+    Calculate daily tracking metrics for a user.
+    """
+    if date is None:
+        date = timezone.now().date()
+        
+    sessions = WorkSession.objects.filter(
+        user=user,
+        login_time__date=date
+    )
+    
+    total_tracked_seconds = sum(s.tracked_seconds for s in sessions)
+    productive_seconds = sum(s.productive_seconds for s in sessions)
+    non_productive_seconds = sum(s.idle_seconds for s in sessions)
+    
+    if (productive_seconds + non_productive_seconds) > 0:
+        activity_percentage = (productive_seconds / (productive_seconds + non_productive_seconds) * 100)
+        return {
+            'total_tracked_time': timedelta(seconds=total_tracked_seconds),
+            'productive_time': timedelta(seconds=productive_seconds),
+            'non_productive_time': timedelta(seconds=non_productive_seconds),
+            'activity_percentage': activity_percentage
+        }
+        
+    # Legacy fallback from AppActivity
+    activities = AppActivity.objects.filter(
+        user=user,
+        timestamp__date=date
+    )
+    
+    if activities.exists():
+        total_tracked_seconds = sum(act.duration_seconds for act in activities)
+        productive_seconds = sum(act.productive_seconds for act in activities)
+        non_productive_seconds = max(0, total_tracked_seconds - productive_seconds)
+        activity_percentage = (productive_seconds / (productive_seconds + non_productive_seconds) * 100) if (productive_seconds + non_productive_seconds) > 0 else 0.0
+        
+        return {
+            'total_tracked_time': timedelta(seconds=total_tracked_seconds),
+            'productive_time': timedelta(seconds=productive_seconds),
+            'non_productive_time': timedelta(seconds=non_productive_seconds),
+            'activity_percentage': activity_percentage
+        }
+    
+    # Fallback for historical / web-only sessions
+    total_duration = timedelta(0)
+    for session in sessions:
+        duration = session.calculate_duration()
+        if duration.total_seconds() > 86400:
+            continue
+        total_duration += duration
+        
+    return {
+        'total_tracked_time': total_duration,
+        'productive_time': total_duration,
+        'non_productive_time': timedelta(0),
+        'activity_percentage': 100.0 if total_duration.total_seconds() > 0 else 0.0
+    }
+
+
 def calculate_daily_working_time(user, date=None):
     """
     Calculate total working time for a user on a specific date.
@@ -99,28 +159,11 @@ def calculate_daily_working_time(user, date=None):
     Returns:
         timedelta: Total working time
     """
-    if date is None:
-        date = timezone.now().date()
-    
-    # Get all sessions for the user on the given date
-    sessions = WorkSession.objects.filter(
-        user=user,
-        login_time__date=date
-    )
-    
-    total_duration = timedelta(0)
-    
-    for session in sessions:
-        duration = session.calculate_duration()
-        # Ensure duration doesn't exceed 24 hours (sanity check)
-        if duration.total_seconds() > 86400:
-            continue
-        total_duration += duration
-    
-    return total_duration
+    metrics = calculate_daily_metrics(user, date)
+    return metrics['productive_time']
 
 
-def get_employee_status(user):
+def get_employee_status(user, detailed=False):
     """
     Get comprehensive status info for an employee.
     
@@ -133,7 +176,15 @@ def get_employee_status(user):
         profile = get_or_create_user_profile(user)
     
     try:
-        session = WorkSession.objects.filter(user=user).latest('login_time')
+        from django.db import models
+        session = WorkSession.objects.filter(user=user, is_active_session=True).annotate(
+            last_activity=models.F('last_ping')
+        ).order_by('-last_activity').first()
+        
+        if not session:
+            session = WorkSession.objects.filter(user=user).annotate(
+                last_activity=models.F('last_ping')
+            ).order_by('-last_activity').first()
     except WorkSession.DoesNotExist:
         session = None
         
@@ -154,9 +205,8 @@ def get_employee_status(user):
         login_time = None
         last_ping = None
     
-    # Calculate daily working time
-    daily_working_time = calculate_daily_working_time(user)
-    formatted_time = format_duration(daily_working_time)
+    # Calculate daily metrics
+    metrics = calculate_daily_metrics(user)
     
     # Calculate full_name using user.name or first_name + last_name
     full_name = getattr(user, 'name', '').strip()
@@ -166,7 +216,17 @@ def get_employee_status(user):
     # Calculate employee_code
     employee_code = f"GS-26-{str(user.id).zfill(3)}"
     
-    return {
+    # Fetch current active app/window
+    current_app = None
+    current_window = None
+    
+    if session:
+        latest_act = AppActivity.objects.filter(session=session).order_by('-timestamp').first()
+        if latest_act:
+            current_app = latest_act.app_name
+            current_window = latest_act.window_title
+    
+    result = {
         'user_id': user.id,
         'username': user.username,
         'first_name': user.first_name or '',
@@ -180,9 +240,65 @@ def get_employee_status(user):
         'login_time': login_time,
         'first_login_time': first_login_time,
         'last_ping': last_ping,
-        'total_work_time': formatted_time,
+        'total_work_time': format_duration(metrics['productive_time']),
+        'idle_time': format_duration(metrics['non_productive_time']),
+        'activity_percentage': round(metrics['activity_percentage'], 2),
+        'productive_time': format_duration(metrics['productive_time']),
+        'non_productive_time': format_duration(metrics['non_productive_time']),
+        'total_tracked_time': format_duration(metrics['total_tracked_time']),
         'session_id': session.id if session else None,
+        'current_app': current_app,
+        'current_window': current_window,
+        'mouse_moves': session.mouse_moves if session else 0,
+        'key_presses': session.key_presses if session else 0,
+        'clicks': session.clicks if session else 0,
+        'productive_seconds': session.productive_seconds if session else 0,
+        'idle_seconds': session.idle_seconds if session else 0,
     }
+    
+    if detailed:
+        # Fetch up to 50 recent activities for today
+        recent_activities = []
+        if session:
+            acts = AppActivity.objects.filter(session=session).order_by('-timestamp')[:50]
+            recent_activities = list(acts)
+            
+
+            
+        # Compute hourly timeline data
+        hourly_timeline = []
+        from .reports import classify_app_activity
+        for h in range(24):
+            hour_12 = f"{h if h % 12 != 0 else 12:02d}:00 {'AM' if h < 12 else 'PM'}"
+            hourly_timeline.append({
+                'hour': hour_12,
+                'productive': 0.0,
+                'idle': 0.0,
+            })
+            
+        if session:
+            day_activities = AppActivity.objects.filter(user=user, timestamp__date=timezone.now().date())
+            for act in day_activities:
+                act_hour = act.timestamp.astimezone(timezone.get_current_timezone()).hour
+                category = classify_app_activity(act.app_name, act.window_title)
+                duration = act.duration_seconds
+                
+                if category == 'productive':
+                    hourly_timeline[act_hour]['productive'] += duration
+                elif category == 'non_productive':
+                    hourly_timeline[act_hour]['idle'] += duration
+                else:
+                    hourly_timeline[act_hour]['productive'] += duration
+                    
+        # Convert seconds to minutes for clean chart rendering
+        for entry in hourly_timeline:
+            entry['productive'] = round(entry['productive'] / 60, 2)
+            entry['idle'] = round(entry['idle'] / 60, 2)
+            
+        result['app_activities'] = recent_activities
+        result['timeline_data'] = hourly_timeline
+        
+    return result
 
 
 def get_all_employees_status(include_inactive=False):
@@ -204,9 +320,10 @@ def get_all_employees_status(include_inactive=False):
         
     employees_status = []
     for user in users:
-        employees_status.append(get_employee_status(user))
+        employees_status.append(get_employee_status(user, detailed=False))
     
     return employees_status
+
 
 
 def toggle_tracking(user, enable=None):

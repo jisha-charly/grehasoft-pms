@@ -99,6 +99,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       icon: "bi-clock-history",
       permission: Permission.MANAGE_SETTINGS,
     },
+    {
+      label: "Work Reports",
+      path: "/admin/reports",
+      icon: "bi-graph-up",
+      permission: Permission.MANAGE_SETTINGS,
+    },
   ];
 
   const hasAccess = (permission?: Permission) => {

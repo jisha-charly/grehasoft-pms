@@ -21,6 +21,22 @@ export interface EmployeeStatus {
   last_ping: string | null;
   total_work_time: string; // HH:MM:SS
   session_id: number | null;
+  idle_time?: string;
+  idleTime?: string;
+  activity_percentage?: number;
+  productive_time?: string;
+  productiveTime?: string;
+  non_productive_time?: string;
+  total_tracked_time?: string;
+  current_app?: string | null;
+  current_window?: string | null;
+  app_activities?: any[];
+  timeline_data?: any[];
+  mouse_moves?: number;
+  mouseMoves?: number;
+  key_presses?: number;
+  keyPresses?: number;
+  clicks?: number;
 }
 
 export interface UserTrackingProfile {
@@ -168,6 +184,96 @@ class TrackingAPI {
       return response.data;
     } catch (error) {
       console.error('User sessions error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get daily reports for all users
+   */
+  async getDailyReport(params?: {
+    date?: string;
+    start_date?: string;
+    end_date?: string;
+    department_id?: string;
+    search?: string;
+  }): Promise<any[]> {
+    try {
+      const response = await this.api.get<any[]>('/tracking/reports/daily/', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Daily report API error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get weekly reports & trends
+   */
+  async getWeeklyReport(params?: {
+    start_date?: string;
+    end_date?: string;
+    department_id?: string;
+  }): Promise<any> {
+    try {
+      const response = await this.api.get<any>('/tracking/reports/weekly/', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Weekly report API error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get monthly reports & rankings
+   */
+  async getMonthlyReport(params?: {
+    year?: number;
+    month?: number;
+    department_id?: string;
+  }): Promise<any> {
+    try {
+      const response = await this.api.get<any>('/tracking/reports/monthly/', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Monthly report API error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get detailed employee analytics
+   */
+  async getEmployeeAnalytics(params: {
+    user_id: number;
+    start_date?: string;
+    end_date?: string;
+  }): Promise<any> {
+    try {
+      const response = await this.api.get<any>('/tracking/reports/employee-analytics/', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Employee analytics API error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Export reports as CSV, Excel or PDF with Auth Header
+   */
+  async exportReport(params: {
+    type: 'daily' | 'weekly' | 'monthly' | 'employee';
+    format: 'csv' | 'excel' | 'pdf';
+    [key: string]: any;
+  }): Promise<Blob> {
+    try {
+      const response = await this.api.get<Blob>('/tracking/reports/export/', {
+        params,
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Export report API error:', error);
       throw error;
     }
   }

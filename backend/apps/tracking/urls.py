@@ -26,7 +26,13 @@ urlpatterns = [
     path('toggle-tracking/<int:user_id>/', views.toggle_user_tracking, name='toggle_tracking'),
     path('set-track-enable/', views.set_track_enable, name='set_track_enable'),
     
-    # Batch syncing & Screenshot upload
+    # Batch syncing
     path('activity-batch-sync/', views.activity_batch_sync, name='activity_batch_sync'),
-    path('screenshot-upload/', views.ScreenshotUploadView.as_view(), name='screenshot_upload'),
+    
+    # Reporting & Export endpoints
+    path('reports/daily/', views.daily_report_view, name='reports_daily'),
+    path('reports/weekly/', views.weekly_report_view, name='reports_weekly'),
+    path('reports/monthly/', views.monthly_report_view, name='reports_monthly'),
+    path('reports/employee-analytics/', views.employee_analytics_view, name='reports_employee_analytics'),
+    path('reports/export/', views.export_report_view, name='reports_export'),
 ]
