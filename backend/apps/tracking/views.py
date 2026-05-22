@@ -363,7 +363,18 @@ def activity_batch_sync(request):
     if not is_tracking_enabled(user):
         return Response({'success': False, 'message': 'Tracking is disabled'}, status=status.HTTP_403_FORBIDDEN)
         
-    session, _ = get_or_create_active_session(user)
+    device_id = request.data.get('device_id') or 'default'
+    installation_uuid = request.data.get('installation_uuid')
+    tracker_id = request.data.get('tracker_id')
+    machine_fingerprint = request.data.get('machine_fingerprint')
+
+    session, created = get_or_create_active_session(user, device_id=device_id)
+    if created or not session.installation_uuid:
+        session.installation_uuid = installation_uuid
+        session.tracker_id = tracker_id
+        session.machine_fingerprint = machine_fingerprint
+        session.save(update_fields=['installation_uuid', 'tracker_id', 'machine_fingerprint'])
+
     print("SESSION ID:", session.id)
     activities = request.data.get('activities', [])
     

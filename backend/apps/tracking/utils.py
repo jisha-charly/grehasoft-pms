@@ -20,12 +20,13 @@ def is_tracking_enabled(user):
         return False
 
 
-def get_or_create_active_session(user):
+def get_or_create_active_session(user, device_id='default'):
     """Get existing active session or create new one.
        If the existing session has been inactive for > 5 mins, close it and create a new one."""
     try:
         session = WorkSession.objects.get(
             user=user,
+            device_id=device_id,
             is_active_session=True
         )
         
@@ -41,6 +42,7 @@ def get_or_create_active_session(user):
             # Start new session
             new_session = WorkSession.objects.create(
                 user=user,
+                device_id=device_id,
                 is_active_session=True
             )
             return new_session, True
@@ -49,6 +51,7 @@ def get_or_create_active_session(user):
     except WorkSession.DoesNotExist:
         session = WorkSession.objects.create(
             user=user,
+            device_id=device_id,
             is_active_session=True
         )
         return session, True

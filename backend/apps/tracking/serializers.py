@@ -111,6 +111,11 @@ class HeartbeatRequestSerializer(serializers.Serializer):
     idle_seconds = serializers.IntegerField(required=False, default=0)
     timestamp = serializers.DateTimeField(required=False)
     user_id = serializers.IntegerField(required=False)
+    username = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    device_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    installation_uuid = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    tracker_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    machine_fingerprint = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
     def save(self, user):
         from django.utils import timezone
@@ -119,8 +124,20 @@ class HeartbeatRequestSerializer(serializers.Serializer):
 
         validated_data = self.validated_data
         
-        # Get or create active session
-        session, created = get_or_create_active_session(user)
+        device_id = validated_data.get('device_id') or 'default'
+        installation_uuid = validated_data.get('installation_uuid')
+        tracker_id = validated_data.get('tracker_id')
+        machine_fingerprint = validated_data.get('machine_fingerprint')
+
+        # Get or create active session isolated by device_id
+        session, created = get_or_create_active_session(user, device_id=device_id)
+
+        # Save unique identifiers to session
+        if created or not session.installation_uuid:
+            session.installation_uuid = installation_uuid
+            session.tracker_id = tracker_id
+            session.machine_fingerprint = machine_fingerprint
+            session.save(update_fields=['installation_uuid', 'tracker_id', 'machine_fingerprint'])
         
         # Update last_ping
         session = update_session_ping(session)

@@ -30,6 +30,12 @@ class WorkSession(models.Model):
     logout_time = models.DateTimeField(null=True, blank=True)
     is_active_session = models.BooleanField(default=True)
     
+    # Device isolation fields
+    device_id = models.CharField(max_length=255, default='default')
+    installation_uuid = models.CharField(max_length=255, null=True, blank=True)
+    tracker_id = models.CharField(max_length=255, null=True, blank=True)
+    machine_fingerprint = models.CharField(max_length=255, null=True, blank=True)
+    
     # Additional tracking fields
     total_duration = models.DurationField(null=True, blank=True)  # Cached duration
     last_desktop_ping = models.DateTimeField(null=True, blank=True)
@@ -56,9 +62,9 @@ class WorkSession(models.Model):
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=['user'],
+                fields=['user', 'device_id'],
                 condition=models.Q(is_active_session=True),
-                name='only_one_active_session_per_user'
+                name='only_one_active_session_per_user_device'
             )
         ]
 
