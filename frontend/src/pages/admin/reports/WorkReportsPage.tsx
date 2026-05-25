@@ -259,9 +259,23 @@ const WorkReportsPage: React.FC = () => {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Export failed:', error);
-      alert('Failed to export report.');
+      let errorMsg = 'Failed to export report.';
+      if (error.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const parsed = JSON.parse(text);
+          errorMsg = parsed.error || parsed.detail || errorMsg;
+        } catch (e) {
+          console.error('Failed to parse error blob:', e);
+        }
+      } else if (error.response?.data) {
+        errorMsg = error.response.data.error || error.response.data.detail || errorMsg;
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      alert(`Export failed: ${errorMsg}`);
     } finally {
       setExporting(false);
     }

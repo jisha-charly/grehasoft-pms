@@ -542,6 +542,13 @@ from reportlab.lib.pagesizes import letter, landscape
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
+from rest_framework.negotiation import DefaultContentNegotiation
+
+class IgnoreFormatContentNegotiation(DefaultContentNegotiation):
+    def select_renderer(self, request, renderers, format_suffix=None):
+        # Always return the default renderer to ignore 'format' query parameters for suffix negotiation
+        return (renderers[0], renderers[0].media_type)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, HasPermission])
@@ -816,12 +823,53 @@ def export_report_view(request):
             doc.build(story)
             return response
             
-        keys = [k for k in data[0].keys() if not k.startswith('raw_')][:8] # limit to 8 columns for layout fit
-        headers = [k.replace('_', ' ').title() for k in keys]
+        # Define customized column layout for each report type
+        report_columns = {
+            'daily': [
+                ('full_name', 'Full Name'),
+                ('department', 'Department'),
+                ('date', 'Date'),
+                ('total_tracked_time', 'Tracked Time'),
+                ('productive_time', 'Productive Time'),
+                ('idle_time', 'Idle Time'),
+                ('activity_percentage', 'Activity %'),
+                ('status', 'Status')
+            ],
+            'weekly': [
+                ('Date', 'Date'),
+                ('Productive Hours', 'Productive Hours'),
+                ('Idle Hours', 'Idle Hours'),
+                ('Total Tracked', 'Total Tracked')
+            ],
+            'monthly': [
+                ('full_name', 'Full Name'),
+                ('employee_code', 'Employee Code'),
+                ('department', 'Department'),
+                ('productive_hours', 'Productive Hours'),
+                ('tracked_hours', 'Tracked Hours'),
+                ('activity_percentage', 'Activity %')
+            ],
+            'employee': [
+                ('date', 'Date'),
+                ('total_tracked_time', 'Tracked Time'),
+                ('productive_time', 'Productive Time'),
+                ('idle_time', 'Idle Time'),
+                ('activity_percentage', 'Activity %'),
+                ('break_count', 'Breaks')
+            ]
+        }
         
+        cols = report_columns.get(report_type)
+        if cols:
+            keys = [c[0] for c in cols if c[0] in data[0]]
+            headers = [c[1] for c in cols if c[0] in data[0]]
+        else:
+            keys = [k for k in data[0].keys() if not k.startswith('raw_')][:8]
+            headers = [k.replace('_', ' ').title() for k in keys]
+            
         table_data = [headers]
         for item in data:
-            row = [str(item[k] or '-') for k in keys]
+            row = [str(item.get(k) if item.get(k) is not None else '-') for k in keys]
             table_data.append(row)
             
         t = Table(table_data)
@@ -844,3 +892,15 @@ def export_report_view(request):
         return response
         
     return Response({'error': 'Invalid format requested.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Bind custom content negotiation class to export view
+export_report_view.cls.content_negotiation_class = IgnoreFormatContentNegotiation
+
+# Secure report views by setting class-level required_permission
+daily_report_view.cls.required_permission = 'MANAGE_SETTINGS'
+weekly_report_view.cls.required_permission = 'MANAGE_SETTINGS'
+monthly_report_view.cls.required_permission = 'MANAGE_SETTINGS'
+employee_analytics_view.cls.required_permission = 'MANAGE_SETTINGS'
+export_report_view.cls.required_permission = 'MANAGE_SETTINGS'
+

@@ -839,10 +839,6 @@ const WorkTrackingDashboard: React.FC = () => {
     };
   })();
 
-  // Find active employee for live debug overlay
-  const debugEmployee = state.employees.find((emp) => emp.is_tracking_enabled && emp.status !== 'Offline') 
-    || state.employees[0];
-
   return (
     <div className="live-dashboard-container p-4">
 
@@ -1572,101 +1568,103 @@ const WorkTrackingDashboard: React.FC = () => {
       </AnimatePresence>
 
       {/* REAL-TIME LIVE DEBUG OVERLAY */}
-      <div 
-        className="position-fixed" 
-        style={{ 
-          bottom: '20px', 
-          right: '20px', 
-          zIndex: 1030,
-          maxWidth: '320px',
-          width: '100%',
-        }}
-      >
-        <div className="card glass-card shadow-lg border-primary p-3 animate-fade-in" style={{ borderLeft: '4px solid #6366f1' }}>
-          <div className="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
-            <div className="d-flex align-items-center gap-1.5">
-              <span className="pulse-indicator-active animate-pulse" style={{ width: '8px', height: '8px', backgroundColor: '#6366f1', animation: 'none' }} />
-              <h6 className="fw-bold mb-0 text-slate-800" style={{ fontSize: '0.8rem' }}>
-                Pipeline Live Debug Overlay
-              </h6>
+      {false && (
+        <div 
+          className="position-fixed" 
+          style={{ 
+            bottom: '20px', 
+            right: '20px', 
+            zIndex: 1030,
+            maxWidth: '320px',
+            width: '100%',
+          }}
+        >
+          <div className="card glass-card shadow-lg border-primary p-3 animate-fade-in" style={{ borderLeft: '4px solid #6366f1' }}>
+            <div className="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
+              <div className="d-flex align-items-center gap-1.5">
+                <span className="pulse-indicator-active animate-pulse" style={{ width: '8px', height: '8px', backgroundColor: '#6366f1', animation: 'none' }} />
+                <h6 className="fw-bold mb-0 text-slate-800" style={{ fontSize: '0.8rem' }}>
+                  Pipeline Live Debug Overlay
+                </h6>
+              </div>
+              <span className="badge bg-indigo text-white font-mono" style={{ fontSize: '0.6rem' }}>Active Tracker</span>
             </div>
-            <span className="badge bg-indigo text-white font-mono" style={{ fontSize: '0.6rem' }}>Active Tracker</span>
+            
+            {debugEmployee ? (
+              <div className="d-flex flex-column gap-2 text-xs">
+                <div className="d-flex justify-content-between">
+                  <span className="text-slate-400 font-bold">User Focus:</span>
+                  <span className="fw-bold text-slate-700 text-truncate" style={{ maxWidth: '180px' }}>
+                    {debugEmployee.full_name || debugEmployee.email}
+                  </span>
+                </div>
+                
+                <div className="d-flex justify-content-between align-items-center">
+                  <span className="text-slate-400 font-bold">App Focus:</span>
+                  <span className="badge bg-light text-slate-800 fw-bold border d-flex align-items-center gap-1">
+                    {getAppIcon(debugEmployee.current_app)}
+                    {debugEmployee.current_app || 'None'}
+                  </span>
+                </div>
+
+                <div className="d-flex justify-content-between">
+                  <span className="text-slate-400 font-bold">Window Focus:</span>
+                  <span className="fw-bold text-slate-600 text-truncate" style={{ maxWidth: '180px' }} title={debugEmployee.current_window || ''}>
+                    {debugEmployee.current_window || '—'}
+                  </span>
+                </div>
+
+                <div className="d-flex justify-content-between">
+                  <span className="text-slate-400 font-bold">Heartbeat Status:</span>
+                  <span className={`fw-bold ${debugEmployee.status === 'Idle' ? 'text-warning' : debugEmployee.status === 'Active' ? 'text-success' : 'text-slate-400'}`}>
+                    {debugEmployee.status || 'Offline'}
+                  </span>
+                </div>
+
+                <div className="row g-1 mt-1 text-center py-2 bg-slate-50 border rounded">
+                  <div className="col-4 border-end">
+                    <span className="text-slate-400 text-xxs font-bold d-block">MOVES</span>
+                    <span className="font-mono fw-bold text-indigo-600">{debugEmployee.mouse_moves ?? debugEmployee.mouseMoves ?? 0}</span>
+                  </div>
+                  <div className="col-4 border-end">
+                    <span className="text-slate-400 text-xxs font-bold d-block">KEYS</span>
+                    <span className="font-mono fw-bold text-indigo-600">{debugEmployee.key_presses ?? debugEmployee.keyPresses ?? 0}</span>
+                  </div>
+                  <div className="col-4">
+                    <span className="text-slate-400 text-xxs font-bold d-block">CLICKS</span>
+                    <span className="font-mono fw-bold text-indigo-600">{debugEmployee.clicks ?? 0}</span>
+                  </div>
+                </div>
+
+                <div className="d-flex justify-content-between mt-1">
+                  <span className="text-slate-400 font-bold">Productive Time:</span>
+                  <span className="font-mono fw-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">
+                    {debugEmployee.productive_time || debugEmployee.productiveTime || debugEmployee.total_work_time || '00:00:00'}
+                  </span>
+                </div>
+
+                <div className="d-flex justify-content-between">
+                  <span className="text-slate-400 font-bold">Idle Time:</span>
+                  <span className="font-mono fw-bold text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded">
+                    {debugEmployee.idle_time || debugEmployee.idleTime || '00:00:00'}
+                  </span>
+                </div>
+
+                <div className="d-flex justify-content-between align-items-center mt-1 pt-1.5 border-top">
+                  <span className="text-slate-400 text-xxs font-bold">LAST HEARTBEAT:</span>
+                  <span className="font-mono text-xxs text-slate-500">
+                    {debugEmployee.last_ping ? new Date(debugEmployee.last_ping).toLocaleTimeString('en-US', { hour12: false }) : 'N/A'}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-3 text-slate-400 text-xs">
+                No tracking employees online
+              </div>
+            )}
           </div>
-          
-          {debugEmployee ? (
-            <div className="d-flex flex-column gap-2 text-xs">
-              <div className="d-flex justify-content-between">
-                <span className="text-slate-400 font-bold">User Focus:</span>
-                <span className="fw-bold text-slate-700 text-truncate" style={{ maxWidth: '180px' }}>
-                  {debugEmployee.full_name || debugEmployee.email}
-                </span>
-              </div>
-              
-              <div className="d-flex justify-content-between align-items-center">
-                <span className="text-slate-400 font-bold">App Focus:</span>
-                <span className="badge bg-light text-slate-800 fw-bold border d-flex align-items-center gap-1">
-                  {getAppIcon(debugEmployee.current_app)}
-                  {debugEmployee.current_app || 'None'}
-                </span>
-              </div>
-
-              <div className="d-flex justify-content-between">
-                <span className="text-slate-400 font-bold">Window Focus:</span>
-                <span className="fw-bold text-slate-600 text-truncate" style={{ maxWidth: '180px' }} title={debugEmployee.current_window || ''}>
-                  {debugEmployee.current_window || '—'}
-                </span>
-              </div>
-
-              <div className="d-flex justify-content-between">
-                <span className="text-slate-400 font-bold">Heartbeat Status:</span>
-                <span className={`fw-bold ${debugEmployee.status === 'Idle' ? 'text-warning' : debugEmployee.status === 'Active' ? 'text-success' : 'text-slate-400'}`}>
-                  {debugEmployee.status || 'Offline'}
-                </span>
-              </div>
-
-              <div className="row g-1 mt-1 text-center py-2 bg-slate-50 border rounded">
-                <div className="col-4 border-end">
-                  <span className="text-slate-400 text-xxs font-bold d-block">MOVES</span>
-                  <span className="font-mono fw-bold text-indigo-600">{debugEmployee.mouse_moves ?? debugEmployee.mouseMoves ?? 0}</span>
-                </div>
-                <div className="col-4 border-end">
-                  <span className="text-slate-400 text-xxs font-bold d-block">KEYS</span>
-                  <span className="font-mono fw-bold text-indigo-600">{debugEmployee.key_presses ?? debugEmployee.keyPresses ?? 0}</span>
-                </div>
-                <div className="col-4">
-                  <span className="text-slate-400 text-xxs font-bold d-block">CLICKS</span>
-                  <span className="font-mono fw-bold text-indigo-600">{debugEmployee.clicks ?? 0}</span>
-                </div>
-              </div>
-
-              <div className="d-flex justify-content-between mt-1">
-                <span className="text-slate-400 font-bold">Productive Time:</span>
-                <span className="font-mono fw-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">
-                  {debugEmployee.productive_time || debugEmployee.productiveTime || debugEmployee.total_work_time || '00:00:00'}
-                </span>
-              </div>
-
-              <div className="d-flex justify-content-between">
-                <span className="text-slate-400 font-bold">Idle Time:</span>
-                <span className="font-mono fw-bold text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded">
-                  {debugEmployee.idle_time || debugEmployee.idleTime || '00:00:00'}
-                </span>
-              </div>
-
-              <div className="d-flex justify-content-between align-items-center mt-1 pt-1.5 border-top">
-                <span className="text-slate-400 text-xxs font-bold">LAST HEARTBEAT:</span>
-                <span className="font-mono text-xxs text-slate-500">
-                  {debugEmployee.last_ping ? new Date(debugEmployee.last_ping).toLocaleTimeString('en-US', { hour12: false }) : 'N/A'}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-3 text-slate-400 text-xs">
-              No tracking employees online
-            </div>
-          )}
         </div>
-      </div>
+      )}
     </div>
   );
 };
