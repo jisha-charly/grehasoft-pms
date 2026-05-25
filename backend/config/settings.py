@@ -103,6 +103,20 @@ DATABASES = {
     }
 }
 
+# Override database configuration in production if DATABASE_URL is set (e.g., on Render)
+database_url = os.environ.get('DATABASE_URL')
+if database_url and os.environ.get('RENDER') == 'true':
+    from urllib.parse import urlparse
+    url = urlparse(database_url)
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': url.path[1:],
+        'USER': url.username,
+        'PASSWORD': url.password,
+        'HOST': url.hostname,
+        'PORT': url.port or 5432,
+    }
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
