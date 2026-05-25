@@ -1,4 +1,4 @@
-﻿amqp==5.3.1
+amqp==5.3.1
 asgiref==3.11.1
 billiard==4.2.4
 celery==5.3.6
@@ -39,3 +39,5 @@ whitenoise==6.12.0
 gunicorn==21.2.0
 django-storages[s3]==1.14.2
 openpyxl==3.1.5
+dj-database-url==2.1.0
+psycopg2-binary==2.9.9

@@ -96,25 +96,18 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # ==============================
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+import dj_database_url
 
-# Override database configuration in production if DATABASE_URL is set (e.g., on Render)
-database_url = os.environ.get('DATABASE_URL')
-if database_url and os.environ.get('RENDER') == 'true':
-    from urllib.parse import urlparse
-    url = urlparse(database_url)
-    DATABASES['default'] = {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': url.path[1:],
-        'USER': url.username,
-        'PASSWORD': url.password,
-        'HOST': url.hostname,
-        'PORT': url.port or 5432,
+if os.getenv("RENDER"):
+    DATABASES = {
+        'default': dj_database_url.parse(os.environ.get("DATABASE_URL"))
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
 
 REST_FRAMEWORK = {
