@@ -72,6 +72,52 @@ class WorkSession(models.Model):
         status = "Active" if self.is_active_session else "Inactive"
         return f"{self.user.username} - {self.login_time.date()} ({status})"
 
+    @property
+    def session_type(self):
+        """Computed field distinguishing browser pings from desktop tracking."""
+        return 'browser' if self.device_id == 'default' else 'desktop'
+
+    def save(self, *args, **kwargs):
+        """Save and validate/cap session tracked times."""
+        if self.device_id == 'default':
+            self.productive_seconds = 0
+            self.idle_seconds = 0
+            self.tracked_seconds = 0
+            self.activity_percentage = 0.0
+        elif self.login_time:
+            now = timezone.now()
+            last_active = self.logout_time or self.last_ping or now
+            elapsed = (last_active - self.login_time).total_seconds()
+            elapsed = max(0, int(elapsed))
+            
+            # Ensure none of these are negative
+            if self.productive_seconds < 0:
+                self.productive_seconds = 0
+            if self.idle_seconds < 0:
+                self.idle_seconds = 0
+                
+            total = self.productive_seconds + self.idle_seconds
+            if total > elapsed:
+                if self.productive_seconds > elapsed:
+                    self.productive_seconds = elapsed
+                    self.idle_seconds = 0
+                else:
+                    self.idle_seconds = elapsed - self.productive_seconds
+            
+            self.tracked_seconds = self.productive_seconds + self.idle_seconds
+            if self.tracked_seconds > 0:
+                self.activity_percentage = min(100.0, max(0.0, (self.productive_seconds / self.tracked_seconds) * 100.0))
+            else:
+                self.activity_percentage = 0.0
+                
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None:
+            update_fields = set(update_fields)
+            update_fields.update(['productive_seconds', 'idle_seconds', 'tracked_seconds', 'activity_percentage'])
+            kwargs['update_fields'] = list(update_fields)
+                
+        super().save(*args, **kwargs)
+
     def calculate_duration(self):
         """Calculate session duration."""
         if self.logout_time:

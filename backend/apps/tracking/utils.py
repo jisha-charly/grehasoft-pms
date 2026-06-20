@@ -23,6 +23,44 @@ def is_tracking_enabled(user):
 def get_or_create_active_session(user, device_id='default'):
     """Get existing active session or create new one.
        If the existing session has been inactive for > 5 mins, close it and create a new one."""
+    now = timezone.now()
+    
+    # 1. Handle browser ping request (device_id == 'default')
+    if device_id == 'default':
+        # Check if there is an active desktop session first
+        active_desktop_session = WorkSession.objects.filter(
+            user=user,
+            is_active_session=True
+        ).exclude(device_id='default').first()
+        
+        if active_desktop_session:
+            # If the desktop session has been inactive for > 5 mins, we close it and fallback to browser
+            time_since_desktop_ping = now - active_desktop_session.last_ping
+            if time_since_desktop_ping.total_seconds() > 300:
+                active_desktop_session.logout_time = active_desktop_session.last_ping
+                active_desktop_session.is_active_session = False
+                active_desktop_session.total_duration = active_desktop_session.calculate_duration()
+                active_desktop_session.save(update_fields=['logout_time', 'is_active_session', 'total_duration', 'updated_at'])
+                # Proceed to get/create browser session below
+            else:
+                # Desktop is active, so route browser ping to this active desktop session
+                return active_desktop_session, False
+                
+    # 2. Handle desktop ping request (device_id != 'default')
+    else:
+        # If there is any active session with a DIFFERENT device_id, close it
+        other_active_sessions = WorkSession.objects.filter(
+            user=user,
+            is_active_session=True
+        ).exclude(device_id=device_id)
+        
+        for old_sess in other_active_sessions:
+            old_sess.logout_time = old_sess.last_ping or old_sess.login_time or now
+            old_sess.is_active_session = False
+            old_sess.total_duration = old_sess.calculate_duration()
+            old_sess.save(update_fields=['logout_time', 'is_active_session', 'total_duration', 'updated_at'])
+            
+    # 3. Standard get/create for the requested device_id
     try:
         session = WorkSession.objects.get(
             user=user,
@@ -31,7 +69,7 @@ def get_or_create_active_session(user, device_id='default'):
         )
         
         # Gap Detection: Check if last ping was more than 5 minutes ago
-        time_since_ping = timezone.now() - session.last_ping
+        time_since_ping = now - session.last_ping
         if time_since_ping.total_seconds() > 300:  # 5 minutes
             # Close old session using last_ping so the offline gap isn't counted
             session.logout_time = session.last_ping
@@ -98,56 +136,81 @@ def calculate_daily_metrics(user, date=None):
     if date is None:
         date = timezone.now().date()
         
-    sessions = WorkSession.objects.filter(
+    sessions = list(WorkSession.objects.filter(
         user=user,
         login_time__date=date
-    )
+    ).order_by('login_time'))
     
-    total_tracked_seconds = sum(s.tracked_seconds for s in sessions)
-    productive_seconds = sum(s.productive_seconds for s in sessions)
-    non_productive_seconds = sum(s.idle_seconds for s in sessions)
-    
-    if (productive_seconds + non_productive_seconds) > 0:
-        activity_percentage = (productive_seconds / (productive_seconds + non_productive_seconds) * 100)
+    if not sessions:
         return {
-            'total_tracked_time': timedelta(seconds=total_tracked_seconds),
-            'productive_time': timedelta(seconds=productive_seconds),
-            'non_productive_time': timedelta(seconds=non_productive_seconds),
-            'activity_percentage': activity_percentage
+            'total_tracked_time': timezone.timedelta(0),
+            'productive_time': timezone.timedelta(0),
+            'non_productive_time': timezone.timedelta(0),
+            'portal_active_time': timezone.timedelta(0),
+            'break_time': timezone.timedelta(0),
+            'unaccounted_time': timezone.timedelta(0),
+            'desktop_work_time': timezone.timedelta(0),
+            'total_engagement_time': timezone.timedelta(0),
+            'activity_percentage': 0.0
         }
         
-    # Legacy fallback from AppActivity
-    activities = AppActivity.objects.filter(
+    first_login = min(s.login_time for s in sessions)
+    last_active = max(s.logout_time or s.last_ping or s.login_time for s in sessions)
+    spanned_duration = max(0, int((last_active - first_login).total_seconds()))
+    
+    productive_sec = 0
+    idle_sec = 0
+    portal_active_sec = 0
+    
+    for s in sessions:
+        s_end = s.logout_time or s.last_ping or timezone.now()
+        s_elapsed = max(0, int((s_end - s.login_time).total_seconds()))
+        if s.device_id == 'default':
+            portal_active_sec += s_elapsed
+        else:
+            s_prod = max(0, s.productive_seconds)
+            s_idle = max(0, s.idle_seconds)
+            if s_prod + s_idle > s_elapsed:
+                if s_prod > s_elapsed:
+                    s_prod = s_elapsed
+                    s_idle = 0
+                else:
+                    s_idle = s_elapsed - s_prod
+            productive_sec += s_prod
+            idle_sec += s_idle
+            
+    activities = list(AppActivity.objects.filter(
         user=user,
         timestamp__date=date
-    )
+    ).order_by('timestamp'))
     
-    if activities.exists():
-        total_tracked_seconds = sum(act.duration_seconds for act in activities)
-        productive_seconds = sum(act.productive_seconds for act in activities)
-        non_productive_seconds = max(0, total_tracked_seconds - productive_seconds)
-        activity_percentage = (productive_seconds / (productive_seconds + non_productive_seconds) * 100) if (productive_seconds + non_productive_seconds) > 0 else 0.0
-        
-        return {
-            'total_tracked_time': timedelta(seconds=total_tracked_seconds),
-            'productive_time': timedelta(seconds=productive_seconds),
-            'non_productive_time': timedelta(seconds=non_productive_seconds),
-            'activity_percentage': activity_percentage
-        }
+    from .reports import detect_breaks_and_gaps
+    break_analysis = detect_breaks_and_gaps(user, date, date, sessions_list=sessions, activities_list=activities)
     
-    # Fallback for historical / web-only sessions
-    total_duration = timedelta(0)
-    for session in sessions:
-        duration = session.calculate_duration()
-        if duration.total_seconds() > 86400:
-            continue
-        total_duration += duration
-        
+    offline_break_sec = sum(b['duration'] for b in break_analysis['breaks_list'] if b['type'] == 'offline')
+    idle_break_sec = sum(b['duration'] for b in break_analysis['breaks_list'] if b['type'] == 'idle')
+    
+    reconciled_idle_sec = max(0, idle_sec - idle_break_sec)
+    reconciled_break_sec = offline_break_sec + idle_break_sec
+    
+    desktop_work_sec = productive_sec + reconciled_idle_sec
+    total_engagement_sec = desktop_work_sec + portal_active_sec
+    
+    sum_accounted = productive_sec + reconciled_idle_sec + portal_active_sec + reconciled_break_sec
+    unaccounted_sec = max(0, spanned_duration - sum_accounted)
+    
+    activity_percentage = (productive_sec / desktop_work_sec * 100) if desktop_work_sec > 0 else 0.0
+    
     return {
-        'total_tracked_time': total_duration,
-        'productive_time': total_duration,
-        'non_productive_time': timedelta(0),
-        'activity_percentage': 100.0 if total_duration.total_seconds() > 0 else 0.0
+        'total_tracked_time': timezone.timedelta(seconds=desktop_work_sec),
+        'productive_time': timezone.timedelta(seconds=productive_sec),
+        'non_productive_time': timezone.timedelta(seconds=reconciled_idle_sec),
+        'portal_active_time': timezone.timedelta(seconds=portal_active_sec),
+        'break_time': timezone.timedelta(seconds=reconciled_break_sec),
+        'unaccounted_time': timezone.timedelta(seconds=unaccounted_sec),
+        'desktop_work_time': timezone.timedelta(seconds=desktop_work_sec),
+        'total_engagement_time': timezone.timedelta(seconds=total_engagement_sec),
+        'activity_percentage': activity_percentage
     }
 
 
@@ -249,7 +312,13 @@ def get_employee_status(user, detailed=False):
         'productive_time': format_duration(metrics['productive_time']),
         'non_productive_time': format_duration(metrics['non_productive_time']),
         'total_tracked_time': format_duration(metrics['total_tracked_time']),
+        'desktop_work_time': format_duration(metrics['desktop_work_time']),
+        'portal_active_time': format_duration(metrics['portal_active_time']),
+        'break_time': format_duration(metrics['break_time']),
+        'unaccounted_time': format_duration(metrics['unaccounted_time']),
+        'total_engagement_time': format_duration(metrics['total_engagement_time']),
         'session_id': session.id if session else None,
+        'session_type': session.session_type if session else None,
         'current_app': current_app,
         'current_window': current_window,
         'mouse_moves': session.mouse_moves if session else 0,

@@ -232,7 +232,10 @@ class UtilityFunctionsTest(TestCase):
         # Create multiple sessions
         session1 = WorkSession.objects.create(
             user=self.user,
-            is_active_session=False
+            is_active_session=False,
+            device_id='dev-1',
+            productive_seconds=14400,
+            idle_seconds=0
         )
         WorkSession.objects.filter(id=session1.id).update(
             login_time=now - timedelta(hours=8),
@@ -241,7 +244,10 @@ class UtilityFunctionsTest(TestCase):
 
         session2 = WorkSession.objects.create(
             user=self.user,
-            is_active_session=False
+            is_active_session=False,
+            device_id='dev-1',
+            productive_seconds=7200,
+            idle_seconds=0
         )
         WorkSession.objects.filter(id=session2.id).update(
             login_time=now - timedelta(hours=3),
@@ -369,7 +375,8 @@ class HeartbeatAPITest(APITestCase):
             'duration_seconds': 60,
             'mouse_moves': 10,
             'key_presses': 5,
-            'clicks': 3
+            'clicks': 3,
+            'device_id': 'desktop-123'
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         session = WorkSession.objects.get(user=self.user)
@@ -387,7 +394,8 @@ class HeartbeatAPITest(APITestCase):
             'duration_seconds': 60,
             'mouse_moves': 0,
             'key_presses': 0,
-            'clicks': 0
+            'clicks': 0,
+            'device_id': 'desktop-123'
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         session = WorkSession.objects.get(user=self.user)
@@ -399,6 +407,7 @@ class HeartbeatAPITest(APITestCase):
     def test_batch_sync_activity_processing(self):
         """Test batch sync processing activity counts and updating metrics."""
         response = self.client.post('/api/v1/tracking/activity-batch-sync/', {
+            'device_id': 'desktop-123',
             'activities': [
                 {
                     'app_name': 'VS Code',
@@ -499,6 +508,290 @@ class ToggleTrackingAPITest(APITestCase):
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.data['data']['is_tracking_enabled'])
+
+
+from django.core.management import call_command
+from io import StringIO
+from .reports import get_reconciliation_report_data, get_session_audit_data
+
+class WorkTrackerCalculationEnhancementsTest(TestCase):
+    """Test save capping, single active session constraint, reconciliation math, session audit, and repair command."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='jisha_test',
+            email='jisha@example.com',
+            password='testpass123'
+        )
+        UserProfile.objects.filter(user=self.user).delete()
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            is_tracking_enabled=True
+        )
+
+    def test_save_capping_limit(self):
+        """Test that productive_seconds and idle_seconds are capped on save to the elapsed time."""
+        now = timezone.now()
+        session = WorkSession.objects.create(
+            user=self.user,
+            is_active_session=True,
+            device_id='test-device'
+        )
+        login_time = now - timedelta(minutes=10)
+        WorkSession.objects.filter(id=session.id).update(login_time=login_time, last_ping=now)
+        
+        session.refresh_from_db()
+        session.productive_seconds = 400
+        session.idle_seconds = 500
+        
+        session.save()
+        
+        self.assertEqual(session.tracked_seconds, 600)
+        self.assertEqual(session.productive_seconds, 400)
+        self.assertEqual(session.idle_seconds, 200)
+        self.assertLessEqual(session.activity_percentage, 100.0)
+        self.assertGreaterEqual(session.activity_percentage, 0.0)
+
+    def test_save_negative_values_capping(self):
+        """Test that negative tracking numbers are corrected to 0."""
+        session = WorkSession.objects.create(
+            user=self.user,
+            is_active_session=True,
+            productive_seconds=-50,
+            idle_seconds=-10
+        )
+        session.save()
+        self.assertEqual(session.productive_seconds, 0)
+        self.assertEqual(session.idle_seconds, 0)
+        self.assertEqual(session.tracked_seconds, 0)
+        self.assertEqual(session.activity_percentage, 0.0)
+
+    def test_single_active_session_constraint_desktop_closes_browser(self):
+        """Test that starting a desktop session automatically closes an active browser session."""
+        browser_sess, created1 = get_or_create_active_session(self.user, device_id='default')
+        self.assertTrue(browser_sess.is_active_session)
+        self.assertEqual(browser_sess.device_id, 'default')
+        
+        desktop_sess, created2 = get_or_create_active_session(self.user, device_id='dev-unique-123')
+        
+        browser_sess.refresh_from_db()
+        self.assertFalse(browser_sess.is_active_session)
+        self.assertIsNotNone(browser_sess.logout_time)
+        
+        self.assertTrue(desktop_sess.is_active_session)
+        self.assertEqual(desktop_sess.device_id, 'dev-unique-123')
+
+    def test_single_active_session_constraint_browser_routes_to_desktop(self):
+        """Test that browser pings route to active desktop session rather than starting a new browser session."""
+        desktop_sess, created = get_or_create_active_session(self.user, device_id='dev-unique-123')
+        self.assertTrue(desktop_sess.is_active_session)
+        
+        session, created_browser = get_or_create_active_session(self.user, device_id='default')
+        
+        self.assertFalse(created_browser)
+        self.assertEqual(session.id, desktop_sess.id)
+        
+        browser_exists = WorkSession.objects.filter(user=self.user, device_id='default', is_active_session=True).exists()
+        self.assertFalse(browser_exists)
+
+    def test_reconciliation_math_formula(self):
+        """Test that reconciliation report totals perfectly add up to spanned workday and session duration."""
+        today = timezone.now().date()
+        now = timezone.now().replace(hour=12, minute=0, second=0, microsecond=0)
+        
+        session = WorkSession.objects.create(
+            user=self.user,
+            is_active_session=False,
+            device_id='dev-1'
+        )
+        WorkSession.objects.filter(id=session.id).update(
+            login_time=now - timedelta(hours=4),
+            last_ping=now - timedelta(hours=2),
+            logout_time=now - timedelta(hours=2),
+            productive_seconds=3600,
+            idle_seconds=3600
+        )
+        session.refresh_from_db()
+        session.save()
+        
+        reconciliation_data = get_reconciliation_report_data(today, today)
+        self.assertEqual(len(reconciliation_data), 1)
+        row = reconciliation_data[0]
+        
+        self.assertEqual(row['raw_workday_span'], 7200)
+        self.assertEqual(row['raw_session_duration'], 7200)
+        
+        sum_span = row['raw_productive_seconds'] + row['raw_idle_seconds'] + row['raw_break_seconds'] + row['raw_unaccounted_seconds']
+        self.assertEqual(sum_span, row['raw_workday_span'])
+        
+        sum_session = row['raw_productive_seconds'] + row['raw_idle_seconds'] + row['raw_in_session_break_seconds'] + row['raw_unaccounted_session_seconds']
+        self.assertEqual(sum_session, row['raw_session_duration'])
+
+    def test_session_audit_severity_levels(self):
+        """Test that session audit correctly flags warning/critical/info conditions."""
+        today = timezone.now().date()
+        
+        s1 = WorkSession.objects.create(user=self.user, is_active_session=True, device_id='dev-1')
+        s2 = WorkSession.objects.create(user=self.user, is_active_session=True, device_id='dev-2')
+        
+        audit_data = get_session_audit_data(today, today, user_id=self.user.id)
+        row_s2 = next(r for r in audit_data if r['session_id'] == s2.id)
+        self.assertEqual(row_s2['severity'], 'Critical')
+        self.assertIn("overlapping active sessions", row_s2['validation_status'])
+        
+        s1.delete()
+        s2.delete()
+
+    def test_repair_management_command(self):
+        """Test running repair_tracking_sessions command cleans up anomalous session database records."""
+        user = User.objects.create_user(username='jisha_repair_test', password='testpass123')
+        
+        now = timezone.now()
+        s1 = WorkSession.objects.create(
+            user=user,
+            is_active_session=True,
+            device_id='dev-1',
+            last_ping=now - timedelta(minutes=10)
+        )
+        s2 = WorkSession.objects.create(
+            user=user,
+            is_active_session=True,
+            device_id='dev-2',
+            last_ping=now
+        )
+        WorkSession.objects.filter(id=s1.id).update(login_time=now - timedelta(minutes=20))
+        WorkSession.objects.filter(id=s2.id).update(login_time=now - timedelta(minutes=5))
+        
+        s3 = WorkSession.objects.create(
+            user=user,
+            is_active_session=False,
+            device_id='dev-3',
+            productive_seconds=5000,
+            idle_seconds=5000
+        )
+        WorkSession.objects.filter(id=s3.id).update(
+            login_time=now - timedelta(minutes=30),
+            logout_time=now - timedelta(minutes=20)
+        )
+        
+        out_dry = StringIO()
+        call_command('repair_tracking_sessions', '--dry-run', stdout=out_dry)
+        dry_output = out_dry.getvalue()
+        self.assertIn("Dry run database changes rolled back successfully", dry_output)
+        
+        s1.refresh_from_db()
+        s3.refresh_from_db()
+        self.assertTrue(s1.is_active_session)
+        self.assertEqual(s3.productive_seconds, 5000)
+        
+        out_real = StringIO()
+        call_command('repair_tracking_sessions', stdout=out_real)
+        real_output = out_real.getvalue()
+        
+        s1.refresh_from_db()
+        self.assertFalse(s1.is_active_session)
+        self.assertIsNotNone(s1.logout_time)
+        
+        s2.refresh_from_db()
+        self.assertTrue(s2.is_active_session)
+        
+        s3.refresh_from_db()
+        self.assertEqual(s3.tracked_seconds, 600)
+        self.assertEqual(s3.productive_seconds, 600)
+        self.assertEqual(s3.idle_seconds, 0)
+        
+        self.assertIn("Total Sessions Scanned:", real_output)
+        self.assertIn("Total Sessions Repaired:", real_output)
+        self.assertIn("Total Overlapping Resolved:", real_output)
+
+    def test_browser_only_session_metrics_zero(self):
+        """Test that browser pings/sessions enforce 0 productive, idle, and tracked metrics, and session type is 'browser'."""
+        session = WorkSession.objects.create(
+            user=self.user,
+            is_active_session=True,
+            device_id='default',
+            productive_seconds=300,
+            idle_seconds=200
+        )
+        session.save()
+        
+        self.assertEqual(session.productive_seconds, 0)
+        self.assertEqual(session.idle_seconds, 0)
+        self.assertEqual(session.tracked_seconds, 0)
+        self.assertEqual(session.activity_percentage, 0.0)
+        self.assertEqual(session.session_type, 'browser')
+
+    def test_reconciliation_math_with_portal_active_time(self):
+        """Test the reconciliation math including Portal Active Time and derived metrics."""
+        today = timezone.now().date()
+        now = timezone.now().replace(hour=12, minute=0, second=0, microsecond=0)
+        
+        # 1. Desktop session
+        s_desk = WorkSession.objects.create(
+            user=self.user,
+            is_active_session=False,
+            device_id='dev-1'
+        )
+        WorkSession.objects.filter(id=s_desk.id).update(
+            login_time=now - timedelta(hours=5),
+            last_ping=now - timedelta(hours=3),
+            logout_time=now - timedelta(hours=3),
+            productive_seconds=3600,
+            idle_seconds=1800
+        )
+        s_desk.refresh_from_db()
+        s_desk.save()
+        
+        # 2. Browser session
+        s_browser = WorkSession.objects.create(
+            user=self.user,
+            is_active_session=False,
+            device_id='default'
+        )
+        WorkSession.objects.filter(id=s_browser.id).update(
+            login_time=now - timedelta(hours=2),
+            last_ping=now - timedelta(hours=1),
+            logout_time=now - timedelta(hours=1),
+            productive_seconds=1800, # Will be set to 0 on save
+            idle_seconds=1800
+        )
+        s_browser.refresh_from_db()
+        s_browser.save()
+        
+        reconciliation_data = get_reconciliation_report_data(today, today)
+        self.assertEqual(len(reconciliation_data), 1)
+        row = reconciliation_data[0]
+        
+        # Verify browser session reset
+        s_browser.refresh_from_db()
+        self.assertEqual(s_browser.productive_seconds, 0)
+        self.assertEqual(s_browser.idle_seconds, 0)
+        
+        # Verify formula: Workday Span = Productive Time + Idle Time + Portal Active Time + Break Time + Unaccounted Time
+        # Spanned time is from first_login (now - 5h) to last_active (now - 1h) = 4 hours = 14400 seconds.
+        self.assertEqual(row['raw_workday_span'], 14400)
+        
+        # desktop productive = 3600, desktop idle = 1800, portal active = 3600
+        self.assertEqual(row['raw_productive_seconds'], 3600)
+        self.assertEqual(row['raw_portal_active_seconds'], 3600)
+        
+        # break time = gap between s_desk and s_browser = (now - 2h) - (now - 3h) = 1 hour = 3600 seconds
+        self.assertEqual(row['raw_break_seconds'], 3600)
+        
+        sum_span = (
+            row['raw_productive_seconds'] + 
+            row['raw_idle_seconds'] + 
+            row['raw_portal_active_seconds'] + 
+            row['raw_break_seconds'] + 
+            row['raw_unaccounted_seconds']
+        )
+        self.assertEqual(sum_span, row['raw_workday_span'])
+        
+        # Desktop Work Time = Productive + Idle
+        self.assertEqual(row['raw_desktop_work_seconds'], row['raw_productive_seconds'] + row['raw_idle_seconds'])
+        
+        # Total Engagement = Desktop Work + Portal Active
+        self.assertEqual(row['raw_total_engagement_seconds'], row['raw_desktop_work_seconds'] + row['raw_portal_active_seconds'])
 
 
 # Run tests with: python manage.py test apps.tracking

@@ -34,5 +34,7 @@ urlpatterns = [
     path('reports/weekly/', views.weekly_report_view, name='reports_weekly'),
     path('reports/monthly/', views.monthly_report_view, name='reports_monthly'),
     path('reports/employee-analytics/', views.employee_analytics_view, name='reports_employee_analytics'),
+    path('reports/reconciliation/', views.reconciliation_report_view, name='reports_reconciliation'),
+    path('reports/session-audit/', views.session_audit_report_view, name='reports_session_audit'),
     path('reports/export/', views.export_report_view, name='reports_export'),
 ]

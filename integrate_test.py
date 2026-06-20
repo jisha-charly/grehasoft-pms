@@ -23,7 +23,9 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 from rest_framework.test import APIClient
 
+# pyrefly: ignore [missing-import]
 from apps.tracking.models import UserProfile, WorkSession
+# pyrefly: ignore [missing-import]
 from apps.tracking.utils import get_or_create_user_profile
 
 class TrackingSystemIntegrationTest:

@@ -73,8 +73,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       permission: Permission.VIEW_REMINDERS,
       children: [
         { label: "Reminders", path: "/reminders", permission: Permission.VIEW_REMINDERS },
-        { label: "SEO", path: "/seo", permission: Permission.VIEW_TASKS },
-        { label: "SEO Websites", path: "/seo/websites", permission: Permission.VIEW_TASKS }
+        { label: "SEO Dashboard", path: "/seo", permission: Permission.VIEW_SEO_DASHBOARD },
       ],
     },
     {

@@ -26,6 +26,8 @@ from .reports import (
     get_weekly_report_data,
     get_monthly_report_data,
     get_employee_analytics_data,
+    get_reconciliation_report_data,
+    get_session_audit_data,
 )
 from core.permissions import HasPermission
 import datetime
@@ -381,6 +383,39 @@ def activity_batch_sync(request):
     # Sort activities by timestamp to aggregate in order
     activities = sorted(activities, key=lambda x: x.get('timestamp', ''))
     
+    # Align session login_time and last_ping with batch activity timestamps to ensure correct session span
+    batch_timestamps = []
+    for act in activities:
+        ts_str = act.get('timestamp')
+        if ts_str:
+            try:
+                ts = datetime.datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                batch_timestamps.append((ts, act.get('duration_seconds', 10)))
+            except Exception:
+                pass
+                
+    if batch_timestamps:
+        min_ts_info = min(batch_timestamps, key=lambda x: x[0])
+        max_ts_info = max(batch_timestamps, key=lambda x: x[0])
+        min_ts = min_ts_info[0]
+        max_ts = max_ts_info[0]
+        first_act_duration = min_ts_info[1]
+        
+        session_login_candidate = min_ts - timedelta(seconds=first_act_duration)
+        session_ping_candidate = max_ts
+        
+        if created:
+            session.login_time = session_login_candidate
+            session.last_ping = session_ping_candidate
+            session.save(update_fields=['login_time', 'last_ping'])
+        else:
+            session.refresh_from_db()
+            if session_login_candidate < session.login_time:
+                session.login_time = session_login_candidate
+            if session_ping_candidate > session.last_ping:
+                session.last_ping = session_ping_candidate
+            session.save(update_fields=['login_time', 'last_ping'])
+    
     MIN_MOUSE_ACTIVITY = getattr(settings, 'TRACKING_MIN_MOUSE_ACTIVITY', 5)
     MIN_KEY_ACTIVITY = getattr(settings, 'TRACKING_MIN_KEY_ACTIVITY', 1)
     
@@ -407,7 +442,7 @@ def activity_batch_sync(request):
         timestamp = timezone.now()
         if timestamp_str:
             try:
-                timestamp = timezone.datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                timestamp = datetime.datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
             except Exception:
                 pass
 
@@ -582,6 +617,64 @@ def daily_report_view(request):
     search = request.query_params.get('search')
     
     data = get_daily_report_data(start_date, end_date, department_id=dept_id, search_query=search)
+    return Response(data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, HasPermission])
+def reconciliation_report_view(request):
+    """Get reconciliation report for employees."""
+    request.parser_context['view'].required_permission = 'MANAGE_SETTINGS'
+    
+    start_date_param = request.query_params.get('start_date')
+    end_date_param = request.query_params.get('end_date')
+    
+    if start_date_param and end_date_param:
+        try:
+            start_date = datetime.date.fromisoformat(start_date_param)
+            end_date = datetime.date.fromisoformat(end_date_param)
+        except ValueError:
+            return Response({'error': 'Invalid start_date or end_date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        # Default to today
+        start_date = timezone.now().date()
+        end_date = start_date
+
+    dept_id = request.query_params.get('department_id')
+    search = request.query_params.get('search')
+    
+    data = get_reconciliation_report_data(start_date, end_date, department_id=dept_id, search_query=search)
+    return Response(data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, HasPermission])
+def session_audit_report_view(request):
+    """Get historical session audit report."""
+    request.parser_context['view'].required_permission = 'MANAGE_SETTINGS'
+    
+    start_date_param = request.query_params.get('start_date')
+    end_date_param = request.query_params.get('end_date')
+    
+    if start_date_param and end_date_param:
+        try:
+            start_date = datetime.date.fromisoformat(start_date_param)
+            end_date = datetime.date.fromisoformat(end_date_param)
+        except ValueError:
+            return Response({'error': 'Invalid start_date or end_date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        # Default to today
+        start_date = timezone.now().date()
+        end_date = start_date
+
+    user_id = request.query_params.get('user_id')
+    if user_id:
+        try:
+            user_id = int(user_id)
+        except ValueError:
+            return Response({'error': 'Invalid user_id.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    data = get_session_audit_data(start_date, end_date, user_id=user_id)
     return Response(data, status=status.HTTP_200_OK)
 
 
@@ -829,11 +922,14 @@ def export_report_view(request):
                 ('full_name', 'Full Name'),
                 ('department', 'Department'),
                 ('date', 'Date'),
-                ('total_tracked_time', 'Tracked Time'),
                 ('productive_time', 'Productive Time'),
                 ('idle_time', 'Idle Time'),
-                ('activity_percentage', 'Activity %'),
-                ('status', 'Status')
+                ('desktop_work_time', 'Desktop Work Time'),
+                ('portal_active_time', 'Portal Active Time'),
+                ('break_time', 'Break Time'),
+                ('unaccounted_time', 'Unaccounted Time'),
+                ('total_engagement_time', 'Total Engagement Time'),
+                ('activity_percentage', 'Activity %')
             ],
             'weekly': [
                 ('Date', 'Date'),
@@ -851,11 +947,14 @@ def export_report_view(request):
             ],
             'employee': [
                 ('date', 'Date'),
-                ('total_tracked_time', 'Tracked Time'),
                 ('productive_time', 'Productive Time'),
                 ('idle_time', 'Idle Time'),
-                ('activity_percentage', 'Activity %'),
-                ('break_count', 'Breaks')
+                ('desktop_work_time', 'Desktop Work Time'),
+                ('portal_active_time', 'Portal Active Time'),
+                ('break_time', 'Break Time'),
+                ('unaccounted_time', 'Unaccounted Time'),
+                ('total_engagement_time', 'Total Engagement Time'),
+                ('activity_percentage', 'Activity %')
             ]
         }
         
@@ -903,4 +1002,6 @@ weekly_report_view.cls.required_permission = 'MANAGE_SETTINGS'
 monthly_report_view.cls.required_permission = 'MANAGE_SETTINGS'
 employee_analytics_view.cls.required_permission = 'MANAGE_SETTINGS'
 export_report_view.cls.required_permission = 'MANAGE_SETTINGS'
+reconciliation_report_view.cls.required_permission = 'MANAGE_SETTINGS'
+session_audit_report_view.cls.required_permission = 'MANAGE_SETTINGS'
 

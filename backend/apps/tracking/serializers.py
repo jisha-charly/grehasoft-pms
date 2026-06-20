@@ -20,7 +20,7 @@ class WorkSessionSerializer(serializers.ModelSerializer):
         model = WorkSession
         fields = [
             'id', 'user_id', 'login_time', 'last_ping', 'logout_time',
-            'is_active_session', 'total_duration_seconds', 'status',
+            'is_active_session', 'session_type', 'total_duration_seconds', 'status',
             'mouse_moves', 'key_presses', 'clicks', 'productive_seconds', 'idle_seconds',
             'tracked_seconds', 'break_count', 'activity_percentage',
             'created_at', 'updated_at'
@@ -58,7 +58,13 @@ class EmployeeStatusSerializer(serializers.Serializer):
     productive_time = serializers.CharField(allow_blank=True, required=False)
     non_productive_time = serializers.CharField(allow_blank=True, required=False)
     total_tracked_time = serializers.CharField(allow_blank=True, required=False)
+    desktop_work_time = serializers.CharField(allow_blank=True, required=False)
+    portal_active_time = serializers.CharField(allow_blank=True, required=False)
+    break_time = serializers.CharField(allow_blank=True, required=False)
+    unaccounted_time = serializers.CharField(allow_blank=True, required=False)
+    total_engagement_time = serializers.CharField(allow_blank=True, required=False)
     session_id = serializers.IntegerField(allow_null=True)
+    session_type = serializers.CharField(allow_blank=True, required=False, allow_null=True)
     current_app = serializers.CharField(allow_blank=True, required=False, allow_null=True)
     current_window = serializers.CharField(allow_blank=True, required=False, allow_null=True)
     mouse_moves = serializers.IntegerField(required=False)
@@ -139,13 +145,26 @@ class HeartbeatRequestSerializer(serializers.Serializer):
             session.machine_fingerprint = machine_fingerprint
             session.save(update_fields=['installation_uuid', 'tracker_id', 'machine_fingerprint'])
         
-        # Update last_ping
-        session = update_session_ping(session)
-        
         # Extract telemetry fields with clean fallbacks
         app_name = validated_data.get('app_name') or validated_data.get('current_app')
         window_title = validated_data.get('window_title') or validated_data.get('current_window') or ''
         duration_seconds = validated_data.get('duration_seconds', 10)
+        
+        # Update login_time and last_ping based on timestamp and duration
+        timestamp = validated_data.get('timestamp') or timezone.now()
+        from datetime import timedelta
+        
+        if created:
+            session.login_time = timestamp - timedelta(seconds=duration_seconds)
+            session.last_ping = timestamp
+            session.save(update_fields=['login_time', 'last_ping'])
+        else:
+            session.refresh_from_db()
+            if timestamp < session.login_time:
+                session.login_time = timestamp - timedelta(seconds=duration_seconds)
+            if timestamp > session.last_ping:
+                session.last_ping = timestamp
+            session.save(update_fields=['login_time', 'last_ping'])
         is_idle = validated_data.get('is_idle', False)
         mouse_moves = validated_data.get('mouse_moves', 0)
         key_presses = validated_data.get('key_presses', 0)
@@ -161,7 +180,7 @@ class HeartbeatRequestSerializer(serializers.Serializer):
             "is_idle": is_idle
         })
 
-        is_desktop = (app_name is not None) or ('is_idle' in validated_data) or (mouse_moves > 0 or key_presses > 0 or clicks > 0)
+        is_desktop = (device_id != 'default') or (app_name is not None) or (mouse_moves > 0 or key_presses > 0 or clicks > 0)
         
         if is_desktop:
             # Refresh session from database before incrementing fields to prevent race conditions

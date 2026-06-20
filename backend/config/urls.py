@@ -11,8 +11,8 @@ from apps.tasks.views import (
 #from apps.activity.views import ActivityLogViewSet
 from apps.reports.views import DashboardStatsView
 from apps.seo.views import (
-    SEOAnalyticsViewSet, SEOTaskViewSet, KeywordViewSet, BacklinkViewSet,
-    SocialMediaViewSet,  TechnicalSEOViewSet, WebsiteViewSet, seo_dashboard
+    SEOActivityTypeViewSet, WebsiteViewSet, KeywordViewSet, SEODailyWorkLogViewSet,
+    SEOMonthlyTargetViewSet, SEOTaskViewSet, SEOReminderViewSet, SEOCredentialViewSet
 )
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -57,18 +57,18 @@ router.register(r'task-reviews', TaskReviewViewSet)
 # Global activity logs (profile, login etc.)
 router.register(r'activity-logs', GlobalActivityLogViewSet, basename='activity-logs')
 
-# SEO & Social Module
+# SEO Module
 router.register("websites", WebsiteViewSet)
 router.register("seo-tasks", SEOTaskViewSet)
-router.register("keywords", KeywordViewSet)
-router.register("backlinks", BacklinkViewSet)
-router.register("technical-seo", TechnicalSEOViewSet)
-router.register("seo-analytics", SEOAnalyticsViewSet)
-router.register("social-media", SocialMediaViewSet)
+router.register("seo-keywords", KeywordViewSet, basename="seo-keywords")
+router.register("seo-activity-types", SEOActivityTypeViewSet, basename="seo-activity-types")
+router.register("seo-daily-logs", SEODailyWorkLogViewSet, basename="seo-daily-logs")
+router.register("seo-monthly-targets", SEOMonthlyTargetViewSet, basename="seo-monthly-targets")
+router.register("seo-reminders", SEOReminderViewSet, basename="seo-reminders")
+router.register("seo-credentials", SEOCredentialViewSet, basename="seo-credentials")
 
 
 urlpatterns = [
-    path('api/v1/seo-dashboard/', seo_dashboard),
 ]
 
 
@@ -97,8 +97,6 @@ urlpatterns = [
   
    
 ] 
-urlpatterns += [
-    path('api/v1/seo-dashboard/', seo_dashboard),
-] 
+# Removed seo-dashboard endpoint 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

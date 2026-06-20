@@ -112,6 +112,8 @@ def detect_breaks_and_gaps(user, start_date, end_date, sessions_list=None, activ
                     
     # 2. In-Session Activity Gaps
     for session in sessions_list:
+        if session.device_id == 'default':
+            continue
         session_activities = [act for act in activities_list if act.session_id == session.id]
         if len(session_activities) < 2:
             continue
@@ -228,46 +230,49 @@ def get_daily_report_data(start_date, end_date, department_id=None, search_query
             first_login = min(s.login_time for s in day_sessions)
             last_active = max(s.logout_time or s.last_ping or s.login_time for s in day_sessions)
             
-            # Total tracked, productive, and idle seconds from WorkSession records
-            total_tracked_sec = sum(s.tracked_seconds for s in day_sessions)
-            productive_sec = sum(s.productive_seconds for s in day_sessions)
-            idle_sec = sum(s.idle_seconds for s in day_sessions)
-            
-            # Non-productive time based on classified app activity pings
-            non_productive_sec = 0
-            for act in day_activities:
-                category = classify_app_activity(act.app_name, act.window_title)
-                if category == 'non_productive':
-                    non_productive_sec += act.duration_seconds
-                    
-            # Fall back to wall-clock session duration if tracked_seconds is 0 (legacy or web sessions)
-            if total_tracked_sec == 0:
-                total_tracked_sec = sum(get_session_duration(s, current_time).total_seconds() for s in day_sessions)
-                if day_activities:
-                    app_productive_sec = 0
-                    for act in day_activities:
-                        category = classify_app_activity(act.app_name, act.window_title)
-                        active_sec = act.productive_seconds
-                        if category == 'productive':
-                            app_productive_sec += active_sec
-                        elif category == 'non_productive':
-                            pass
-                        else:
-                            app_productive_sec += active_sec  # neutral default to productive
-                    productive_sec = app_productive_sec
-                    idle_sec = max(0, total_tracked_sec - productive_sec - non_productive_sec)
+            # Total tracked, productive, and idle seconds from WorkSession records, capped to elapsed duration
+            productive_sec = 0
+            idle_sec = 0
+            portal_active_sec = 0
+            for s in day_sessions:
+                s_end = s.logout_time or s.last_ping or timezone.now()
+                s_elapsed = max(0, int((s_end - s.login_time).total_seconds()))
+                if s.device_id == 'default':
+                    portal_active_sec += s_elapsed
                 else:
-                    # Web-only or legacy session: 100% productive, 0% idle
-                    productive_sec = total_tracked_sec
-                    idle_sec = 0
-            
-            # Activity Percentage
-            activity_pct = (productive_sec / total_tracked_sec * 100) if total_tracked_sec > 0 else 0.0
-            print(f"Daily Report Aggregation - User: {user.username}, Date: {d.isoformat()} - calculated productive seconds: {productive_sec}, calculated idle seconds: {idle_sec}, final report activity_percentage: {activity_pct}")
+                    s_prod = max(0, s.productive_seconds)
+                    s_idle = max(0, s.idle_seconds)
+                    if s_prod + s_idle > s_elapsed:
+                        if s_prod > s_elapsed:
+                            s_prod = s_elapsed
+                            s_idle = 0
+                        else:
+                            s_idle = s_elapsed - s_prod
+                    productive_sec += s_prod
+                    idle_sec += s_idle
             
             # Breaks detection
             break_analysis = detect_breaks_and_gaps(user, d, d, sessions_list=day_sessions, activities_list=day_activities)
             break_count = break_analysis['break_count']
+            
+            offline_break_sec = sum(b['duration'] for b in break_analysis['breaks_list'] if b['type'] == 'offline')
+            idle_break_sec = sum(b['duration'] for b in break_analysis['breaks_list'] if b['type'] == 'idle')
+            
+            reconciled_idle_sec = max(0, idle_sec - idle_break_sec)
+            reconciled_break_sec = offline_break_sec + idle_break_sec
+            
+            spanned_duration = int((last_active - first_login).total_seconds())
+            spanned_duration = max(0, spanned_duration)
+            
+            desktop_work_sec = productive_sec + reconciled_idle_sec
+            total_engagement_sec = desktop_work_sec + portal_active_sec
+            
+            sum_accounted = productive_sec + reconciled_idle_sec + portal_active_sec + reconciled_break_sec
+            unaccounted_sec = max(0, spanned_duration - sum_accounted)
+            
+            # Activity Percentage
+            activity_pct = (productive_sec / desktop_work_sec * 100) if desktop_work_sec > 0 else 0.0
+            print(f"Daily Report Aggregation - User: {user.username}, Date: {d.isoformat()} - calculated productive seconds: {productive_sec}, calculated idle seconds: {reconciled_idle_sec}, final report activity_percentage: {activity_pct}")
             
             # Latest session status
             latest_session = day_sessions[-1]
@@ -275,26 +280,27 @@ def get_daily_report_data(start_date, end_date, department_id=None, search_query
             
             # Save calculations back to db WorkSessions if it's past day or session closed
             for s in day_sessions:
-                if not s.is_active_session and (s.idle_seconds == 0 or s.break_count == 0):
-                    session_breaks = detect_breaks_and_gaps(user, d, d, sessions_list=[s], activities_list=day_activities)
-                    duration_sec = max(0, int(get_session_duration(s, current_time).total_seconds()))
-                    
-                    # Check if desktop session or web-only/legacy
-                    is_desktop_session = s.last_desktop_ping is not None or s.app_activities.exists()
-                    
-                    if not is_desktop_session:
-                        s.productive_seconds = duration_sec
+                if not s.is_active_session:
+                    if s.device_id == 'default':
+                        s.productive_seconds = 0
                         s.idle_seconds = 0
-                    else:
-                        s.idle_seconds = max(0, duration_sec - s.productive_seconds)
-                        
-                    s.tracked_seconds = s.productive_seconds + s.idle_seconds
-                    s.break_count = session_breaks['break_count']
-                    if s.tracked_seconds > 0:
-                        s.activity_percentage = min(100.0, (s.productive_seconds / s.tracked_seconds) * 100.0)
-                    else:
+                        s.tracked_seconds = 0
+                        s.break_count = 0
                         s.activity_percentage = 0.0
-                    s.save(update_fields=['productive_seconds', 'idle_seconds', 'tracked_seconds', 'break_count', 'activity_percentage'])
+                        s.save(update_fields=['productive_seconds', 'idle_seconds', 'tracked_seconds', 'break_count', 'activity_percentage'])
+                    else:
+                        if s.idle_seconds == 0 or s.break_count == 0:
+                            session_breaks = detect_breaks_and_gaps(user, d, d, sessions_list=[s], activities_list=day_activities)
+                            duration_sec = max(0, int(get_session_duration(s, current_time).total_seconds()))
+                            
+                            s.idle_seconds = max(0, duration_sec - s.productive_seconds)
+                            s.tracked_seconds = s.productive_seconds + s.idle_seconds
+                            s.break_count = session_breaks['break_count']
+                            if s.tracked_seconds > 0:
+                                s.activity_percentage = min(100.0, (s.productive_seconds / s.tracked_seconds) * 100.0)
+                            else:
+                                s.activity_percentage = 0.0
+                            s.save(update_fields=['productive_seconds', 'idle_seconds', 'tracked_seconds', 'break_count', 'activity_percentage'])
 
             report_rows.append({
                 'user_id': user.id,
@@ -306,16 +312,27 @@ def get_daily_report_data(start_date, end_date, department_id=None, search_query
                 'date': d.isoformat(),
                 'first_login': first_login.isoformat() if first_login else None,
                 'last_active': last_active.isoformat() if last_active else None,
-                'total_tracked_time': format_seconds(total_tracked_sec),
+                'total_tracked_time': format_seconds(desktop_work_sec),
                 'productive_time': format_seconds(productive_sec),
-                'idle_time': format_seconds(idle_sec),
-                'non_productive_time': format_seconds(non_productive_sec),
+                'idle_time': format_seconds(reconciled_idle_sec),
+                'desktop_work_time': format_seconds(desktop_work_sec),
+                'portal_active_time': format_seconds(portal_active_sec),
+                'break_time': format_seconds(reconciled_break_sec),
+                'unaccounted_time': format_seconds(unaccounted_sec),
+                'total_engagement_time': format_seconds(total_engagement_sec),
+                'workday_span': format_seconds(spanned_duration),
                 'activity_percentage': round(min(100.0, activity_pct), 2),
                 'break_count': break_count,
                 'status': tracking_status,
-                'raw_tracked_seconds': total_tracked_sec,
+                'raw_tracked_seconds': desktop_work_sec,
                 'raw_productive_seconds': productive_sec,
-                'raw_idle_seconds': idle_sec
+                'raw_idle_seconds': reconciled_idle_sec,
+                'raw_desktop_work_seconds': desktop_work_sec,
+                'raw_portal_active_seconds': portal_active_sec,
+                'raw_break_seconds': reconciled_break_sec,
+                'raw_unaccounted_seconds': unaccounted_sec,
+                'raw_total_engagement_seconds': total_engagement_sec,
+                'raw_workday_span': spanned_duration,
             })
             
     return report_rows
@@ -536,52 +553,51 @@ def get_employee_analytics_data(user, start_date, end_date):
     
     # 1. Daily summaries
     daily_summaries = {}
-    current_time = timezone.now()
+    from .utils import calculate_daily_metrics, format_duration
     
-    for s in sessions:
-        dt_str = s.login_time.date().isoformat()
-        if dt_str not in daily_summaries:
-            daily_summaries[dt_str] = {
-                'date': dt_str,
-                'first_login': s.login_time,
-                'last_active': s.logout_time or s.last_ping,
-                'tracked_seconds': 0,
-                'productive_seconds': 0,
-                'breaks_count': 0
-            }
+    # Generate list of dates in range
+    date_list = []
+    temp_date = start_date
+    while temp_date <= end_date:
+        date_list.append(temp_date)
+        temp_date += timedelta(days=1)
+        
+    for d in date_list:
+        day_sessions = [s for s in sessions if s.login_time.date() == d]
+        if not day_sessions:
+            continue
             
-        summary = daily_summaries[dt_str]
-        if s.tracked_seconds > 0:
-            summary['tracked_seconds'] += s.tracked_seconds
-            summary['productive_seconds'] += s.productive_seconds
-        else:
-            duration = get_session_duration(s, current_time).total_seconds()
-            summary['tracked_seconds'] += duration
-            
-            # Check if there are any activities for this session
-            session_has_activities = any(act.session_id == s.id for act in activities)
-            if not session_has_activities:
-                # Web-only session is 100% productive
-                summary['productive_seconds'] += duration
-            
-        summary['first_login'] = min(summary['first_login'], s.login_time)
-        summary['last_active'] = max(summary['last_active'], s.logout_time or s.last_ping or s.login_time)
+        first_login = min(s.login_time for s in day_sessions)
+        last_active = max(s.logout_time or s.last_ping or s.login_time for s in day_sessions)
+        
+        metrics = calculate_daily_metrics(user, d)
+        day_activities = [a for a in activities if a.timestamp.date() == d]
+        break_analysis = detect_breaks_and_gaps(user, d, d, day_sessions, day_activities)
+        
+        dt_str = d.isoformat()
+        daily_summaries[dt_str] = {
+            'date': dt_str,
+            'first_login': first_login.isoformat(),
+            'last_active': last_active.isoformat(),
+            'total_tracked_time': format_duration(metrics['desktop_work_time']),
+            'productive_time': format_duration(metrics['productive_time']),
+            'idle_time': format_duration(metrics['non_productive_time']),
+            'desktop_work_time': format_duration(metrics['desktop_work_time']),
+            'portal_active_time': format_duration(metrics['portal_active_time']),
+            'break_time': format_duration(metrics['break_time']),
+            'unaccounted_time': format_duration(metrics['unaccounted_time']),
+            'total_engagement_time': format_duration(metrics['total_engagement_time']),
+            'activity_percentage': round(metrics['activity_percentage'], 2),
+            'break_count': break_analysis['break_count']
+        }
             
     # app activity grouping and classification
     app_stats = {}
     total_app_sec = 0
     
     for act in activities:
-        dt_str = act.timestamp.date().isoformat()
         cat = classify_app_activity(act.app_name, act.window_title)
-        active_sec = act.productive_seconds
         
-        # Only add productive seconds from app activity to daily summaries if session tracked_seconds was 0 (legacy/web sessions)
-        if dt_str in daily_summaries:
-            session_of_act = next((s for s in sessions if s.id == act.session_id), None)
-            if session_of_act and session_of_act.tracked_seconds == 0:
-                daily_summaries[dt_str]['productive_seconds'] += active_sec
-            
         # App total times
         if act.app_name not in app_stats:
             app_stats[act.app_name] = {
@@ -601,29 +617,7 @@ def get_employee_analytics_data(user, start_date, end_date):
         total_app_sec += act.duration_seconds
 
     # Format daily summaries
-    formatted_daily = []
-    for dt_str, summary in sorted(daily_summaries.items()):
-        total_tracked = summary['tracked_seconds']
-        prod = summary['productive_seconds']
-        idle = max(0, total_tracked - prod)
-        pct = (prod / total_tracked * 100) if total_tracked > 0 else 0.0
-        
-        # Breaks for this day
-        day_date = datetime.date.fromisoformat(dt_str)
-        day_sessions = [s for s in sessions if s.login_time.date() == day_date]
-        day_activities = [a for a in activities if a.timestamp.date() == day_date]
-        break_analysis = detect_breaks_and_gaps(user, day_date, day_date, day_sessions, day_activities)
-        
-        formatted_daily.append({
-            'date': dt_str,
-            'first_login': summary['first_login'].isoformat(),
-            'last_active': summary['last_active'].isoformat(),
-            'total_tracked_time': format_seconds(total_tracked),
-            'productive_time': format_seconds(prod),
-            'idle_time': format_seconds(idle),
-            'activity_percentage': round(min(100.0, pct), 2),
-            'break_count': break_analysis['break_count']
-        })
+    formatted_daily = list(daily_summaries.values())
 
     # Format apps usage list
     formatted_apps = []
@@ -653,10 +647,33 @@ def get_employee_analytics_data(user, start_date, end_date):
         })
 
     # Totals
-    total_tracked_all = sum(s['tracked_seconds'] for s in daily_summaries.values())
-    total_productive_all = sum(s['productive_seconds'] for s in daily_summaries.values())
-    total_idle_all = max(0, total_tracked_all - total_productive_all)
-    avg_activity_all = (total_productive_all / total_tracked_all * 100) if total_tracked_all > 0 else 0.0
+    total_productive_all = 0
+    total_idle_all = 0
+    total_desktop_work_all = 0
+    total_portal_active_all = 0
+    total_break_all = 0
+    total_unaccounted_all = 0
+    total_engagement_all = 0
+    total_break_count = 0
+    
+    for d in date_list:
+        day_sessions = [s for s in sessions if s.login_time.date() == d]
+        if not day_sessions:
+            continue
+        metrics = calculate_daily_metrics(user, d)
+        total_productive_all += int(metrics['productive_time'].total_seconds())
+        total_idle_all += int(metrics['non_productive_time'].total_seconds())
+        total_desktop_work_all += int(metrics['desktop_work_time'].total_seconds())
+        total_portal_active_all += int(metrics['portal_active_time'].total_seconds())
+        total_break_all += int(metrics['break_time'].total_seconds())
+        total_unaccounted_all += int(metrics['unaccounted_time'].total_seconds())
+        total_engagement_all += int(metrics['total_engagement_time'].total_seconds())
+        
+        day_activities = [a for a in activities if a.timestamp.date() == d]
+        day_breaks = detect_breaks_and_gaps(user, d, d, day_sessions, day_activities)
+        total_break_count += day_breaks['break_count']
+        
+    avg_activity_all = (total_productive_all / total_desktop_work_all * 100) if total_desktop_work_all > 0 else 0.0
     
     full_name = user.name or f"{user.first_name} {user.last_name}".strip() or user.username
     emp_code = f"GS-26-{str(user.id).zfill(3)}"
@@ -671,14 +688,250 @@ def get_employee_analytics_data(user, start_date, end_date):
             'department': user.department.name if user.department else 'General'
         },
         'totals': {
-            'total_tracked_time': format_seconds(total_tracked_all),
+            'total_tracked_time': format_seconds(total_desktop_work_all),
             'productive_time': format_seconds(total_productive_all),
             'idle_time': format_seconds(total_idle_all),
+            'desktop_work_time': format_seconds(total_desktop_work_all),
+            'portal_active_time': format_seconds(total_portal_active_all),
+            'break_time': format_seconds(total_break_all),
+            'unaccounted_time': format_seconds(total_unaccounted_all),
+            'total_engagement_time': format_seconds(total_engagement_all),
             'activity_percentage': round(min(100.0, avg_activity_all), 2),
-            'break_count': break_analysis['break_count'],
-            'total_break_time': format_seconds(break_analysis['total_break_seconds'])
+            'break_count': total_break_count,
+            'total_break_time': format_seconds(total_break_all)
         },
         'daily_breakdown': formatted_daily,
         'app_usage': formatted_apps,
         'breaks': formatted_breaks
     }
+
+
+def get_reconciliation_report_data(start_date, end_date, department_id=None, search_query=None):
+    """
+    Get reconciliation report data for employees.
+    Formula: Total Workday Span = Productive Time + Idle Time + Break Time + Unaccounted Time
+    """
+    users_query = User.objects.filter(is_active=True)
+    if department_id:
+        users_query = users_query.filter(department_id=department_id)
+    if search_query:
+        users_query = users_query.filter(
+            Q(name__icontains=search_query) | 
+            Q(username__icontains=search_query) | 
+            Q(email__icontains=search_query)
+        )
+    users = list(users_query.select_related('role', 'department'))
+    user_ids = [u.id for u in users]
+    
+    sessions = list(WorkSession.objects.filter(
+        user_id__in=user_ids,
+        login_time__date__range=(start_date, end_date)
+    ).order_by('login_time'))
+    
+    activities = list(AppActivity.objects.filter(
+        user_id__in=user_ids,
+        timestamp__date__range=(start_date, end_date)
+    ).order_by('timestamp'))
+    
+    user_data = {}
+    for user in users:
+        user_data[user.id] = {
+            'user': user,
+            'sessions': [],
+            'activities': []
+        }
+        
+    for s in sessions:
+        if s.user_id in user_data:
+            user_data[s.user_id]['sessions'].append(s)
+            
+    for a in activities:
+        if a.user_id in user_data:
+            user_data[a.user_id]['activities'].append(a)
+
+    report_rows = []
+    
+    date_list = []
+    temp_date = start_date
+    while temp_date <= end_date:
+        date_list.append(temp_date)
+        temp_date += timedelta(days=1)
+        
+    for user_id, data in user_data.items():
+        user = data['user']
+        full_name = user.name or f"{user.first_name} {user.last_name}".strip() or user.username
+        emp_code = f"GS-26-{str(user.id).zfill(3)}"
+        
+        for d in date_list:
+            day_sessions = [s for s in data['sessions'] if s.login_time.date() == d]
+            day_activities = [a for a in data['activities'] if a.timestamp.date() == d]
+            
+            if not day_sessions:
+                continue
+                
+            first_login = min(s.login_time for s in day_sessions)
+            last_active = max(s.logout_time or s.last_ping or s.login_time for s in day_sessions)
+            spanned_duration = int((last_active - first_login).total_seconds())
+            spanned_duration = max(0, spanned_duration)
+            
+            session_duration_sec = 0
+            productive_sec = 0
+            idle_sec = 0
+            portal_active_sec = 0
+            for s in day_sessions:
+                s_end = s.logout_time or s.last_ping or timezone.now()
+                s_elapsed = max(0, int((s_end - s.login_time).total_seconds()))
+                session_duration_sec += s_elapsed
+                
+                if s.device_id == 'default':
+                    portal_active_sec += s_elapsed
+                else:
+                    s_prod = max(0, s.productive_seconds)
+                    s_idle = max(0, s.idle_seconds)
+                    if s_prod + s_idle > s_elapsed:
+                        if s_prod > s_elapsed:
+                            s_prod = s_elapsed
+                            s_idle = 0
+                        else:
+                            s_idle = s_elapsed - s_prod
+                    productive_sec += s_prod
+                    idle_sec += s_idle
+            
+            break_analysis = detect_breaks_and_gaps(user, d, d, sessions_list=day_sessions, activities_list=day_activities)
+            total_break_sec = break_analysis['total_break_seconds']
+            
+            offline_break_sec = sum(b['duration'] for b in break_analysis['breaks_list'] if b['type'] == 'offline')
+            idle_break_sec = sum(b['duration'] for b in break_analysis['breaks_list'] if b['type'] == 'idle')
+            
+            reconciled_idle_sec = max(0, idle_sec - idle_break_sec)
+            reconciled_break_sec = offline_break_sec + idle_break_sec
+            
+            desktop_work_sec = productive_sec + reconciled_idle_sec
+            total_engagement_sec = desktop_work_sec + portal_active_sec
+            
+            sum_accounted = productive_sec + reconciled_idle_sec + portal_active_sec + reconciled_break_sec
+            unaccounted_sec = spanned_duration - sum_accounted
+            
+            # In-session metrics to verify formula: Session Duration = Productive + Idle + Portal Active + In-Session Break + Unaccounted
+            sum_accounted_session = productive_sec + reconciled_idle_sec + portal_active_sec + idle_break_sec
+            unaccounted_session_sec = session_duration_sec - sum_accounted_session
+            
+            report_rows.append({
+                'user_id': user.id,
+                'username': user.username,
+                'full_name': full_name,
+                'employee_code': emp_code,
+                'department': user.department.name if user.department else 'General',
+                'date': d.isoformat(),
+                'first_seen': first_login.isoformat() if first_login else None,
+                'last_active': last_active.isoformat() if last_active else None,
+                'workday_span': format_seconds(spanned_duration),
+                'session_duration': format_seconds(session_duration_sec),
+                'productive_time': format_seconds(productive_sec),
+                'idle_time': format_seconds(reconciled_idle_sec),
+                'desktop_work_time': format_seconds(desktop_work_sec),
+                'portal_active_time': format_seconds(portal_active_sec),
+                'break_time': format_seconds(reconciled_break_sec),
+                'unaccounted_time': format_seconds(unaccounted_sec),
+                'total_engagement_time': format_seconds(total_engagement_sec),
+                'in_session_break_time': format_seconds(idle_break_sec),
+                'unaccounted_session_time': format_seconds(unaccounted_session_sec),
+                'raw_workday_span': spanned_duration,
+                'raw_session_duration': session_duration_sec,
+                'raw_productive_seconds': productive_sec,
+                'raw_idle_seconds': reconciled_idle_sec,
+                'raw_desktop_work_seconds': desktop_work_sec,
+                'raw_portal_active_seconds': portal_active_sec,
+                'raw_break_seconds': reconciled_break_sec,
+                'raw_unaccounted_seconds': unaccounted_sec,
+                'raw_total_engagement_seconds': total_engagement_sec,
+                'raw_in_session_break_seconds': idle_break_sec,
+                'raw_unaccounted_session_seconds': unaccounted_session_sec,
+            })
+            
+    return report_rows
+
+
+def get_session_audit_data(start_date, end_date, user_id=None):
+    """
+    Get audit metrics for tracking sessions.
+    Identifies overlapping active sessions, duration discrepancies, and percentage anomalies.
+    """
+    sessions_query = WorkSession.objects.filter(login_time__date__range=(start_date, end_date))
+    if user_id:
+        sessions_query = sessions_query.filter(user_id=user_id)
+    
+    sessions = list(sessions_query.select_related('user').order_by('login_time'))
+    
+    active_sessions_by_user = {}
+    for s in sessions:
+        if s.is_active_session:
+            if s.user_id not in active_sessions_by_user:
+                active_sessions_by_user[s.user_id] = []
+            active_sessions_by_user[s.user_id].append(s)
+            
+    audit_rows = []
+    
+    for s in sessions:
+        user = s.user
+        full_name = user.name or f"{user.first_name} {user.last_name}".strip() or user.username
+        emp_code = f"GS-26-{str(user.id).zfill(3)}"
+        
+        last_active = s.logout_time or s.last_ping or s.login_time
+        elapsed_sec = max(0, int((last_active - s.login_time).total_seconds()))
+        
+        prod_sec = s.productive_seconds
+        idle_sec = s.idle_seconds
+        tracked_sec = s.tracked_seconds
+        act_pct = s.activity_percentage
+        
+        flags = []
+        severity = 'Ok'
+        
+        if s.is_active_session and len(active_sessions_by_user.get(s.user_id, [])) > 1:
+            flags.append("Multiple overlapping active sessions exist for user")
+            severity = 'Critical'
+            
+        if prod_sec + idle_sec > elapsed_sec:
+            flags.append(f"Productive + Idle ({prod_sec + idle_sec}s) exceeds elapsed session duration ({elapsed_sec}s)")
+            severity = 'Warning'
+        elif tracked_sec > elapsed_sec:
+            flags.append(f"Tracked seconds ({tracked_sec}s) exceeds elapsed session duration ({elapsed_sec}s)")
+            severity = 'Warning'
+        elif act_pct > 100.0:
+            flags.append(f"Activity percentage ({act_pct}%) exceeds 100%")
+            severity = 'Warning'
+            
+        if tracked_sec != prod_sec + idle_sec:
+            flags.append(f"Tracked seconds ({tracked_sec}s) does not equal Productive + Idle ({prod_sec + idle_sec}s)")
+            if severity not in ['Critical', 'Warning']:
+                severity = 'Info'
+        if prod_sec < 0 or idle_sec < 0 or tracked_sec < 0:
+            flags.append("Negative tracking values detected")
+            severity = 'Warning'
+            
+        status_str = ", ".join(flags) if flags else "Valid"
+        
+        audit_rows.append({
+            'user_id': user.id,
+            'username': user.username,
+            'full_name': full_name,
+            'employee_code': emp_code,
+            'session_id': s.id,
+            'device_id': s.device_id,
+            'login_time': s.login_time.isoformat(),
+            'last_active': last_active.isoformat(),
+            'session_duration': format_seconds(elapsed_sec),
+            'productive_time': format_seconds(prod_sec),
+            'idle_time': format_seconds(idle_sec),
+            'tracked_time': format_seconds(tracked_sec),
+            'activity_percentage': round(act_pct, 2),
+            'validation_status': status_str,
+            'severity': severity,
+            'raw_elapsed_seconds': elapsed_sec,
+            'raw_productive_seconds': prod_sec,
+            'raw_idle_seconds': idle_sec,
+            'raw_tracked_seconds': tracked_sec,
+        })
+        
+    return audit_rows
