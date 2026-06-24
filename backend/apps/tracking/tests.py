@@ -512,7 +512,7 @@ class ToggleTrackingAPITest(APITestCase):
 
 from django.core.management import call_command
 from io import StringIO
-from .reports import get_reconciliation_report_data, get_session_audit_data
+from .reports import get_reconciliation_report_data, get_session_audit_data, get_daily_report_data
 
 class WorkTrackerCalculationEnhancementsTest(TestCase):
     """Test save capping, single active session constraint, reconciliation math, session audit, and repair command."""
@@ -792,6 +792,106 @@ class WorkTrackerCalculationEnhancementsTest(TestCase):
         
         # Total Engagement = Desktop Work + Portal Active
         self.assertEqual(row['raw_total_engagement_seconds'], row['raw_desktop_work_seconds'] + row['raw_portal_active_seconds'])
+
+    def test_reconciliation_math_with_within_session_idle_breaks(self):
+        """Test that idle breaks (gaps > 3 min) do not subtract from reconciled idle seconds."""
+        from .models import AppActivity
+        today = timezone.now().date()
+        now = timezone.now().replace(hour=12, minute=0, second=0, microsecond=0)
+        
+        s_desk = WorkSession.objects.create(
+            user=self.user,
+            is_active_session=False,
+            device_id='dev-1'
+        )
+        WorkSession.objects.filter(id=s_desk.id).update(
+            login_time=now - timedelta(hours=4),
+            last_ping=now,
+            logout_time=now,
+            productive_seconds=3600,
+            idle_seconds=1800
+        )
+        s_desk.refresh_from_db()
+        s_desk.save()
+        
+        # Create consecutive activities with an in-session gap of 5 minutes (300 seconds)
+        AppActivity.objects.create(
+            user=self.user,
+            session=s_desk,
+            app_name='VS Code',
+            duration_seconds=60,
+            timestamp=now - timedelta(hours=3)
+        )
+        AppActivity.objects.create(
+            user=self.user,
+            session=s_desk,
+            app_name='VS Code',
+            duration_seconds=60,
+            timestamp=now - timedelta(hours=3) + timedelta(minutes=6)
+        )
+        
+        reconciliation_data = get_reconciliation_report_data(today, today)
+        self.assertEqual(len(reconciliation_data), 1)
+        row = reconciliation_data[0]
+        
+        # Idle time should not be reduced by the gap duration
+        self.assertEqual(row['raw_idle_seconds'], 1800)
+        
+        # Reconciliation formula should still hold
+        sum_span = (
+            row['raw_productive_seconds'] + 
+            row['raw_idle_seconds'] + 
+            row['raw_portal_active_seconds'] + 
+            row['raw_break_seconds'] + 
+            row['raw_unaccounted_seconds']
+        )
+        self.assertEqual(sum_span, row['raw_workday_span'])
+
+    def test_ordered_fields_in_report_apis(self):
+        """Test that report APIs include requested employee fields as the first keys."""
+        today = timezone.now().date()
+        now = timezone.now().replace(hour=12, minute=0, second=0, microsecond=0)
+        
+        session = WorkSession.objects.create(
+            user=self.user,
+            is_active_session=False,
+            device_id='dev-1'
+        )
+        WorkSession.objects.filter(id=session.id).update(
+            login_time=now - timedelta(hours=4),
+            last_ping=now,
+            logout_time=now,
+            productive_seconds=3600,
+            idle_seconds=1800
+        )
+        session.refresh_from_db()
+        session.save()
+        
+        # 1. Daily Report Data
+        daily_data = get_daily_report_data(today, today)
+        self.assertGreater(len(daily_data), 0)
+        row_daily = daily_data[0]
+        
+        # Verify first 14 keys order
+        keys_daily = list(row_daily.keys())
+        expected_keys = [
+            'employee_name', 'employee_code', 'department', 'date',
+            'productive_time', 'idle_time', 'desktop_work_time', 'portal_active_time',
+            'break_time', 'unaccounted_time', 'total_engagement_time', 'workday_span',
+            'activity_percentage', 'status'
+        ]
+        self.assertEqual(keys_daily[:14], expected_keys)
+        
+        # 2. Reconciliation Report Data
+        reconciliation_data = get_reconciliation_report_data(today, today)
+        self.assertGreater(len(reconciliation_data), 0)
+        row_recon = reconciliation_data[0]
+        keys_recon = list(row_recon.keys())
+        self.assertEqual(keys_recon[:14], expected_keys)
+
+
+# Run tests with: python manage.py test apps.tracking
+# Or: pytest backend/apps/tracking/tests.py
 
 
 # Run tests with: python manage.py test apps.tracking

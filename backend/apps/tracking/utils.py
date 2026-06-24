@@ -190,7 +190,7 @@ def calculate_daily_metrics(user, date=None):
     offline_break_sec = sum(b['duration'] for b in break_analysis['breaks_list'] if b['type'] == 'offline')
     idle_break_sec = sum(b['duration'] for b in break_analysis['breaks_list'] if b['type'] == 'idle')
     
-    reconciled_idle_sec = max(0, idle_sec - idle_break_sec)
+    reconciled_idle_sec = idle_sec
     reconciled_break_sec = offline_break_sec + idle_break_sec
     
     desktop_work_sec = productive_sec + reconciled_idle_sec

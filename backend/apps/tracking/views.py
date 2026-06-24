@@ -800,6 +800,9 @@ def export_report_view(request):
     if report_type == 'daily':
         data = get_daily_report_data(start_date, end_date, department_id=dept_id, search_query=search)
         filename = f"daily_report_{start_date}"
+    elif report_type == 'reconciliation':
+        data = get_reconciliation_report_data(start_date, end_date, department_id=dept_id, search_query=search)
+        filename = f"reconciliation_report_{start_date}"
     elif report_type == 'weekly':
         data_summary = get_weekly_report_data(start_date, end_date, department_id=dept_id)
         # Flatten daily productivity trend for weekly rows
@@ -835,11 +838,27 @@ def export_report_view(request):
             return response
             
         writer = csv.writer(response)
-        headers = list(data[0].keys())
-        writer.writerow(headers)
-        
-        for row in data:
-            writer.writerow([row[h] for h in headers])
+        if report_type in ['daily', 'reconciliation', 'employee']:
+            headers = [
+                'Employee Name', 'Employee Code', 'Department', 'Date',
+                'Productive Time', 'Idle Time', 'Desktop Work Time', 'Portal Active Time',
+                'Break Time', 'Unaccounted Time', 'Total Engagement Time', 'Workday Span',
+                'Activity Percentage', 'Status'
+            ]
+            keys = [
+                'employee_name', 'employee_code', 'department', 'date',
+                'productive_time', 'idle_time', 'desktop_work_time', 'portal_active_time',
+                'break_time', 'unaccounted_time', 'total_engagement_time', 'workday_span',
+                'activity_percentage', 'status'
+            ]
+            writer.writerow(headers)
+            for row in data:
+                writer.writerow([row.get(k, '-') for k in keys])
+        else:
+            headers = list(data[0].keys())
+            writer.writerow(headers)
+            for row in data:
+                writer.writerow([row[h] for h in headers])
             
         return response
 
@@ -855,7 +874,23 @@ def export_report_view(request):
             wb.save(response)
             return response
             
-        headers = [h.replace('_', ' ').title() for h in data[0].keys() if not h.startswith('raw_')]
+        if report_type in ['daily', 'reconciliation', 'employee']:
+            headers = [
+                'Employee Name', 'Employee Code', 'Department', 'Date',
+                'Productive Time', 'Idle Time', 'Desktop Work Time', 'Portal Active Time',
+                'Break Time', 'Unaccounted Time', 'Total Engagement Time', 'Workday Span',
+                'Activity Percentage', 'Status'
+            ]
+            keys = [
+                'employee_name', 'employee_code', 'department', 'date',
+                'productive_time', 'idle_time', 'desktop_work_time', 'portal_active_time',
+                'break_time', 'unaccounted_time', 'total_engagement_time', 'workday_span',
+                'activity_percentage', 'status'
+            ]
+        else:
+            headers = [h.replace('_', ' ').title() for h in data[0].keys() if not h.startswith('raw_')]
+            keys = [k for k in data[0].keys() if not k.startswith('raw_')]
+            
         ws.append(headers)
         
         # Style Header
@@ -869,9 +904,8 @@ def export_report_view(request):
             cell.alignment = Alignment(horizontal="center", vertical="center")
             
         # Add Data Rows
-        key_list = [k for k in data[0].keys() if not k.startswith('raw_')]
         for item in data:
-            row_data = [item[k] for k in key_list]
+            row_data = [item.get(k, '-') for k in keys]
             ws.append(row_data)
             
         # Adjust Columns
@@ -919,7 +953,8 @@ def export_report_view(request):
         # Define customized column layout for each report type
         report_columns = {
             'daily': [
-                ('full_name', 'Full Name'),
+                ('employee_name', 'Employee Name'),
+                ('employee_code', 'Employee Code'),
                 ('department', 'Department'),
                 ('date', 'Date'),
                 ('productive_time', 'Productive Time'),
@@ -929,7 +964,25 @@ def export_report_view(request):
                 ('break_time', 'Break Time'),
                 ('unaccounted_time', 'Unaccounted Time'),
                 ('total_engagement_time', 'Total Engagement Time'),
-                ('activity_percentage', 'Activity %')
+                ('workday_span', 'Workday Span'),
+                ('activity_percentage', 'Activity %'),
+                ('status', 'Status')
+            ],
+            'reconciliation': [
+                ('employee_name', 'Employee Name'),
+                ('employee_code', 'Employee Code'),
+                ('department', 'Department'),
+                ('date', 'Date'),
+                ('productive_time', 'Productive Time'),
+                ('idle_time', 'Idle Time'),
+                ('desktop_work_time', 'Desktop Work Time'),
+                ('portal_active_time', 'Portal Active Time'),
+                ('break_time', 'Break Time'),
+                ('unaccounted_time', 'Unaccounted Time'),
+                ('total_engagement_time', 'Total Engagement Time'),
+                ('workday_span', 'Workday Span'),
+                ('activity_percentage', 'Activity %'),
+                ('status', 'Status')
             ],
             'weekly': [
                 ('Date', 'Date'),
@@ -946,6 +999,9 @@ def export_report_view(request):
                 ('activity_percentage', 'Activity %')
             ],
             'employee': [
+                ('employee_name', 'Employee Name'),
+                ('employee_code', 'Employee Code'),
+                ('department', 'Department'),
                 ('date', 'Date'),
                 ('productive_time', 'Productive Time'),
                 ('idle_time', 'Idle Time'),
@@ -954,7 +1010,9 @@ def export_report_view(request):
                 ('break_time', 'Break Time'),
                 ('unaccounted_time', 'Unaccounted Time'),
                 ('total_engagement_time', 'Total Engagement Time'),
-                ('activity_percentage', 'Activity %')
+                ('workday_span', 'Workday Span'),
+                ('activity_percentage', 'Activity %'),
+                ('status', 'Status')
             ]
         }
         
@@ -971,18 +1029,34 @@ def export_report_view(request):
             row = [str(item.get(k) if item.get(k) is not None else '-') for k in keys]
             table_data.append(row)
             
-        t = Table(table_data)
+        col_widths = None
+        is_large_report = report_type in ['daily', 'reconciliation', 'employee'] and len(keys) == 14
+        
+        if is_large_report:
+            # colWidths in points to fit within 732 points of printable width
+            col_widths = [85, 55, 75, 55, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45]
+            
+        t = Table(table_data, colWidths=col_widths)
+        
+        # Adjust font size and padding if we have many columns
+        font_size_header = 7 if is_large_report else 10
+        font_size_cell = 6 if is_large_report else 8
+        padding_val = 3 if is_large_report else 6
+        
         t.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#4F46E5')),
             ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
             ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (-1,0), 10),
-            ('BOTTOMPADDING', (0,0), (-1,0), 8),
+            ('FONTSIZE', (0,0), (-1,0), font_size_header),
+            ('TOPPADDING', (0,0), (-1,-1), padding_val),
+            ('BOTTOMPADDING', (0,0), (-1,-1), padding_val),
+            ('LEFTPADDING', (0,0), (-1,-1), 2),
+            ('RIGHTPADDING', (0,0), (-1,-1), 2),
             ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#F8FAFC')),
             ('GRID', (0,0), (-1,-1), 1, colors.HexColor('#E2E8F0')),
             ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F1F5F9')]),
-            ('FONTSIZE', (0,1), (-1,-1), 8),
+            ('FONTSIZE', (0,1), (-1,-1), font_size_cell),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ]))
         

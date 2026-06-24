@@ -112,8 +112,6 @@ def detect_breaks_and_gaps(user, start_date, end_date, sessions_list=None, activ
                     
     # 2. In-Session Activity Gaps
     for session in sessions_list:
-        if session.device_id == 'default':
-            continue
         session_activities = [act for act in activities_list if act.session_id == session.id]
         if len(session_activities) < 2:
             continue
@@ -258,7 +256,7 @@ def get_daily_report_data(start_date, end_date, department_id=None, search_query
             offline_break_sec = sum(b['duration'] for b in break_analysis['breaks_list'] if b['type'] == 'offline')
             idle_break_sec = sum(b['duration'] for b in break_analysis['breaks_list'] if b['type'] == 'idle')
             
-            reconciled_idle_sec = max(0, idle_sec - idle_break_sec)
+            reconciled_idle_sec = idle_sec
             reconciled_break_sec = offline_break_sec + idle_break_sec
             
             spanned_duration = int((last_active - first_login).total_seconds())
@@ -303,16 +301,11 @@ def get_daily_report_data(start_date, end_date, department_id=None, search_query
                             s.save(update_fields=['productive_seconds', 'idle_seconds', 'tracked_seconds', 'break_count', 'activity_percentage'])
 
             report_rows.append({
-                'user_id': user.id,
-                'username': user.username,
-                'full_name': full_name,
-                'email': user.email,
+                # Ordered fields requested by USER
+                'employee_name': full_name,
                 'employee_code': emp_code,
                 'department': user.department.name if user.department else 'General',
                 'date': d.isoformat(),
-                'first_login': first_login.isoformat() if first_login else None,
-                'last_active': last_active.isoformat() if last_active else None,
-                'total_tracked_time': format_seconds(desktop_work_sec),
                 'productive_time': format_seconds(productive_sec),
                 'idle_time': format_seconds(reconciled_idle_sec),
                 'desktop_work_time': format_seconds(desktop_work_sec),
@@ -322,8 +315,19 @@ def get_daily_report_data(start_date, end_date, department_id=None, search_query
                 'total_engagement_time': format_seconds(total_engagement_sec),
                 'workday_span': format_seconds(spanned_duration),
                 'activity_percentage': round(min(100.0, activity_pct), 2),
-                'break_count': break_count,
                 'status': tracking_status,
+                
+                # Original fields for backward compatibility
+                'user_id': user.id,
+                'username': user.username,
+                'full_name': full_name,
+                'email': user.email,
+                'first_login': first_login.isoformat() if first_login else None,
+                'last_active': last_active.isoformat() if last_active else None,
+                'total_tracked_time': format_seconds(desktop_work_sec),
+                'break_count': break_count,
+                
+                # Raw fields
                 'raw_tracked_seconds': desktop_work_sec,
                 'raw_productive_seconds': productive_sec,
                 'raw_idle_seconds': reconciled_idle_sec,
@@ -552,6 +556,8 @@ def get_employee_analytics_data(user, start_date, end_date):
     ).order_by('timestamp'))
     
     # 1. Daily summaries
+    full_name = user.name or f"{user.first_name} {user.last_name}".strip() or user.username
+    emp_code = f"GS-26-{str(user.id).zfill(3)}"
     daily_summaries = {}
     from .utils import calculate_daily_metrics, format_duration
     
@@ -576,10 +582,11 @@ def get_employee_analytics_data(user, start_date, end_date):
         
         dt_str = d.isoformat()
         daily_summaries[dt_str] = {
+            # Ordered fields requested by USER
+            'employee_name': full_name,
+            'employee_code': emp_code,
+            'department': user.department.name if user.department else 'General',
             'date': dt_str,
-            'first_login': first_login.isoformat(),
-            'last_active': last_active.isoformat(),
-            'total_tracked_time': format_duration(metrics['desktop_work_time']),
             'productive_time': format_duration(metrics['productive_time']),
             'idle_time': format_duration(metrics['non_productive_time']),
             'desktop_work_time': format_duration(metrics['desktop_work_time']),
@@ -587,7 +594,14 @@ def get_employee_analytics_data(user, start_date, end_date):
             'break_time': format_duration(metrics['break_time']),
             'unaccounted_time': format_duration(metrics['unaccounted_time']),
             'total_engagement_time': format_duration(metrics['total_engagement_time']),
+            'workday_span': format_seconds(max(0, int((last_active - first_login).total_seconds()))),
             'activity_percentage': round(metrics['activity_percentage'], 2),
+            'status': 'Offline',
+            
+            # Original fields for backward compatibility
+            'first_login': first_login.isoformat(),
+            'last_active': last_active.isoformat(),
+            'total_tracked_time': format_duration(metrics['desktop_work_time']),
             'break_count': break_analysis['break_count']
         }
             
@@ -803,7 +817,7 @@ def get_reconciliation_report_data(start_date, end_date, department_id=None, sea
             offline_break_sec = sum(b['duration'] for b in break_analysis['breaks_list'] if b['type'] == 'offline')
             idle_break_sec = sum(b['duration'] for b in break_analysis['breaks_list'] if b['type'] == 'idle')
             
-            reconciled_idle_sec = max(0, idle_sec - idle_break_sec)
+            reconciled_idle_sec = idle_sec
             reconciled_break_sec = offline_break_sec + idle_break_sec
             
             desktop_work_sec = productive_sec + reconciled_idle_sec
@@ -816,17 +830,15 @@ def get_reconciliation_report_data(start_date, end_date, department_id=None, sea
             sum_accounted_session = productive_sec + reconciled_idle_sec + portal_active_sec + idle_break_sec
             unaccounted_session_sec = session_duration_sec - sum_accounted_session
             
+            # Latest session status
+            tracking_status = day_sessions[-1].get_status() if d == timezone.now().date() else 'Offline'
+            
             report_rows.append({
-                'user_id': user.id,
-                'username': user.username,
-                'full_name': full_name,
+                # Ordered fields requested by USER
+                'employee_name': full_name,
                 'employee_code': emp_code,
                 'department': user.department.name if user.department else 'General',
                 'date': d.isoformat(),
-                'first_seen': first_login.isoformat() if first_login else None,
-                'last_active': last_active.isoformat() if last_active else None,
-                'workday_span': format_seconds(spanned_duration),
-                'session_duration': format_seconds(session_duration_sec),
                 'productive_time': format_seconds(productive_sec),
                 'idle_time': format_seconds(reconciled_idle_sec),
                 'desktop_work_time': format_seconds(desktop_work_sec),
@@ -834,8 +846,21 @@ def get_reconciliation_report_data(start_date, end_date, department_id=None, sea
                 'break_time': format_seconds(reconciled_break_sec),
                 'unaccounted_time': format_seconds(unaccounted_sec),
                 'total_engagement_time': format_seconds(total_engagement_sec),
+                'workday_span': format_seconds(spanned_duration),
+                'activity_percentage': round(min(100.0, (productive_sec / desktop_work_sec * 100) if desktop_work_sec > 0 else 0.0), 2),
+                'status': tracking_status,
+                
+                # Original fields for backward compatibility
+                'user_id': user.id,
+                'username': user.username,
+                'full_name': full_name,
+                'first_seen': first_login.isoformat() if first_login else None,
+                'last_active': last_active.isoformat() if last_active else None,
+                'session_duration': format_seconds(session_duration_sec),
                 'in_session_break_time': format_seconds(idle_break_sec),
                 'unaccounted_session_time': format_seconds(unaccounted_session_sec),
+                
+                # Raw fields
                 'raw_workday_span': spanned_duration,
                 'raw_session_duration': session_duration_sec,
                 'raw_productive_seconds': productive_sec,

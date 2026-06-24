@@ -90,6 +90,15 @@ class WorkSession(models.Model):
             elapsed = (last_active - self.login_time).total_seconds()
             elapsed = max(0, int(elapsed))
             
+            # --- START DIAGNOSTIC LOGGING ---
+            print(f"[DIAGNOSTIC SAVE LOG] Session ID: {self.id}, User: {self.user.username}, Device: {self.device_id}")
+            print(f"  - login_time: {self.login_time}")
+            print(f"  - last_active: {last_active}")
+            print(f"  - elapsed: {elapsed} seconds")
+            print(f"  - productive_seconds before capping: {self.productive_seconds}")
+            print(f"  - idle_seconds before capping: {self.idle_seconds}")
+            # --- END DIAGNOSTIC LOGGING ---
+            
             # Ensure none of these are negative
             if self.productive_seconds < 0:
                 self.productive_seconds = 0
@@ -98,11 +107,27 @@ class WorkSession(models.Model):
                 
             total = self.productive_seconds + self.idle_seconds
             if total > elapsed:
+                # Structured capping event log for production monitoring
+                print(f"[CAPPING TRIGGERED EVENT]")
+                print(f"  - session_id: {self.id}")
+                print(f"  - username: {self.user.username}")
+                print(f"  - device_id: {self.device_id}")
+                print(f"  - login_time: {self.login_time}")
+                print(f"  - last_active: {last_active}")
+                print(f"  - elapsed: {elapsed}")
+                print(f"  - productive_seconds: {self.productive_seconds}")
+                print(f"  - idle_seconds: {self.idle_seconds}")
+                print(f"  - total: {total}")
+                print(f"=========================")
+                
                 if self.productive_seconds > elapsed:
+                    print(f"    - Wiping/Capping: productive_seconds = {elapsed}, idle_seconds = 0 (previously {self.idle_seconds})")
                     self.productive_seconds = elapsed
                     self.idle_seconds = 0
                 else:
-                    self.idle_seconds = elapsed - self.productive_seconds
+                    new_idle = elapsed - self.productive_seconds
+                    print(f"    - Capping: idle_seconds = {new_idle} (previously {self.idle_seconds})")
+                    self.idle_seconds = new_idle
             
             self.tracked_seconds = self.productive_seconds + self.idle_seconds
             if self.tracked_seconds > 0:

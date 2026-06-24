@@ -222,6 +222,13 @@ class HeartbeatRequestSerializer(serializers.Serializer):
                 'key_presses', 'clicks', 'productive_seconds', 'idle_seconds', 
                 'tracked_seconds', 'break_count', 'activity_percentage', 'updated_at'
             ])
+            
+            # --- START TELEMETRY LOGGING ---
+            print(f"[HEARTBEAT TELEMETRY LOG] Session ID: {session.id}")
+            print(f"  - productive_seconds: {session.productive_seconds}")
+            print(f"  - idle_seconds: {session.idle_seconds}")
+            print(f"  - activity_percentage: {session.activity_percentage}")
+            # --- END TELEMETRY LOGGING ---
   
             session.refresh_from_db()
 
