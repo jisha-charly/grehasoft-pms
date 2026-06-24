@@ -573,7 +573,7 @@ import csv
 from django.http import HttpResponse
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
-from reportlab.lib.pagesizes import letter, landscape
+from reportlab.lib.pagesizes import letter, landscape, A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
@@ -926,7 +926,7 @@ def export_report_view(request):
         
         doc = SimpleDocTemplate(
             response, 
-            pagesize=landscape(letter),
+            pagesize=landscape(A4),
             rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30
         )
         
@@ -950,45 +950,45 @@ def export_report_view(request):
             doc.build(story)
             return response
             
-        # Define customized column layout for each report type
+        # Define customized column layout for each report type. Use newlines (\n) for headers in 14-column reports.
         report_columns = {
             'daily': [
-                ('employee_name', 'Employee Name'),
-                ('employee_code', 'Employee Code'),
+                ('employee_name', 'Employee\nName'),
+                ('employee_code', 'Employee\nCode'),
                 ('department', 'Department'),
                 ('date', 'Date'),
-                ('productive_time', 'Productive Time'),
-                ('idle_time', 'Idle Time'),
-                ('desktop_work_time', 'Desktop Work Time'),
-                ('portal_active_time', 'Portal Active Time'),
-                ('break_time', 'Break Time'),
-                ('unaccounted_time', 'Unaccounted Time'),
-                ('total_engagement_time', 'Total Engagement Time'),
-                ('workday_span', 'Workday Span'),
-                ('activity_percentage', 'Activity %'),
+                ('productive_time', 'Productive\nTime'),
+                ('idle_time', 'Idle\nTime'),
+                ('desktop_work_time', 'Desktop\nWork'),
+                ('portal_active_time', 'Portal\nActive'),
+                ('break_time', 'Break\nTime'),
+                ('unaccounted_time', 'Unaccounted\nTime'),
+                ('total_engagement_time', 'Total\nEngagement'),
+                ('workday_span', 'Workday\nSpan'),
+                ('activity_percentage', 'Activity\n%'),
                 ('status', 'Status')
             ],
             'reconciliation': [
-                ('employee_name', 'Employee Name'),
-                ('employee_code', 'Employee Code'),
+                ('employee_name', 'Employee\nName'),
+                ('employee_code', 'Employee\nCode'),
                 ('department', 'Department'),
                 ('date', 'Date'),
-                ('productive_time', 'Productive Time'),
-                ('idle_time', 'Idle Time'),
-                ('desktop_work_time', 'Desktop Work Time'),
-                ('portal_active_time', 'Portal Active Time'),
-                ('break_time', 'Break Time'),
-                ('unaccounted_time', 'Unaccounted Time'),
-                ('total_engagement_time', 'Total Engagement Time'),
-                ('workday_span', 'Workday Span'),
-                ('activity_percentage', 'Activity %'),
+                ('productive_time', 'Productive\nTime'),
+                ('idle_time', 'Idle\nTime'),
+                ('desktop_work_time', 'Desktop\nWork'),
+                ('portal_active_time', 'Portal\nActive'),
+                ('break_time', 'Break\nTime'),
+                ('unaccounted_time', 'Unaccounted\nTime'),
+                ('total_engagement_time', 'Total\nEngagement'),
+                ('workday_span', 'Workday\nSpan'),
+                ('activity_percentage', 'Activity\n%'),
                 ('status', 'Status')
             ],
             'weekly': [
                 ('Date', 'Date'),
-                ('Productive Hours', 'Productive Hours'),
-                ('Idle Hours', 'Idle Hours'),
-                ('Total Tracked', 'Total Tracked')
+                ('Productive Hours', 'Productive\nHours'),
+                ('Idle Hours', 'Idle\nHours'),
+                ('Total Tracked', 'Total\nTracked')
             ],
             'monthly': [
                 ('full_name', 'Full Name'),
@@ -999,19 +999,19 @@ def export_report_view(request):
                 ('activity_percentage', 'Activity %')
             ],
             'employee': [
-                ('employee_name', 'Employee Name'),
-                ('employee_code', 'Employee Code'),
+                ('employee_name', 'Employee\nName'),
+                ('employee_code', 'Employee\nCode'),
                 ('department', 'Department'),
                 ('date', 'Date'),
-                ('productive_time', 'Productive Time'),
-                ('idle_time', 'Idle Time'),
-                ('desktop_work_time', 'Desktop Work Time'),
-                ('portal_active_time', 'Portal Active Time'),
-                ('break_time', 'Break Time'),
-                ('unaccounted_time', 'Unaccounted Time'),
-                ('total_engagement_time', 'Total Engagement Time'),
-                ('workday_span', 'Workday Span'),
-                ('activity_percentage', 'Activity %'),
+                ('productive_time', 'Productive\nTime'),
+                ('idle_time', 'Idle\nTime'),
+                ('desktop_work_time', 'Desktop\nWork'),
+                ('portal_active_time', 'Portal\nActive'),
+                ('break_time', 'Break\nTime'),
+                ('unaccounted_time', 'Unaccounted\nTime'),
+                ('total_engagement_time', 'Total\nEngagement'),
+                ('workday_span', 'Workday\nSpan'),
+                ('activity_percentage', 'Activity\n%'),
                 ('status', 'Status')
             ]
         }
@@ -1024,24 +1024,40 @@ def export_report_view(request):
             keys = [k for k in data[0].keys() if not k.startswith('raw_')][:8]
             headers = [k.replace('_', ' ').title() for k in keys]
             
-        table_data = [headers]
-        for item in data:
-            row = [str(item.get(k) if item.get(k) is not None else '-') for k in keys]
-            table_data.append(row)
-            
         col_widths = None
         is_large_report = report_type in ['daily', 'reconciliation', 'employee'] and len(keys) == 14
         
         if is_large_report:
-            # colWidths in points to fit within 732 points of printable width
-            col_widths = [85, 55, 75, 55, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45]
-            
-        t = Table(table_data, colWidths=col_widths)
-        
+            # A4 landscape width is 841.89 points.
+            # Printable width with left/right margins of 30 is 781.89 points.
+            # Explicit column widths totaling 749 points:
+            col_widths = [90, 48, 80, 55, 48, 48, 48, 48, 48, 48, 48, 48, 44, 48]
+
         # Adjust font size and padding if we have many columns
         font_size_header = 7 if is_large_report else 10
         font_size_cell = 6 if is_large_report else 8
         padding_val = 3 if is_large_report else 6
+
+        # Create paragraph style for table headers to support multi-line text wrapping (ReportLab Table cells need Flowables for newlines/br)
+        header_text_style = ParagraphStyle(
+            'HeaderTextStyle',
+            parent=styles['Normal'],
+            fontName='Helvetica-Bold',
+            fontSize=font_size_header,
+            textColor=colors.whitesmoke,
+            alignment=1,  # Center alignment
+            leading=font_size_header + 2  # Adjust line height dynamically
+        )
+        
+        # Wrap header labels in Paragraph to render HTML <br/> line breaks
+        wrapped_headers = [Paragraph(h.replace('\n', '<br/>'), header_text_style) for h in headers]
+        
+        table_data = [wrapped_headers]
+        for item in data:
+            row = [str(item.get(k) if item.get(k) is not None else '-') for k in keys]
+            table_data.append(row)
+            
+        t = Table(table_data, colWidths=col_widths)
         
         t.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#4F46E5')),
