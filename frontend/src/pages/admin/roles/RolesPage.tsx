@@ -247,8 +247,19 @@ const RolesPage: React.FC = () => {
 
       {isModalOpen && (
         <div className="modal show d-block bg-dark bg-opacity-50" tabIndex={-1}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 rounded-4 overflow-hidden shadow-lg">
+         <div
+  className="modal-dialog modal-dialog-centered"
+  style={{
+    maxWidth: "1000px",
+    width: "95vw",
+  }}
+>
+           <div
+  className="modal-content border-0 rounded-4 shadow-lg"
+  style={{
+    maxHeight: "90vh",
+  }}
+>
               <form onSubmit={handleSubmit} noValidate>
                 <div className="modal-header border-0 pt-4 px-4 bg-white">
                   <h5 className="modal-title fw-bold text-dark">
@@ -286,7 +297,16 @@ const RolesPage: React.FC = () => {
                     ></textarea>
                     {errors.description && <div className="invalid-feedback">{errors.description}</div>}
                   </div>
-                  <div className="mt-4">
+                 <div
+  className="mt-4"
+  style={{
+    maxHeight: "320px",
+    overflowY: "auto",
+    border: "1px solid #e5e7eb",
+    borderRadius: "10px",
+    padding: "15px",
+  }}
+>
   <label className="form-label fw-bold">Permissions</label>
 
   <div className="row">
