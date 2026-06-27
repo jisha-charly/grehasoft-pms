@@ -20,19 +20,20 @@ from .serializers import (
     SEODailyWorkLogSerializer, SEOMonthlyTargetSerializer, SEOTaskSerializer, SEOReminderSerializer, SEOCredentialSerializer
 )
 from .utils import decrypt_password, encrypt_password
+from apps.projects.models import Client
 
 
 
 def is_admin(user):
-    return user.is_superuser or (user.role and user.role.name == "SUPER_ADMIN")
+    return user.is_authenticated and (user.is_superuser or (hasattr(user, 'role') and user.role and user.role.name == "SUPER_ADMIN"))
 
 
 def is_seo_manager(user):
-    return user.role and user.role.name == "SEO_MANAGER"
+    return user.is_authenticated and hasattr(user, 'role') and user.role and user.role.name == "SEO_MANAGER"
 
 
 def is_seo_executive(user):
-    return user.role and user.role.name == "SEO_EXECUTIVE"
+    return user.is_authenticated and hasattr(user, 'role') and user.role and user.role.name == "SEO_EXECUTIVE"
 
 
 class SEOActivityTypeViewSet(viewsets.ModelViewSet):
@@ -361,7 +362,7 @@ class SEODailyWorkLogViewSet(viewsets.ModelViewSet):
 
         if is_admin(user) or is_seo_manager(user):
             # Manager Dashboard KPIs
-            total_clients = Client.objects.count()
+            total_clients = Client.objects.filter(seo_websites__isnull=False).distinct().count()
             total_websites = Website.objects.count()
             active_projects = Website.objects.filter(status="active").count()
             
