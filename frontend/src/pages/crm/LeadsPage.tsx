@@ -26,6 +26,178 @@ type LeadFormValues = {
   login_credentials: string[];
 };
 
+interface ServiceItem {
+  label: string;
+  value: string;
+}
+
+interface ServiceCategory {
+  title: string;
+  emoji: string;
+  icon: string;
+  services: ServiceItem[];
+}
+
+const SERVICE_CATEGORIES: ServiceCategory[] = [
+  {
+    title: 'Website Development',
+    emoji: '🌐',
+    icon: 'bi-globe',
+    services: [
+      { label: 'Business Website', value: 'Business Website' },
+      { label: 'Corporate Website', value: 'Corporate Website' },
+      { label: 'Custom Website', value: 'Custom Website' },
+      { label: 'Dynamic Custom Website', value: 'Dynamic Custom Website' },
+      { label: 'HTML Website', value: 'HTML Website' },
+      { label: 'Landing Page', value: 'Landing Page' },
+      { label: 'LearnPress', value: 'LearnPress' },
+      { label: 'Portfolio Website', value: 'Portfolio Website' },
+      { label: 'Shopify', value: 'Shopify' },
+      { label: 'Website Maintenance', value: 'Website Maintenance' },
+      { label: 'Website Migration', value: 'Website Migration' },
+      { label: 'Website Redesign', value: 'Website Redesign' },
+      { label: 'Website Speed Optimization', value: 'Website Speed Optimization' },
+      { label: 'WooCommerce', value: 'WooCommerce' },
+      { label: 'WordPress Website', value: 'WordPress Website' }
+    ]
+  },
+  {
+    title: 'Software Development',
+    emoji: '💻',
+    icon: 'bi-laptop',
+    services: [
+      { label: 'Billing Software', value: 'Billing Software' },
+      { label: 'CRM Development', value: 'CRM Development' },
+      { label: 'Custom Software', value: 'Custom Software' },
+      { label: 'ERP Development', value: 'ERP Development' },
+      { label: 'Hospital Management', value: 'Hospital Management' },
+      { label: 'Hotel Management', value: 'Hotel Management' },
+      { label: 'HRMS', value: 'HRMS' },
+      { label: 'Inventory Management', value: 'Inventory Management' },
+      { label: 'Restaurant POS', value: 'Restaurant POS' },
+      { label: 'School Management', value: 'School Management' }
+    ]
+  },
+  {
+    title: 'Mobile App Development',
+    emoji: '📱',
+    icon: 'bi-phone',
+    services: [
+      { label: 'Android App', value: 'Android App' },
+      { label: 'Flutter App', value: 'Flutter App' },
+      { label: 'Hybrid App', value: 'Hybrid App' },
+      { label: 'iOS App', value: 'iOS App' },
+      { label: 'Mobile App', value: 'Mobile App' },
+      { label: 'Progressive Web App (PWA)', value: 'Progressive Web App (PWA)' },
+      { label: 'React Native App', value: 'React Native App' }
+    ]
+  },
+  {
+    title: 'Digital Marketing',
+    emoji: '📈',
+    icon: 'bi-graph-up-arrow',
+    services: [
+      { label: 'Content Marketing', value: 'Content Marketing' },
+      { label: 'Ecommerce SEO', value: 'Ecommerce SEO' },
+      { label: 'Email Marketing', value: 'Email Marketing' },
+      { label: 'Google Ads', value: 'Google Ads' },
+      { label: 'Local SEO', value: 'Local SEO' },
+      { label: 'Meta Ads', value: 'Meta Ads' },
+      { label: 'Online Reputation Management', value: 'Online Reputation Management' },
+      { label: 'SEO', value: 'SEO' },
+      { label: 'Social Media Marketing', value: 'Social Media Marketing' },
+      { label: 'Technical SEO', value: 'Technical SEO' },
+      { label: 'YouTube Marketing', value: 'YouTube Marketing' }
+    ]
+  },
+  {
+    title: 'Branding & Graphic Design',
+    emoji: '🎨',
+    icon: 'bi-palette',
+    services: [
+      { label: 'Banner Design', value: 'Banner Design' },
+      { label: 'Brand Identity', value: 'Brand Identity' },
+      { label: 'Branding', value: 'Branding' },
+      { label: 'Brochure', value: 'Brochure' },
+      { label: 'Business Card', value: 'Business Card' },
+      { label: 'Company Profile', value: 'Company Profile' },
+      { label: 'Flyer', value: 'Flyer' },
+      { label: 'Letter Head', value: 'Letter Head' },
+      { label: 'Letterhead', value: 'Letterhead' },
+      { label: 'Logo', value: 'Logo' },
+      { label: 'Logo Design', value: 'Logo Design' },
+      { label: 'Packaging Design', value: 'Packaging Design' },
+      { label: 'Poster Design', value: 'Poster Design' },
+      { label: 'Social Media Creatives', value: 'Social Media Creatives' },
+      { label: 'UI/UX Design', value: 'UI/UX Design' }
+    ]
+  },
+  {
+    title: 'Cloud & Hosting',
+    emoji: '☁️',
+    icon: 'bi-cloud-arrow-up',
+    services: [
+      { label: 'Backup Solution', value: 'Backup Solution' },
+      { label: 'Business Email', value: 'Business Email' },
+      { label: 'CDN', value: 'CDN' },
+      { label: 'Cloud Hosting', value: 'Cloud Hosting' },
+      { label: 'Dedicated Server', value: 'Dedicated Server' },
+      { label: 'Domain Registration', value: 'Domain Registration' },
+      { label: 'SSL Certificate', value: 'SSL Certificate' },
+      { label: 'VPS Hosting', value: 'VPS Hosting' },
+      { label: 'Web Hosting', value: 'Web Hosting' }
+    ]
+  },
+  {
+    title: 'IT Infrastructure',
+    emoji: '🔒',
+    icon: 'bi-shield-lock',
+    services: [
+      { label: 'Access Control', value: 'Access Control' },
+      { label: 'Biometric Attendance', value: 'Biometric Attendance' },
+      { label: 'CCTV', value: 'CCTV' },
+      { label: 'Cyber Security Audit', value: 'Cyber Security Audit' },
+      { label: 'Data Backup', value: 'Data Backup' },
+      { label: 'Firewall Setup', value: 'Firewall Setup' },
+      { label: 'Network Setup', value: 'Network Setup' },
+      { label: 'Server Installation', value: 'Server Installation' },
+      { label: 'VPN Setup', value: 'VPN Setup' }
+    ]
+  },
+  {
+    title: 'AI & Automation',
+    emoji: '🤖',
+    icon: 'bi-robot',
+    services: [
+      { label: 'AI Analytics', value: 'AI Analytics' },
+      { label: 'AI Chatbot', value: 'AI Chatbot' },
+      { label: 'AI Content Generation', value: 'AI Content Generation' },
+      { label: 'AI Voice Assistant', value: 'AI Voice Assistant' },
+      { label: 'CRM Automation', value: 'CRM Automation' },
+      { label: 'WhatsApp Chatbot', value: 'WhatsApp Chatbot' },
+      { label: 'Workflow Automation', value: 'Workflow Automation' }
+    ]
+  },
+  {
+    title: 'Other Services',
+    emoji: '⚙️',
+    icon: 'bi-gear-wide-connected',
+    services: [
+      { label: 'Annual Maintenance Contract (AMC)', value: 'Annual Maintenance Contract (AMC)' },
+      { label: 'API Integration', value: 'API Integration' },
+      { label: 'GPS Tracking', value: 'GPS Tracking' },
+      { label: 'IoT Solution', value: 'IoT Solution' },
+      { label: 'IT Consultation', value: 'IT Consultation' },
+      { label: 'Payment Gateway Integration', value: 'Payment Gateway Integration' },
+      { label: 'QR Code System', value: 'QR Code System' },
+      { label: 'Staff Training', value: 'Staff Training' },
+      { label: 'Technical Support', value: 'Technical Support' },
+      { label: 'Third-party Integration', value: 'Third-party Integration' },
+      { label: 'Other (Custom)', value: 'Other' }
+    ]
+  }
+];
+
 interface LeadsPageProps {
   users: User[];
   clients: Client[];
@@ -41,6 +213,8 @@ const LeadsPage: React.FC<LeadsPageProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [serviceSearch, setServiceSearch] = useState('');
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const {
     items: leadList,
     pagination: { page, setPage, totalPages },
@@ -135,6 +309,10 @@ const handleConfirmAssignmentDelete = async () => {
       required: true,
       pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
       message: 'Enter a valid corporate email address.'
+    },
+    service_required: {
+      validate: (value: string[]) => value && value.length > 0,
+      message: 'At least one service must be selected.'
     }
   };
 
@@ -226,6 +404,64 @@ const handleConfirmDelete = async () => {
   setDeleteModalOpen(false);
   setLeadToDelete(null);
 };
+  const handleExpandAll = () => {
+    const allExpanded = SERVICE_CATEGORIES.reduce((acc, cat) => {
+      acc[cat.title] = true;
+      return acc;
+    }, {} as Record<string, boolean>);
+    setExpandedCategories(allExpanded);
+  };
+
+  const handleCollapseAll = () => {
+    setExpandedCategories({});
+  };
+
+  const toggleCategory = (title: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [title]: !prev[title]
+    }));
+  };
+
+  const handleSelectAllCategory = (services: ServiceItem[]) => {
+    const currentSelected = new Set(values.service_required);
+    services.forEach(s => {
+      if (s.value === 'Other') {
+        if (!values.service_required.some(val => val === 'Other' || val.startsWith('Other: '))) {
+          currentSelected.add('Other');
+        }
+      } else {
+        currentSelected.add(s.value);
+      }
+    });
+    handleChange('service_required', Array.from(currentSelected));
+  };
+
+  const handleClearAllCategory = (services: ServiceItem[]) => {
+    const valuesToClear = new Set(services.map(s => s.value));
+    const newSelected = values.service_required.filter(val => {
+      if (val === 'Other' || val.startsWith('Other: ')) {
+        return !valuesToClear.has('Other');
+      }
+      return !valuesToClear.has(val);
+    });
+    handleChange('service_required', newSelected);
+  };
+
+  const getServiceLabel = (value: string) => {
+    if (value.startsWith('Other: ')) {
+      return value;
+    }
+    if (value === 'Other') {
+      return 'Other (Custom)';
+    }
+    for (const cat of SERVICE_CATEGORIES) {
+      const found = cat.services.find(s => s.value === value);
+      if (found) return found.label;
+    }
+    return value;
+  };
+
   const handleEdit = (lead: Lead) => {
     setEditingLead(lead);
     setValues({
@@ -247,12 +483,26 @@ const handleConfirmDelete = async () => {
       documents_given: lead.documents_given || [],
       login_credentials: lead.login_credentials || []
     });
+    setServiceSearch('');
+    const initialExpanded: Record<string, boolean> = {};
+    if (lead.service_required) {
+      lead.service_required.forEach(val => {
+        const cleanVal = val.startsWith('Other: ') ? 'Other' : val;
+        const cat = SERVICE_CATEGORIES.find(c => c.services.some(s => s.value === cleanVal));
+        if (cat) {
+          initialExpanded[cat.title] = true;
+        }
+      });
+    }
+    setExpandedCategories(initialExpanded);
     setModalOpen(true);
   };
 
   const handleAddNew = () => {
     setEditingLead(null);
     resetForm();
+    setServiceSearch('');
+    setExpandedCategories({});
     setModalOpen(true);
   };
 
@@ -403,6 +653,17 @@ const formatPhoneForWhatsApp = (phone: string) => {
   if (!phone) return '';
   return phone.replace(/\D/g, '');
 };
+
+const filteredCategories = SERVICE_CATEGORIES.map(category => {
+  const matchingServices = category.services.filter(s =>
+    s.label.toLowerCase().includes(serviceSearch.toLowerCase()) ||
+    category.title.toLowerCase().includes(serviceSearch.toLowerCase())
+  );
+  return {
+    ...category,
+    services: matchingServices
+  };
+}).filter(category => category.services.length > 0);
   return (
      <>
     <div className="container-fluid p-0">
@@ -690,42 +951,207 @@ const formatPhoneForWhatsApp = (phone: string) => {
                       </h6>
                     </div>
                     <div className="col-12">
-                      <div className="row g-2">
-                        {[
-                          { label: 'Logo', value: 'Logo' },
-                          { label: 'Branding', value: 'Branding' },
-                          { label: 'Poster Design', value: 'Poster Design' },
-                          { label: 'Letter Head', value: 'Letter Head' },
-                          { label: 'Business Card', value: 'Business Card' },
-                          { label: 'WordPress Website', value: 'WordPress Website' },
-                          { label: 'Shopify', value: 'Shopify' },
-                          { label: 'WooCommerce', value: 'WooCommerce' },
-                          { label: 'LearnPress', value: 'LearnPress' },
-                          { label: 'HTML Website', value: 'HTML Website' },
-                          { label: 'Dynamic Custom Website', value: 'Dynamic Custom Website' },
-                          { label: 'Custom Software', value: 'Custom Software' },
-                          { label: 'Mobile App', value: 'Mobile App' },
-                        ].map(service => (
-                          <div key={service.value} className="col-md-4">
-                            <div className="form-check">
-                              <input
-                                className="form-check-input"
-                                type="checkbox"
-                                id={`service_${service.value}`}
-                                checked={values.service_required.includes(service.value)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setValues({ ...values, service_required: [...values.service_required, service.value] });
-                                  } else {
-                                    setValues({ ...values, service_required: values.service_required.filter(s => s !== service.value) });
-                                  }
-                                }}
-                              />
-                              <label className="form-check-label small" htmlFor={`service_${service.value}`}>{service.label}</label>
-                            </div>
+                      {/* Selected Chips container */}
+                      {values.service_required.length > 0 && (
+                        <div className="mb-3">
+                          <label className="form-label small fw-bold text-secondary text-uppercase mb-1">Selected Services</label>
+                          <div className="d-flex flex-wrap gap-2 p-2 rounded bg-light border border-light-subtle">
+                            {values.service_required.map((serviceVal) => (
+                              <span 
+                                key={serviceVal} 
+                                className="badge bg-primary-subtle text-primary border border-primary d-flex align-items-center gap-1.5 py-1.5 px-2.5 rounded-pill"
+                                style={{ fontSize: '0.8rem' }}
+                              >
+                                <span>{getServiceLabel(serviceVal)}</span>
+                                <button 
+                                  type="button" 
+                                  className="btn-close text-primary ms-1" 
+                                  style={{ fontSize: '0.5rem', filter: 'none', background: 'none', border: 'none', padding: 0 }}
+                                  onClick={() => {
+                                    handleChange('service_required', values.service_required.filter(s => s !== serviceVal));
+                                  }}
+                                >
+                                  <i className="bi bi-x fs-6"></i>
+                                </button>
+                              </span>
+                            ))}
                           </div>
-                        ))}
+                        </div>
+                      )}
+
+                      {/* Search box & Accordion controls */}
+                      <div className="row g-2 align-items-center mb-3">
+                        <div className="col-12 col-sm">
+                          <div className="input-group input-group-sm">
+                            <span className="input-group-text bg-light border-end-0"><i className="bi bi-search text-muted"></i></span>
+                            <input 
+                              type="text" 
+                              className="form-control bg-light border-start-0 shadow-none" 
+                              placeholder="Search services..." 
+                              value={serviceSearch}
+                              onChange={(e) => setServiceSearch(e.target.value)}
+                            />
+                            {serviceSearch && (
+                              <button 
+                                type="button" 
+                                className="btn btn-outline-secondary" 
+                                onClick={() => setServiceSearch('')}
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="col-12 col-sm-auto d-flex justify-content-end">
+                          <div className="btn-group btn-group-sm w-100">
+                            <button 
+                              type="button" 
+                              className="btn btn-outline-primary fw-medium px-3"
+                              onClick={handleExpandAll}
+                            >
+                              Expand All
+                            </button>
+                            <button 
+                              type="button" 
+                              className="btn btn-outline-secondary fw-medium px-3"
+                              onClick={handleCollapseAll}
+                            >
+                              Collapse All
+                            </button>
+                          </div>
+                        </div>
                       </div>
+
+                      {/* Categories Accordion */}
+                      <div className="services-accordion-wrapper" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                        {filteredCategories.map((category) => {
+                          const selectedInCategory = category.services.filter(s => 
+                            values.service_required.includes(s.value)
+                          );
+                          const isOtherCategory = category.title === 'Other Services';
+                          const hasOtherSelected = isOtherCategory && values.service_required.some(s => s === 'Other' || s.startsWith('Other: '));
+                          const selectedCount = selectedInCategory.length + (hasOtherSelected ? 1 : 0);
+                          const totalCount = category.services.length;
+
+                          const isExpanded = serviceSearch ? true : !!expandedCategories[category.title];
+
+                          return (
+                            <div key={category.title} className="card border mb-2 overflow-hidden shadow-none rounded-3">
+                              <div 
+                                className="card-header bg-light d-flex justify-content-between align-items-center cursor-pointer py-2.5 px-3"
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                                onClick={() => toggleCategory(category.title)}
+                              >
+                                <div className="d-flex align-items-center gap-2">
+                                  <span className="fs-5">{category.emoji}</span>
+                                  <span className="fw-bold text-dark small">{category.title}</span>
+                                  <span className={`badge ${selectedCount > 0 ? 'bg-primary-subtle text-primary border border-primary' : 'bg-secondary-subtle text-secondary'} rounded-pill smaller`}>
+                                    {selectedCount}/{totalCount} Selected
+                                  </span>
+                                </div>
+                                <div className="d-flex align-items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                  <div className="btn-group btn-group-xs">
+                                    <button 
+                                      type="button" 
+                                      className="btn btn-outline-primary btn-xs py-0.5 px-2" 
+                                      style={{ fontSize: '0.7rem' }}
+                                      onClick={() => handleSelectAllCategory(category.services)}
+                                    >
+                                      Select All
+                                    </button>
+                                    <button 
+                                      type="button" 
+                                      className="btn btn-outline-secondary btn-xs py-0.5 px-2" 
+                                      style={{ fontSize: '0.7rem' }}
+                                      onClick={() => handleClearAllCategory(category.services)}
+                                    >
+                                      Clear All
+                                    </button>
+                                  </div>
+                                  <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} text-muted`}></i>
+                                </div>
+                              </div>
+                              
+                              <div 
+                                className={`collapse ${isExpanded ? 'show' : ''}`}
+                                style={{ transition: 'all 0.3s ease-out' }}
+                              >
+                                <div className="card-body py-3 px-3 bg-white">
+                                  <div className="row g-2">
+                                    {category.services.map((service) => {
+                                      const isOtherItem = service.value === 'Other';
+                                      const isChecked = isOtherItem 
+                                        ? values.service_required.some(s => s === 'Other' || s.startsWith('Other: '))
+                                        : values.service_required.includes(service.value);
+
+                                      return (
+                                        <div key={service.value} className="col-md-6 col-lg-4">
+                                          <div className={`form-check p-2 rounded border hover-bg-light transition h-100 d-flex flex-column justify-content-center ${isChecked ? 'border-primary bg-primary bg-opacity-10' : 'border-light-subtle'}`}>
+                                            <div className="d-flex align-items-center">
+                                              <input
+                                                className="form-check-input ms-1 me-2 flex-shrink-0"
+                                                type="checkbox"
+                                                id={`service_${service.value}`}
+                                                checked={isChecked}
+                                                onChange={(e) => {
+                                                  if (isOtherItem) {
+                                                    if (e.target.checked) {
+                                                      handleChange('service_required', [...values.service_required, 'Other']);
+                                                    } else {
+                                                      handleChange('service_required', values.service_required.filter(s => s !== 'Other' && !s.startsWith('Other: ')));
+                                                    }
+                                                  } else {
+                                                    if (e.target.checked) {
+                                                      handleChange('service_required', [...values.service_required, service.value]);
+                                                    } else {
+                                                      handleChange('service_required', values.service_required.filter(s => s !== service.value));
+                                                    }
+                                                  }
+                                                }}
+                                              />
+                                              <label className="form-check-label small cursor-pointer flex-grow-1" htmlFor={`service_${service.value}`}>
+                                                {service.label}
+                                              </label>
+                                            </div>
+                                            {isOtherItem && isChecked && (
+                                              <div className="mt-2 px-2 pb-1" onClick={(e) => e.stopPropagation()}>
+                                                <input
+                                                  type="text"
+                                                  className="form-control form-control-sm"
+                                                  placeholder="Enter custom requirement..."
+                                                  value={
+                                                    values.service_required.find(s => s.startsWith('Other: '))?.replace('Other: ', '') || ''
+                                                  }
+                                                  onChange={(e) => {
+                                                    const newText = e.target.value;
+                                                    const updated = values.service_required.filter(s => s !== 'Other' && !s.startsWith('Other: '));
+                                                    if (newText.trim()) {
+                                                      updated.push(`Other: ${newText}`);
+                                                    } else {
+                                                      updated.push('Other');
+                                                    }
+                                                    handleChange('service_required', updated);
+                                                  }}
+                                                />
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {errors.service_required && (
+                        <div className="text-danger smaller mt-1 fw-medium animate-fade-in">
+                          <i className="bi bi-exclamation-circle me-1"></i>
+                          {errors.service_required}
+                        </div>
+                      )}
                     </div>
 
                     {/* PROJECT DETAILS SECTION */}
