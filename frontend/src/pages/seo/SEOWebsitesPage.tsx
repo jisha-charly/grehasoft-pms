@@ -25,7 +25,7 @@ const SEOWebsitesPage: React.FC = () => {
   };
 
   const fetchClients = async () => {
-    const res = await axiosInstance.get("/clients/");
+    const res = await axiosInstance.get("/clients/?all=true");
     setClients(res.data.results || res.data);
   };
 

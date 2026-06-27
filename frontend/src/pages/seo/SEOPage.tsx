@@ -117,7 +117,7 @@ const SEOPage: React.FC = () => {
       setLoading(true);
       const [webRes, clientRes, userRes, actTypeRes, logRes, targetRes, taskRes, reminderRes, credRes] = await Promise.all([
         axiosInstance.get("/websites/"),
-        axiosInstance.get("/clients/"),
+        axiosInstance.get("/clients/?all=true"),
         isManager ? axiosInstance.get("/users/") : Promise.resolve({ data: [] }),
         axiosInstance.get("/seo-activity-types/"),
         axiosInstance.get("/seo-daily-logs/"),

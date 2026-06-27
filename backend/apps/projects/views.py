@@ -27,6 +27,35 @@ class ClientViewSet(viewsets.ModelViewSet):
     permission_classes = [HasPermission]
     required_permission = 'VIEW_CLIENTS'
    
+    def list(self, request, *args, **kwargs):
+        if request.query_params.get('all') == 'true':
+            from rest_framework.response import Response
+            user = request.user
+            role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+            is_admin_or_manager = getattr(user, 'is_superuser', False) or role_name in ['SUPER_ADMIN', 'SEO_MANAGER', 'PROJECT_MANAGER', 'SALES_MANAGER']
+            
+            if is_admin_or_manager:
+                clients_qs = Client.objects.all()
+            else:
+                clients_qs = Client.objects.filter(projects__members__user=user).distinct()
+            
+            clients_data = []
+            for c in clients_qs:
+                company = c.company_name.strip() if c.company_name else None
+                contact = c.name.strip() if c.name else None
+                display_name = company or contact or f"Client #{c.id}"
+                
+                clients_data.append({
+                    "id": c.id,
+                    "company_name": display_name,
+                    "contact_person": contact
+                })
+            
+            clients_data.sort(key=lambda x: x["company_name"].lower())
+            return Response(clients_data)
+            
+        return super().list(request, *args, **kwargs)
+
     def perform_create(self, serializer):
      serializer.save()
 
