@@ -12,13 +12,21 @@ class SEOActivityTypeSerializer(serializers.ModelSerializer):
 
 
 class WebsiteSerializer(serializers.ModelSerializer):
-    client_name = serializers.CharField(source="client.company_name", read_only=True)
+    client_name = serializers.SerializerMethodField(read_only=True)
     executive_name = serializers.CharField(source="assigned_executive.name", default="", read_only=True)
     assigned_by_name = serializers.CharField(source="assigned_by.name", default="", read_only=True)
 
     class Meta:
         model = Website
         fields = "__all__"
+
+    def get_client_name(self, obj):
+        if obj.client:
+            company = obj.client.company_name.strip() if obj.client.company_name else None
+            contact = obj.client.name.strip() if obj.client.name else None
+            email = obj.client.email.strip() if obj.client.email else None
+            return company or contact or email or f"Client #{obj.client.id}"
+        return ""
 
 
 class KeywordSerializer(serializers.ModelSerializer):
