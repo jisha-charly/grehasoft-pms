@@ -32,83 +32,152 @@ const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects, setLe
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [selectedLeadId, setSelectedLeadId] = useState<number | ''>('');
+  const [hasImported, setHasImported] = useState(false);
+  const [importedLeadId, setImportedLeadId] = useState<number | ''>('');
+  const [isItemsDirty, setIsItemsDirty] = useState(false);
   const location = useLocation();
 
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   const params = new URLSearchParams(location.search);
   const leadId = params.get("lead");
- useEffect(() => {
-  if (leadId) {
-    axiosInstance.get(`/leads/${leadId}/`).then(res => {
-      const lead = res.data;
+  useEffect(() => {
+    if (leadId) {
+      axiosInstance.get(`/leads/${leadId}/`).then(res => {
+        const lead = res.data;
 
-      setSelectedLeadId(lead.id);   // ⭐ important
-      setClientName(lead.name);
-      setEmail(lead.email);
-      setPhone(lead.phone);
+        setSelectedLeadId(lead.id);   // ⭐ important
+        setClientName(lead.name);
+        setEmail(lead.email);
+        setPhone(lead.phone);
 
-      setModalOpen(true);
-    });
-  }
-}, [leadId]);
+        if (!editingProposal) {
+          if (lead.service_required && lead.service_required.length > 0) {
+            const importedItems = lead.service_required.map((s: string) => {
+              const serviceName = s.startsWith('Other: ') ? s.replace('Other: ', '') : s;
+              return {
+                service: serviceName,
+                description: '',
+                cost: 0
+              };
+            });
+            setItems(importedItems);
+            setHasImported(true);
+          } else {
+            setItems([{ service: '', description: '', cost: 0 }]);
+            setHasImported(false);
+          }
+          setImportedLeadId(lead.id);
+          setIsItemsDirty(false);
+        }
 
- useEffect(() => {
-  if (editingProposal) {
-    // ✅ Existing logic
-    setItems(editingProposal.items || [{ service: '', description: '', cost: 0 }]);
-    setDiscount(editingProposal.discount || 0);
-
-    // 🔥 ADD THIS BLOCK
-    const lead = leads.find(l => l.id === editingProposal.leadId);
-
-    if (lead) {
-      setSelectedLeadId(lead.id);   // ✅ FIX DROPDOWN
-      setClientName(lead.name);
-      setEmail(lead.email);
-      setPhone(lead.phone);
+        setModalOpen(true);
+      });
     }
-
-  } else {
-    setItems([{ service: '', description: '', cost: 0 }]);
-    setDiscount(0);
-
-    // 🔥 Reset when creating new
-    setSelectedLeadId('');
-    setClientName('');
-    setEmail('');
-    setPhone('');
-  }
-}, [editingProposal, isModalOpen, leads]);
-
+  }, [leadId, editingProposal]);
 
   useEffect(() => {
-  if (!selectedLeadId) return;
+    if (editingProposal) {
+      // ✅ Existing logic
+      setItems(editingProposal.items || [{ service: '', description: '', cost: 0 }]);
+      setDiscount(editingProposal.discount || 0);
 
-  const lead = leads.find(l => l.id === Number(selectedLeadId));
+      // 🔥 ADD THIS BLOCK
+      const lead = leads.find(l => l.id === editingProposal.leadId);
 
-  if (lead) {
-    setClientName(lead.name);
-    setEmail(lead.email);
-    setPhone(lead.phone);
-  }
-}, [selectedLeadId, leads]);
+      if (lead) {
+        setSelectedLeadId(lead.id);   // ✅ FIX DROPDOWN
+        setClientName(lead.name);
+        setEmail(lead.email);
+        setPhone(lead.phone);
+      }
+    } else {
+      if (!isModalOpen) {
+        setItems([{ service: '', description: '', cost: 0 }]);
+        setDiscount(0);
+
+        // 🔥 Reset when creating new
+        setSelectedLeadId('');
+        setClientName('');
+        setEmail('');
+        setPhone('');
+        setHasImported(false);
+        setImportedLeadId('');
+        setIsItemsDirty(false);
+      }
+    }
+  }, [editingProposal, isModalOpen, leads]);
+
+  useEffect(() => {
+    if (!selectedLeadId) {
+      if (!editingProposal) {
+        setClientName('');
+        setEmail('');
+        setPhone('');
+        setItems([{ service: '', description: '', cost: 0 }]);
+        setHasImported(false);
+        setImportedLeadId('');
+      }
+      return;
+    }
+
+    const lead = leads.find(l => l.id === Number(selectedLeadId));
+
+    if (lead) {
+      setClientName(lead.name);
+      setEmail(lead.email);
+      setPhone(lead.phone);
+
+      if (!editingProposal && selectedLeadId !== importedLeadId) {
+        if (lead.service_required && lead.service_required.length > 0) {
+          const importedItems = lead.service_required.map((s: string) => {
+            const serviceName = s.startsWith('Other: ') ? s.replace('Other: ', '') : s;
+            return {
+              service: serviceName,
+              description: '',
+              cost: 0
+            };
+          });
+          setItems(importedItems);
+          setHasImported(true);
+        } else {
+          setItems([{ service: '', description: '', cost: 0 }]);
+          setHasImported(false);
+        }
+        setImportedLeadId(selectedLeadId);
+        setIsItemsDirty(false);
+      }
+    }
+  }, [selectedLeadId, leads, editingProposal, importedLeadId]);
 
   const subtotal = items.reduce((sum, item) => sum + (Number(item.cost) || 0), 0);
   const totalAmount = subtotal - discount;
 
   const handleAddItem = () => {
     setItems([...items, { service: '', description: '', cost: 0 }]);
+    setIsItemsDirty(true);
   };
 
   const handleRemoveItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
+    setIsItemsDirty(true);
   };
 
   const handleItemChange = (index: number, field: keyof ProposalItem, value: string | number) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
     setItems(newItems);
+    setIsItemsDirty(true);
+  };
+
+  const handleLeadChange = (newLeadId: number | '') => {
+    if (!editingProposal && isItemsDirty) {
+      const confirmChange = window.confirm("You have edited the service items. Are you sure you want to change the selected lead and replace the current service list?");
+      if (!confirmChange) {
+        return;
+      }
+    }
+    setSelectedLeadId(newLeadId);
   };
   const [errors, setErrors] = useState<any>({});
   const validateForm = () => {
@@ -424,11 +493,14 @@ const handleConvert = async (proposal: Proposal) => {
                   <div className="row">
                     <div className="col-md-6 mb-3">
                       <label className="form-label small fw-bold">Lead</label>
-                     <select
+                      <select
   name="leadId"
   className="form-select"
   value={selectedLeadId || ""} 
-  onChange={(e) => setSelectedLeadId(Number(e.target.value))}
+  onChange={(e) => {
+    const val = e.target.value ? Number(e.target.value) : '';
+    handleLeadChange(val);
+  }}
   required
 >
   <option value="">Select Lead</option>
@@ -477,6 +549,15 @@ const handleConvert = async (proposal: Proposal) => {
                       <i className="bi bi-plus-lg me-1"></i>Add Item
                     </button>
                   </div>
+
+                  {hasImported && (
+                    <div className="alert alert-info py-2 px-3 mb-3 small d-flex align-items-start gap-2 border-0 bg-info-subtle text-info-emphasis rounded-3">
+                      <i className="bi bi-info-circle-fill mt-0.5"></i>
+                      <div>
+                        The services below were automatically imported from the selected lead. You can edit, remove, or add additional services before saving the proposal.
+                      </div>
+                    </div>
+                  )}
 
                   <div className="table-responsive">
                     <table className="table table-sm table-bordered">
