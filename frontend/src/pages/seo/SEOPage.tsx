@@ -118,7 +118,7 @@ const SEOPage: React.FC = () => {
       const [webRes, clientRes, userRes, actTypeRes, logRes, targetRes, taskRes, reminderRes, credRes] = await Promise.all([
         axiosInstance.get("/websites/"),
         axiosInstance.get("/clients/?all=true"),
-        isManager ? axiosInstance.get("/users/") : Promise.resolve({ data: [] }),
+        isManager ? axiosInstance.get("/users/?all=true&role_name=SEO_EXECUTIVE&is_active=true") : Promise.resolve({ data: [] }),
         axiosInstance.get("/seo-activity-types/"),
         axiosInstance.get("/seo-daily-logs/"),
         axiosInstance.get("/seo-monthly-targets/"),
@@ -1941,7 +1941,7 @@ const SEOPage: React.FC = () => {
                       <select className="form-select" value={targetForm.executive} onChange={e => setTargetForm({ ...targetForm, executive: e.target.value })} required>
                         <option value="">Select Executive</option>
                         {executives.map(ex => (
-                          <option key={ex.id} value={ex.id}>{ex.name || ex.username}</option>
+                          <option key={ex.id} value={ex.id}>{ex.name ? `${ex.name} (${ex.username})` : ex.username}</option>
                         ))}
                       </select>
                     </div>
@@ -2255,7 +2255,7 @@ const SEOPage: React.FC = () => {
                     <label className="form-label small text-muted fw-bold">ASSIGNED EXECUTIVE</label>
                     <select className="form-select" value={websiteForm.assigned_executive || ""} onChange={e => setWebsiteForm({ ...websiteForm, assigned_executive: e.target.value ? Number(e.target.value) : null })}>
                       <option value="">Unassigned</option>
-                      {executives.map(ex => <option key={ex.id} value={ex.id}>{ex.name || ex.username}</option>)}
+                      {executives.map(ex => <option key={ex.id} value={ex.id}>{ex.name ? `${ex.name} (${ex.username})` : ex.username}</option>)}
                     </select>
                   </div>
                   <div className="row g-2 mb-3">
@@ -2608,7 +2608,7 @@ const SEOPage: React.FC = () => {
                     <label className="form-label small text-muted fw-bold">EXECUTIVE *</label>
                     <select className="form-select" value={targetForm.executive} onChange={e => setTargetForm({ ...targetForm, executive: e.target.value })} required>
                       <option value="">Select Executive</option>
-                      {executives.map(ex => <option key={ex.id} value={ex.id}>{ex.name || ex.username}</option>)}
+                      {executives.map(ex => <option key={ex.id} value={ex.id}>{ex.name ? `${ex.name} (${ex.username})` : ex.username}</option>)}
                     </select>
                   </div>
                   <div className="mb-3">
@@ -2674,7 +2674,7 @@ const SEOPage: React.FC = () => {
                     <label className="form-label small text-muted fw-bold">ASSIGNED EXECUTIVE *</label>
                     <select className="form-select" value={taskForm.assigned_executive} onChange={e => setTaskForm({ ...taskForm, assigned_executive: e.target.value })} required>
                       <option value="">Select Executive</option>
-                      {executives.map(ex => <option key={ex.id} value={ex.id}>{ex.name || ex.username}</option>)}
+                      {executives.map(ex => <option key={ex.id} value={ex.id}>{ex.name ? `${ex.name} (${ex.username})` : ex.username}</option>)}
                     </select>
                   </div>
                   <div className="row g-2 mb-3">
@@ -2732,7 +2732,7 @@ const SEOPage: React.FC = () => {
                     <label className="form-label small text-muted fw-bold">ASSIGNED EXECUTIVE *</label>
                     <select className="form-select" value={reminderForm.assigned_executive} onChange={e => setReminderForm({ ...reminderForm, assigned_executive: e.target.value })} required>
                       <option value="">Select Executive</option>
-                      {executives.map(ex => <option key={ex.id} value={ex.id}>{ex.name || ex.username}</option>)}
+                      {executives.map(ex => <option key={ex.id} value={ex.id}>{ex.name ? `${ex.name} (${ex.username})` : ex.username}</option>)}
                     </select>
                   </div>
                   <div className="row g-2 mb-3">

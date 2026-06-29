@@ -50,6 +50,20 @@ class User(AbstractUser, SoftDeleteModel):
         choices=[('active', 'Active'), ('inactive', 'Inactive')], 
         default='active'
     )
+    client = models.ForeignKey(
+        'projects.Client',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='associated_users'
+    )
+    profile_photo = models.ImageField(upload_to='profile_photos/', null=True, blank=True)
+
+    def get_associated_client(self):
+        if self.client:
+            return self.client
+        from apps.projects.models import Client
+        return Client.objects.filter(email=self.email).first()
 
     class Meta:
         db_table = 'users'

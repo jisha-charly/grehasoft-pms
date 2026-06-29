@@ -18,6 +18,7 @@ from django.core.mail import send_mail
 from .email_service import send_invoice_email
 import tempfile
 from rest_framework.decorators import api_view, permission_classes
+from apps.projects.utils import log_failed_attempt
 from rest_framework.permissions import IsAuthenticated
 from django.views.decorators.csrf import csrf_exempt
 from reportlab.lib.pagesizes import A4
@@ -40,6 +41,25 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     "invoice_number",
     "client__name"
 ]
+    def get_queryset(self):
+        user = self.request.user
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+        
+        if role_name == 'CLIENT':
+            client = user.get_associated_client()
+            if client:
+                return Invoice.objects.filter(client=client).order_by("-id")
+            return Invoice.objects.none()
+            
+        return Invoice.objects.all().order_by("-id")
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
+        if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:
+            log_failed_attempt(request.user, f"Tried to write invoice via {request.method}")
+            self.permission_denied(request, message="Clients do not have permission to modify invoices.")
+
     @action(detail=False, methods=["get"], url_path="next-number")
     def next_number(self, request):
         number = generate_invoice_number()
@@ -49,6 +69,25 @@ class InvoicePaymentViewSet(viewsets.ModelViewSet):
 
     queryset = InvoicePayment.objects.all()
     serializer_class = InvoicePaymentSerializer    
+
+    def get_queryset(self):
+        user = self.request.user
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+        
+        if role_name == 'CLIENT':
+            client = user.get_associated_client()
+            if client:
+                return InvoicePayment.objects.filter(invoice__client=client)
+            return InvoicePayment.objects.none()
+            
+        return InvoicePayment.objects.all()
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
+        if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:
+            log_failed_attempt(request.user, f"Tried to write invoice payment via {request.method}")
+            self.permission_denied(request, message="Clients do not have permission to modify invoice payments.")
 
 @api_view(["GET"])
 def invoice_analytics(request):
@@ -75,7 +114,26 @@ def invoice_analytics(request):
     })
 def download_invoice(request, pk):
     try:
+        user = request.user
+        if not user.is_authenticated:
+            return HttpResponse("Unauthorized", status=401)
+            
         invoice = Invoice.objects.get(id=pk)
+        
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+        if role_name == 'CLIENT':
+            client = user.get_associated_client()
+            if not client or invoice.client != client:
+                log_failed_attempt(user, f"Tried to download Invoice ID {invoice.id} (owned by another client)")
+                return HttpResponse("Forbidden", status=403)
+                
+        # Audit logging
+        from apps.activity.models import ActivityLog
+        ActivityLog.objects.create(
+            user=user,
+            action=f"Downloaded invoice {invoice.invoice_number}"
+        )
+            
         pdf_path = generate_invoice_pdf(invoice)
 
         with open(pdf_path, "rb") as pdf:

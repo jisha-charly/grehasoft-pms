@@ -25,14 +25,14 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'name', 'username', 'email', 'role', 'role_name', 'role_permissions',
             'department', 'department_name', 'status', 'is_active', 
             'date_joined', 'last_login','position', 'joining_date', 'salary_monthly','address',
-            'is_superuser'
+            'is_superuser', 'client', 'profile_photo'
         ]
         read_only_fields = ['last_login', 'date_joined']
 
 class UserCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'name', 'username', 'email', 'password', 'role', 'department', 'status','position', 'joining_date', 'salary_monthly','address']
+        fields = ['id', 'name', 'username', 'email', 'password', 'role', 'department', 'status','position', 'joining_date', 'salary_monthly','address', 'client', 'profile_photo']
         extra_kwargs = {'password': {'write_only': True}}
         read_only_fields = ['id']
 
@@ -85,6 +85,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "department",
             "date_joined",
             "last_login",
-            "is_superuser"
+            "is_superuser",
+            "client",
+            "profile_photo"
         ]
         read_only_fields = ["role", "department", "date_joined", "last_login", "is_superuser"]

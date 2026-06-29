@@ -20,13 +20,39 @@ class MilestoneSerializer(serializers.ModelSerializer):
         model = Milestone
         fields = "__all__"
 
+class ClientSummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Client
+        fields = ["id", "company_name", "name", "email"]
+
 class ProjectSerializer(serializers.ModelSerializer):
-    client_name = serializers.CharField(source='client.company_name', read_only=True)
+    client = ClientSummarySerializer(read_only=True)
+    client_id = serializers.PrimaryKeyRelatedField(
+        source="client",
+        queryset=Client.objects.all(),
+        write_only=True,
+        required=False,
+    )
+    client_name = serializers.CharField(source='client.name', read_only=True)
+    client_company = serializers.CharField(source='client.company_name', read_only=True)
+    client_email = serializers.EmailField(source='client.email', read_only=True)
     milestones = MilestoneSerializer(many=True, read_only=True)
 
     class Meta:
         model = Project
         fields = '__all__'
+
+    def to_internal_value(self, data):
+        # Backward compatibility for frontend when it passes client as ID instead of client_id
+        if 'client' in data:
+            val = data['client']
+            if isinstance(val, list) and val:
+                val = val[0]
+            if isinstance(val, (int, str, float)):
+                data = data.copy()
+                data['client_id'] = val
+                data.pop('client', None)
+        return super().to_internal_value(data)
 
 
 

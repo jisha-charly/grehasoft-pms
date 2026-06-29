@@ -6,6 +6,7 @@ import { useForm } from '../../hooks/useForm';
 import { useCrud } from '../../hooks/useCrud';
 import FormField from '../../components/FormField';
 import DeleteConfirmModal from '@/components/DeleteConfirmModal';
+import { getClientDisplayName } from '../../utils/clientDisplay';
 
 interface ProjectsPageProps {
   users: User[];
@@ -125,7 +126,7 @@ const handleDeleteConfirm = async () => {
   const filteredProjects = useMemo(() => {
     return projects.filter(p => 
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.clientName?.toLowerCase().includes(searchTerm.toLowerCase())
+      getClientDisplayName(p.client).toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [projects, searchTerm]);
 
@@ -193,7 +194,7 @@ const pageNumbers: number[] = Array.from(
                   {p.status.replace('_', ' ')}
                 </span>
               </div>
-              <p className="text-secondary small mb-4"><i className="bi bi-building me-1"></i> {p.clientName || 'Internal Project'}</p>
+              <p className="text-secondary small mb-4"><i className="bi bi-building me-1"></i> {getClientDisplayName(p.client)}</p>
               
               <div className="mb-4">
                 <div className="d-flex justify-content-between mb-1 small fw-bold">
@@ -332,7 +333,7 @@ const pageNumbers: number[] = Array.from(
                     <option value="">Select Client</option>
                     {clients.map(c => (
                       <option key={c.id} value={c.id}>
-                        {c.name}
+                        {getClientDisplayName(c)}
                       </option>
                     ))}
                   </select>

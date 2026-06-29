@@ -74,3 +74,50 @@ class ProposalSerializer(serializers.ModelSerializer):
                 ProposalItem.objects.create(proposal=instance, **item)
 
         return instance
+
+
+class ClientProposalSerializer(serializers.ModelSerializer):
+    items = ProposalItemSerializer(many=True, read_only=True)
+    proposal_number = serializers.SerializerMethodField()
+    client_details = serializers.SerializerMethodField()
+    leadName = serializers.CharField(source='lead.name', read_only=True)
+    leadEmail = serializers.CharField(source='lead.email', read_only=True)
+    leadPhone = serializers.CharField(source='lead.phone', read_only=True)
+
+    class Meta:
+        model = Proposal
+        fields = [
+            "id",
+            "proposal_number",
+            "title",
+            "description",
+            "project_overview",
+            "subtotal",
+            "discount",
+            "amount",
+            "status",
+            "client",
+            "client_details",
+            "items",
+            "created_at",
+            "is_converted",
+            "leadName",
+            "leadEmail",
+            "leadPhone",
+        ]
+        read_only_fields = fields
+
+    def get_proposal_number(self, obj):
+        return f"PROP-{obj.id:04d}"
+
+    def get_client_details(self, obj):
+        if obj.client:
+            return {
+                "id": obj.client.id,
+                "name": obj.client.name,
+                "company_name": obj.client.company_name,
+                "email": obj.client.email,
+                "phone": obj.client.phone,
+                "address": obj.client.address,
+            }
+        return None

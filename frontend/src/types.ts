@@ -186,7 +186,7 @@ export interface User {
   username: string;
   email: string;
 
-  role_name?: string;
+  role_name: string;
   role_permissions?: Permission[];
 
   department?: number | null;
@@ -206,6 +206,8 @@ export interface User {
   salary_monthly?: number | string;
   address?: string;
   is_superuser?: boolean;
+  client?: number | null;
+  profile_photo?: string | null;
 }
 
 
@@ -253,6 +255,14 @@ export interface Project {
   name: string;
   clientId: number;
   clientName?: string;
+  client?: {
+    id: number;
+    company_name?: string;
+    name?: string;
+    full_name?: string;
+    email?: string;
+  };
+  client_id?: number;
   department: number;
   project_manager: number;
   createdBy: number;

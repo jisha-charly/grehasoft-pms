@@ -68,3 +68,33 @@ class IsTeamMember(permissions.BasePermission):
         if not request.user.is_authenticated or not request.user.role:
             return False
         return request.user.role.name in ['SUPER_ADMIN', 'PROJECT_MANAGER', 'TEAM_MEMBER']
+
+
+class IsClientOwner(permissions.BasePermission):
+    """
+    Object-level permission to restrict access to clients owning the object.
+    """
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+            
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+        if role_name == 'CLIENT':
+            client = user.get_associated_client()
+            if not client:
+                return False
+            
+            # Check if obj itself is Client
+            from apps.projects.models import Client
+            if isinstance(obj, Client):
+                return obj == client
+                
+            # Check if obj has a client field
+            if hasattr(obj, 'client'):
+                return obj.client == client
+                
+            return False
+            
+        return True
+

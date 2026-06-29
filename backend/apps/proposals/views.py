@@ -1,22 +1,50 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
 from datetime import timedelta
-
 from apps.projects.serializers import ProjectSerializer
-
 from .models import Proposal
-from .serializers import ProposalSerializer
-
-from apps.projects.models import Project
-from apps.projects.models import Client
+from .serializers import ProposalSerializer, ClientProposalSerializer
+from apps.projects.models import Project, Client
+from core.permissions import IsClientOwner
 
 
 class ProposalViewSet(viewsets.ModelViewSet):
 
     queryset = Proposal.objects.all().order_by("-created_at")
     serializer_class = ProposalSerializer
+    permission_classes = [permissions.IsAuthenticated, IsClientOwner]
+
+    def get_serializer_class(self):
+        user = self.request.user
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+        if role_name == 'CLIENT':
+            return ClientProposalSerializer
+        return ProposalSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+        
+        if role_name == 'CLIENT':
+            client = user.get_associated_client()
+            if not client:
+                return Proposal.objects.none()
+            if getattr(self, 'detail', False) or self.action in ['retrieve', 'update', 'partial_update', 'destroy', 'send', 'convert'] or 'pk' in self.kwargs:
+                return Proposal.objects.all().order_by("-created_at")
+            return Proposal.objects.filter(client=client).order_by("-created_at")
+            
+        return Proposal.objects.all().order_by("-created_at")
+
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
+        if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:
+            from apps.projects.utils import log_failed_attempt
+            log_failed_attempt(request.user, f"Tried to write proposal via {request.method}")
+            self.permission_denied(request, message="Clients do not have permission to modify proposals.")
 
 
     @action(detail=True, methods=["post"])

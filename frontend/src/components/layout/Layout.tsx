@@ -22,7 +22,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   type NavItem = {
     label: string;
     icon: string;
-    permission: Permission;
+    permission?: Permission;
     path?: string;
     children?: NavChild[];
   };
@@ -106,22 +106,37 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     },
   ];
 
+  const isClient = user?.role_name === "CLIENT";
+
+  const clientNavConfig = [
+    { label: "Dashboard", path: "/client/dashboard", icon: "bi-speedometer2" },
+    { label: "Projects", path: "/client/projects", icon: "bi-briefcase" },
+    { label: "Daily Work Updates", path: "/client/updates", icon: "bi-journal-text" },
+    { label: "SEO Reports", path: "/client/seo", icon: "bi-graph-up-arrow" },
+    { label: "Documents", path: "/client/documents", icon: "bi-file-earmark-medical" },
+    { label: "Invoices", path: "/client/invoices", icon: "bi-cash-stack" },
+    { label: "Notifications", path: "/client/notifications", icon: "bi-bell" },
+    { label: "Profile", path: "/client/profile", icon: "bi-person-circle" },
+  ];
+
   const hasAccess = (permission?: Permission) => {
     return !!(permission && hasPermission(permission));
   };
 
-  const accessibleNavConfig = navigationConfig.map(item => {
-    if (item.children) {
-      const accessibleChildren = item.children.filter(child =>
-        hasAccess(child.permission || item.permission)
-      );
-      if (accessibleChildren.length > 0 || hasAccess(item.permission)) {
-        return { ...item, children: accessibleChildren };
-      }
-      return null;
-    }
-    return hasAccess(item.permission) ? item : null;
-  }).filter(Boolean) as NavItem[];
+  const accessibleNavConfig: NavItem[] = isClient
+    ? (clientNavConfig as unknown as NavItem[])
+    : navigationConfig.map((item: NavItem) => {
+        if (item.children) {
+          const accessibleChildren = item.children.filter((child: NavChild) =>
+            hasAccess(child.permission || item.permission)
+          );
+          if (accessibleChildren.length > 0 || hasAccess(item.permission)) {
+            return { ...item, children: accessibleChildren };
+          }
+          return null;
+        }
+        return hasAccess(item.permission) ? item : null;
+      }).filter(Boolean) as NavItem[];
 
   // Flat list for mobile drawer (keeps existing drawer JSX unchanged)
   const navItems = accessibleNavConfig.flatMap((item) => {

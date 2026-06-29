@@ -82,15 +82,32 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = User.objects.all()
-        dept_id = self.request.query_params.get('department', None)
-        role_id = self.request.query_params.get('role', None)
-        
+
+        dept_id = self.request.query_params.get("department")
+        role_id = self.request.query_params.get("role")
+        role_name = self.request.query_params.get("role_name")
+        is_active = self.request.query_params.get("is_active")
+
         if dept_id:
             queryset = queryset.filter(department_id=dept_id)
+
         if role_id:
             queryset = queryset.filter(role_id=role_id)
-            
+
+        if role_name:
+            queryset = queryset.filter(role__name=role_name)
+
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == "true")
+
         return queryset
+
+    def list(self, request, *args, **kwargs):
+        if request.query_params.get('all') == 'true':
+            queryset = self.filter_queryset(self.get_queryset())
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+        return super().list(request, *args, **kwargs)
 
     def check_email_permission(self, request, instance):
         if 'email' in request.data and request.data['email'] != instance.email:
@@ -148,12 +165,44 @@ class UserViewSet(viewsets.ModelViewSet):
 
 class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
+    from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
 
     def patch(self, request):
+        user = request.user
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+        
+        from rest_framework.exceptions import PermissionDenied, ValidationError
+        from apps.projects.utils import log_failed_attempt
+        if role_name == 'CLIENT':
+            allowed_fields = ['profile_photo']
+            for field in request.data.keys():
+                if field not in allowed_fields:
+                    log_failed_attempt(user, f"Tried to edit Profile field '{field}'")
+                    raise PermissionDenied(f"Clients cannot modify the field '{field}'.")
+
+        # Validate profile photo
+        profile_photo = request.FILES.get('profile_photo') or request.data.get('profile_photo')
+        if profile_photo and not isinstance(profile_photo, str):
+            # Validate size (max 5MB)
+            max_size = 5 * 1024 * 1024
+            if profile_photo.size > max_size:
+                raise ValidationError({"profile_photo": "File size exceeds 5MB limit."})
+            
+            # Validate extension/type
+            ext = profile_photo.name.split('.')[-1].lower() if hasattr(profile_photo, 'name') else ''
+            allowed = ['jpg', 'jpeg', 'png', 'gif']
+            if ext not in allowed:
+                raise ValidationError({"profile_photo": "File type not supported. Allowed: jpg, jpeg, png, gif"})
+
+        # Audit log
+        from apps.activity.models import ActivityLog
+        ActivityLog.objects.create(user=user, action="Updated profile photo")
+
         serializer = UserSerializer(
             request.user,
             data=request.data,
@@ -187,5 +236,9 @@ def change_password(request):
 
      user.set_password(new_password)
      user.save()
+
+     # Audit log
+     from apps.activity.models import ActivityLog
+     ActivityLog.objects.create(user=user, action="Changed password")
 
      return Response({"message": "Password updated successfully"})

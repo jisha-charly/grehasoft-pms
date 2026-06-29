@@ -6,6 +6,7 @@ import TaskDetailsModal from '../../components/TaskDetailsModal';
 import axiosInstance from '../../api/axiosInstance';
 import DeleteConfirmModal from "../../components/DeleteConfirmModal";
 import { getResults } from '@/utils/apiHelper';
+import { getClientDisplayName } from '../../utils/clientDisplay';
 interface ProjectDetailsPageProps {
   projects: Project[];
   tasks: Task[];
@@ -416,7 +417,7 @@ try {
         <div className="d-flex justify-content-between align-items-center">
           <div>
             <h3 className="fw-bold mb-1 text-dark">{project.name}</h3>
-            <p className="text-secondary small mb-0">Client: <span className="fw-semibold text-primary">{project.clientName}</span></p>
+            <p className="text-secondary small mb-0">Client: <span className="fw-semibold text-primary">{getClientDisplayName(project.client)}</span></p>
           </div>
           <div className="d-flex gap-2">
             <Link to={`/projects/${project.id}/kanban`} className="btn btn-outline-dark fw-bold btn-sm px-3 shadow-sm bg-white border">

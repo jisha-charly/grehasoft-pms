@@ -27,6 +27,7 @@ from apps.invoices.views import InvoicePaymentViewSet, InvoiceViewSet
 from apps.invoices import views
 from apps.proposals.views import ProposalViewSet
 from apps.reminders.views import ReminderViewSet, reminder_dashboard_summary
+from apps.dashboard.views import ClientDashboardOverviewView, ClientProjectActivityView
 
 router = routers.DefaultRouter()
 
@@ -87,6 +88,8 @@ urlpatterns = [
     path("api/v1/tracking/", include("apps.tracking.urls")),  # Work Tracking System
     path('api/v1/dashboard-summary/', reminder_dashboard_summary),
     path("api/v1/dashboard/", include("apps.dashboard.urls")),
+    path('api/v1/client/dashboard/overview/', ClientDashboardOverviewView.as_view()),
+    path('api/v1/client/projects/<int:project_id>/activity/', ClientProjectActivityView.as_view()),
     path('api/v1/dashboard/stats/', DashboardStatsView.as_view(), name='dashboard-stats'),
     path('api/v1/auth/', include('rest_framework.urls')), 
     path('api/v1/password_reset/', include('django_rest_passwordreset.urls', namespace='password_reset')),

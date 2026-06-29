@@ -21,6 +21,7 @@ from .serializers import (
 )
 from .utils import decrypt_password, encrypt_password
 from apps.projects.models import Client
+from apps.projects.utils import log_failed_attempt
 
 
 
@@ -52,11 +53,23 @@ class WebsiteViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
         if is_admin(user) or is_seo_manager(user):
             return Website.objects.all().select_related("client", "assigned_executive", "assigned_by")
         elif is_seo_executive(user):
             return Website.objects.filter(assigned_executive=user).select_related("client", "assigned_executive", "assigned_by")
+        elif role_name == 'CLIENT':
+            client = user.get_associated_client()
+            if client:
+                return Website.objects.filter(client=client).select_related("client", "assigned_executive", "assigned_by")
         return Website.objects.none()
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
+        if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:
+            log_failed_attempt(request.user, f"Tried to write website via {request.method}")
+            self.permission_denied(request, message="Clients do not have permission to modify websites.")
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -90,18 +103,32 @@ class KeywordViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         website_id = self.request.query_params.get("website")
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
         
         # Base filter based on user roles
         if is_admin(user) or is_seo_manager(user):
             qs = Keyword.objects.all().select_related("website")
         elif is_seo_executive(user):
             qs = Keyword.objects.filter(website__assigned_executive=user).select_related("website")
+        elif role_name == 'CLIENT':
+            client = user.get_associated_client()
+            if client:
+                qs = Keyword.objects.filter(website__client=client).select_related("website")
+            else:
+                qs = Keyword.objects.none()
         else:
             qs = Keyword.objects.none()
 
         if website_id:
             qs = qs.filter(website_id=website_id)
         return qs
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
+        if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:
+            log_failed_attempt(request.user, f"Tried to write keyword via {request.method}")
+            self.permission_denied(request, message="Clients do not have permission to modify target keywords.")
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -116,6 +143,7 @@ class SEODailyWorkLogViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
         if is_admin(user) or is_seo_manager(user):
             qs = SEODailyWorkLog.objects.all().select_related(
                 "website", "executive", "created_by", "updated_by", "approved_by", "rejected_by"
@@ -124,6 +152,14 @@ class SEODailyWorkLogViewSet(viewsets.ModelViewSet):
             qs = SEODailyWorkLog.objects.filter(executive=user).select_related(
                 "website", "executive", "created_by", "updated_by", "approved_by", "rejected_by"
             ).prefetch_related("items__activity_type")
+        elif role_name == 'CLIENT':
+            client = user.get_associated_client()
+            if client:
+                qs = SEODailyWorkLog.objects.filter(website__client=client, status="approved").select_related(
+                    "website", "executive", "created_by", "updated_by", "approved_by", "rejected_by"
+                ).prefetch_related("items__activity_type")
+            else:
+                qs = SEODailyWorkLog.objects.none()
         else:
             qs = SEODailyWorkLog.objects.none()
 
@@ -152,6 +188,13 @@ class SEODailyWorkLogViewSet(viewsets.ModelViewSet):
             qs = qs.filter(log_date__lte=end_date)
 
         return qs.distinct()
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
+        if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:
+            log_failed_attempt(request.user, f"Tried to write daily work log via {request.method}")
+            self.permission_denied(request, message="Clients do not have permission to modify daily work logs.")
 
     def create(self, request, *args, **kwargs):
         user = request.user

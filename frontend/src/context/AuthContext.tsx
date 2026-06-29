@@ -22,6 +22,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const getDefaultRoute = (user: User | null): string => {
   if (!user) return "/login";
+  if (user.role_name === "CLIENT") return "/client/dashboard";
   if (user.is_superuser) return "/";
 
   const perms = (user.role_permissions || []).map((p) => String(p).toUpperCase());
@@ -63,6 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           username: backendUser.username,
           email: backendUser.email,
           role: backendUser.role_name as UserRole, // ✅ FIXED
+          role_name: backendUser.role_name || "",
           role_permissions: backendUser.role_permissions,
           departmentId: backendUser.department,
           status: backendUser.status,
@@ -83,57 +85,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   /* ================= LOGIN ================= */
 
-const login = async (username: string, password: string) => {
-  try {
-    const res = await axios.post(
-      `${import.meta.env.VITE_API_BASE}/api/token/`,
-      { username, password }
-    );
+  const login = async (username: string, password: string) => {
+    try {
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_BASE}/api/token/`,
+        { username, password }
+      );
 
-    const { access, refresh } = res.data;
+      const { access, refresh } = res.data;
 
-    localStorage.setItem("access", access);
-    localStorage.setItem("refresh", refresh);
+      localStorage.setItem("access", access);
+      localStorage.setItem("refresh", refresh);
 
-    const userRes = await api.get("/users/me/");
-    const backendUser = userRes.data;
+      const userRes = await api.get("/users/me/");
+      const backendUser = userRes.data;
 
-    const newUser = {
-      id: backendUser.id,
-      name: backendUser.name,
-      username: backendUser.username,
-      email: backendUser.email,
-      role: backendUser.role_name as UserRole,
-      role_permissions: backendUser.role_permissions,
-      departmentId: backendUser.department,
-      status: backendUser.status,
-      createdAt: backendUser.created_at,
-      is_superuser: backendUser.is_superuser,
-    };
-    
-    setUser(newUser);
-    return newUser;
-  } catch (error) {
-    console.error("Login error:", error);
-    throw error;
-  }
-};
- const updateUser = async (updates: Partial<User>) => {
-  if (!user) return;
+      const newUser = {
+        id: backendUser.id,
+        name: backendUser.name,
+        username: backendUser.username,
+        email: backendUser.email,
+        role: backendUser.role_name as UserRole,
+        role_name: backendUser.role_name || "",
+        role_permissions: backendUser.role_permissions,
+        departmentId: backendUser.department,
+        status: backendUser.status,
+        createdAt: backendUser.created_at,
+        is_superuser: backendUser.is_superuser,
+      };
 
-  try {
-    const res = await api.patch(`/users/${user.id}/`, updates);
+      setUser(newUser);
+      return newUser;
+    } catch (error) {
+      console.error("Login error:", error);
+      throw error;
+    }
+  };
 
-    const updatedUser = res.data;
+  const updateUser = async (updates: Partial<User>) => {
+    if (!user) return;
 
-    localStorage.setItem("user", JSON.stringify(updatedUser));
+    try {
+      const res = await api.patch(`/users/${user.id}/`, updates);
+      const backendUser = res.data;
 
-    setUser(updatedUser);
+      const newUser: User = {
+        id: backendUser.id,
+        name: backendUser.name,
+        username: backendUser.username,
+        email: backendUser.email,
+        role: (backendUser.role_name || backendUser.role || user.role) as UserRole,
+        role_name: backendUser.role_name || user.role_name || "",
+        role_permissions: backendUser.role_permissions || user.role_permissions,
+        departmentId: backendUser.department || user.departmentId,
+        status: backendUser.status || user.status,
+        createdAt: backendUser.created_at || user.createdAt,
+        is_superuser: backendUser.is_superuser !== undefined ? backendUser.is_superuser : user.is_superuser,
+      };
 
-  } catch (error) {
-    console.error("Error updating user profile:", error);
-  }
-};
+      localStorage.setItem("user", JSON.stringify(newUser));
+      setUser(newUser);
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+    }
+  };
+
   /* ================= LOGOUT ================= */
 
   const logout = () => {

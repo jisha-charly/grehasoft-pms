@@ -6,7 +6,7 @@ from apps.activity.utils import log_system_activity
 from core.permissions import HasPermission
 from django.db import IntegrityError
 from rest_framework.permissions import IsAuthenticated
-from apps.projects.utils import log_system_activity
+from apps.projects.utils import log_system_activity, log_failed_attempt
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.exceptions import PermissionDenied
 class TaskTypeViewSet(viewsets.ModelViewSet):
@@ -75,11 +75,23 @@ class TaskViewSet(viewsets.ModelViewSet):
         if self.action == 'list' and project_id:
             queryset = queryset.filter(project_id=project_id)
 
-        # Role-based filtering
-        if user.role.name in ['SUPER_ADMIN', 'PROJECT_MANAGER']:
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+        if role_name == 'SUPER_ADMIN' or role_name == 'PROJECT_MANAGER':
             return queryset
+        if role_name == 'CLIENT':
+            client = user.get_associated_client()
+            if client:
+                return queryset.filter(project__client=client)
+            return queryset.none()
 
         return queryset.filter(project__members__user=user)
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
+        if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:
+            log_failed_attempt(request.user, f"Tried to write task via {request.method}")
+            self.permission_denied(request, message="Clients do not have permission to modify task data.")
 
     def perform_create(self, serializer):
         task = serializer.save(created_by=self.request.user)
@@ -112,11 +124,28 @@ class TaskFileViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser]  # ✅ IMPORTANT
 
     def get_queryset(self):
+        user = self.request.user
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
         queryset = super().get_queryset()
+        
+        if role_name == 'CLIENT':
+            client = user.get_associated_client()
+            if client:
+                queryset = queryset.filter(task__project__client=client)
+            else:
+                queryset = queryset.none()
+
         task_id = self.request.query_params.get("task")
         if task_id:
             queryset = queryset.filter(task_id=task_id)
         return queryset
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
+        if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:
+            log_failed_attempt(request.user, f"Tried to write task file via {request.method}")
+            self.permission_denied(request, message="Clients do not have permission to modify task files.")
 
 class TaskCommentViewSet(viewsets.ModelViewSet):
     queryset = TaskComment.objects.all()
@@ -124,15 +153,51 @@ class TaskCommentViewSet(viewsets.ModelViewSet):
     permission_classes = [HasPermission]
     required_permission = 'VIEW_TASKS'
 
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
     def get_queryset(self):
+        user = self.request.user
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
         queryset = super().get_queryset()
+        
+        if role_name == 'CLIENT':
+            client = user.get_associated_client()
+            if client:
+                queryset = queryset.filter(task__project__client=client)
+            else:
+                queryset = queryset.none()
+
         task_id = self.request.query_params.get("task")
         if task_id:
             queryset = queryset.filter(task_id=task_id)
         return queryset
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
+        if role_name == 'CLIENT':
+            if request.method not in permissions.SAFE_METHODS and self.action != 'create':
+                log_failed_attempt(request.user, f"Tried to edit/delete task comment via {request.method}")
+                self.permission_denied(request, message="Clients do not have permission to edit or delete comments.")
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+        task = serializer.validated_data.get('task')
+        if role_name == 'CLIENT':
+            client = user.get_associated_client()
+            if not client or task.project.client != client:
+                log_failed_attempt(user, f"Tried to comment on Task ID {task.id} (owned by another client)")
+                raise PermissionDenied("You can only comment on tasks of your own projects.")
+        
+        comment = serializer.save(user=user)
+        
+        # Audit logging
+        from apps.activity.models import ActivityLog
+        ActivityLog.objects.create(
+            user=user,
+            project=task.project,
+            task=task,
+            action=f"Added comment on task '{task.title}'"
+        )
 
 class TaskReviewViewSet(viewsets.ModelViewSet):
     queryset = TaskReview.objects.all()
@@ -140,13 +205,34 @@ class TaskReviewViewSet(viewsets.ModelViewSet):
     permission_classes = [HasPermission]
     required_permission = 'VIEW_TASKS'
 
+    def get_queryset(self):
+        user = self.request.user
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+        queryset = super().get_queryset()
+        
+        if role_name == 'CLIENT':
+            return queryset.none()
+
+        task_id = self.request.query_params.get("task")
+        if task_id:
+            queryset = queryset.filter(task_file__task=task_id)
+        return queryset
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
+        if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:
+            log_failed_attempt(request.user, f"Tried to write task review via {request.method}")
+            self.permission_denied(request, message="Clients do not have permission to modify task reviews.")
+
     def perform_create(self, serializer):
         user = self.request.user
         role_map = {
             'SUPER_ADMIN': 'ADMIN',
             'PROJECT_MANAGER': 'PM'
         }
-        reviewed_by_role = role_map.get(user.role.name)
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+        reviewed_by_role = role_map.get(role_name)
         if not reviewed_by_role:
             raise PermissionDenied("Only SUPER_ADMIN and PROJECT_MANAGER can review files.")
 
@@ -159,14 +245,6 @@ class TaskReviewViewSet(viewsets.ModelViewSet):
             review_version=existing_reviews + 1
         )
 
-    def get_queryset(self):
-     queryset = super().get_queryset()
-     task_id = self.request.query_params.get("task")
-
-     if task_id:
-      queryset = queryset.filter(task_file__task=task_id)
-
-     return queryset
     def perform_update(self, serializer):
         if self.request.user != serializer.instance.reviewer:
             raise PermissionDenied("You can edit only your own review.")
