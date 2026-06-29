@@ -87,6 +87,7 @@ console.error("Error deleting invoice", error);
 
     if (status === "paid") return "success";
     if (status === "partial") return "primary";
+    if (status === "overdue") return "danger";
 
     return "warning";
 

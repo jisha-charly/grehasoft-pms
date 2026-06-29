@@ -1,4 +1,6 @@
 from rest_framework import viewsets, permissions
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from .models import Project, Client,Milestone,ProjectMember,ActivityLog
 from rest_framework.permissions import IsAuthenticated
 from .serializers import ProjectSerializer, ClientSerializer
@@ -120,6 +122,49 @@ class ClientViewSet(viewsets.ModelViewSet):
             return Response(clients_data)
             
         return super().list(request, *args, **kwargs)
+
+    @action(detail=True, methods=['get'], url_path='projects')
+    def get_projects(self, request, pk=None):
+        client = self.get_object()
+        
+        user = request.user
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+        if role_name == 'CLIENT':
+            associated_client = user.get_associated_client()
+            if not associated_client or associated_client.id != client.id:
+                raise PermissionDenied("You do not have permission to view projects for this client.")
+                
+        projects = Project.objects.filter(client=client)
+        from apps.seo.models import Website
+        websites = Website.objects.filter(client=client)
+        
+        results = []
+        for p in projects:
+            results.append({
+                "id": f"project_{p.id}",
+                "name": p.name,
+                "type": "standard",
+                "description": p.name,
+                "rate": 0,
+            })
+            
+        for w in websites:
+            plan_prices = {
+                "basic": 5000,
+                "standard": 10000,
+                "premium": 20000,
+                "custom": 0
+            }
+            plan_price = plan_prices.get(w.package_plan.lower(), 0)
+            results.append({
+                "id": f"seo_{w.id}",
+                "name": f"SEO - {w.website_name}",
+                "type": "seo",
+                "description": f"Monthly SEO Services - {w.website_name}",
+                "rate": plan_price,
+            })
+            
+        return Response(results)
 
     def perform_create(self, serializer):
      serializer.save()

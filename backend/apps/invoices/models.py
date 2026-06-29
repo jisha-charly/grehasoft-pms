@@ -37,22 +37,38 @@ class Invoice(models.Model):
 
     @property
     def total_paid(self):
-        return sum(p.amount for p in self.payments.all())
+        from decimal import Decimal
+        return sum((p.amount for p in self.payments.all()), Decimal('0.00'))
 
     @property
     def balance(self):
-        return self.total - self.total_paid
+        from decimal import Decimal
+        return Decimal(str(self.total)) - Decimal(str(self.total_paid))
 
     @property
     def status(self):
 
+        if self.total_paid >= self.total:
+            return "paid"
+
+        if self.due_date and self.due_date < timezone.localdate():
+            return "overdue"
+
         if self.total_paid == 0:
             return "unpaid"
 
-        elif self.total_paid < self.total:
-            return "partial"
+        return "partial"
 
-        return "paid"
+    @classmethod
+    def get_for_user(cls, user):
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+        if role_name == 'CLIENT':
+            client = user.get_associated_client()
+            if client:
+                return cls.objects.filter(client=client)
+            return cls.objects.none()
+        return cls.objects.all()
+
 
 
 class InvoiceItem(models.Model):

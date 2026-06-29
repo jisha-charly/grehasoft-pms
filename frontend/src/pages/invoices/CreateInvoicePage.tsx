@@ -32,6 +32,9 @@ const navigate = useNavigate()
 const [clients,setClients] = useState<Client[]>([])
 const [client,setClient] = useState<number | "">("")
 const [clientAddress,setClientAddress] = useState("")
+const [clientProjects, setClientProjects] = useState<any[]>([])
+const [selectedProject, setSelectedProject] = useState<string>("")
+
 
 const [services,setServices] = useState<Service[]>([])
 
@@ -127,6 +130,20 @@ setNotes(data.notes || "")
 
 setAdvance(data.advance || "")
 
+setProject(data.project || "")
+
+if (data.client) {
+  api.get(`/clients/${data.client}/projects/`)
+    .then(projRes => {
+      setClientProjects(projRes.data || []);
+      const matched = projRes.data?.find((p: any) => p.name === data.project);
+      if (matched) {
+        setSelectedProject(matched.id);
+      }
+    })
+    .catch(err => console.error("Error fetching client projects in edit mode", err));
+}
+
 })
 
 }
@@ -173,17 +190,71 @@ console.error(err)
 
 /* CLIENT CHANGE → AUTO ADDRESS */
 
-const handleClientChange = (id:number)=>{
+/* CLIENT CHANGE → AUTO ADDRESS & LOAD PROJECTS */
 
-setClient(id)
+const handleClientChange = async (id: number | "") => {
+  setClient(id);
+  setSelectedProject("");
+  setProject("");
+  setClientProjects([]);
+  setItems([{ description: "", quantity: 1, rate: 0 }]);
 
-const selected = clients.find(c=>c.id===id)
+  if (id === "") {
+    setClientAddress("");
+    return;
+  }
 
-if(selected){
-setClientAddress(selected.address || "")
-}
+  const selected = clients.find(c => c.id === id);
+  if (selected) {
+    setClientAddress(selected.address || "");
+  }
 
-}
+  try {
+    const res = await api.get(`/clients/${id}/projects/`);
+    setClientProjects(res.data || []);
+  } catch (err) {
+    console.error("Error loading client projects", err);
+  }
+};
+
+/* PROJECT CHANGE → AUTO-FILL INVOICE ITEMS */
+
+const handleProjectChange = (projId: string) => {
+  setSelectedProject(projId);
+
+  if (projId === "") {
+    return;
+  }
+
+  const selectedProj = clientProjects.find(p => p.id === projId);
+  if (selectedProj) {
+    const targetDesc = selectedProj.description || selectedProj.name;
+
+    // Check if duplicate item (already has this description)
+    const isDuplicate = items.some(item => item.description === targetDesc);
+    if (isDuplicate) {
+      alert("This project has already been added.");
+      setSelectedProject(""); // Reset dropdown
+      return;
+    }
+
+    const newItem = {
+      description: targetDesc,
+      quantity: 1,
+      rate: selectedProj.rate || 0
+    };
+
+    // Replace if there is only one blank item placeholder. Otherwise, append.
+    if (items.length === 1 && items[0].description === "" && items[0].rate === 0) {
+      setItems([newItem]);
+    } else {
+      setItems([...items, newItem]);
+    }
+  }
+
+  // Reset dropdown back to "Select Project"
+  setSelectedProject("");
+};
 
 /* ITEM MANAGEMENT */
 
@@ -422,12 +493,23 @@ onChange={(e)=>{
 </div>
 
 <div className="col-md-6">
-<label>Project (Optional)</label>
-<input
-className="form-control"
-value={project}
-onChange={(e)=>setProject(e.target.value)}
-/>
+<label>Project (Auto-fill Invoice Items)</label>
+<select
+name="project"
+className="form-select"
+value={selectedProject}
+onChange={(e)=>{
+  handleProjectChange(e.target.value);
+}}
+disabled={!client}
+>
+<option value="">Select Project</option>
+{clientProjects.map(p=>(
+<option key={p.id} value={p.id}>
+{p.name}
+</option>
+))}
+</select>
 </div>
 
 <div className="col-md-6">

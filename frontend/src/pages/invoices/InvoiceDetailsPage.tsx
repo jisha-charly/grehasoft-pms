@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import Layout from "../../components/layout/Layout"
 import api from "../../api/axiosInstance"
+import { downloadInvoicePDF } from "../../utils/pdfGenerator"
+
 
 interface InvoiceItem{
   description:string
@@ -94,7 +96,9 @@ console.error("Error adding payment", error)
 
 const downloadInvoice = ()=>{
 
-window.open(`http://127.0.0.1:8000/api/v1/invoices/${id}/download/`)
+if (invoice) {
+  downloadInvoicePDF(Number(id), invoice.invoice_number);
+}
 
 }
 
@@ -180,6 +184,8 @@ invoice.status==="paid"
 ? "success"
 : invoice.status==="partial"
 ? "primary"
+: invoice.status==="overdue"
+? "danger"
 : "warning"
 }`}>
 

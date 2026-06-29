@@ -113,7 +113,9 @@ const ClientDashboardPage: React.FC = () => {
 
   const handleDownloadInvoice = async (url: string) => {
     try {
-      window.open(`${axiosInstance.defaults.baseURL}${url.replace("/api/v1", "")}`, "_blank");
+      const token = localStorage.getItem("access");
+      const suffix = token ? `?token=${token}` : "";
+      window.open(`${axiosInstance.defaults.baseURL}${url.replace("/api/v1", "")}${suffix}`, "_blank");
     } catch (err) {
       console.error("Download failed:", err);
     }

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../../api/axiosInstance";
+import { downloadInvoicePDF } from "../../utils/pdfGenerator";
+
 
 type Invoice = {
   id: number;
@@ -36,19 +38,22 @@ const ClientInvoicesPage: React.FC = () => {
     fetchInvoices(currentPage);
   }, [currentPage]);
 
-  const handleDownload = (invoiceId: number) => {
-    // Open Django download endpoint directly in a new window/tab
-    window.open(`${axiosInstance.defaults.baseURL}/invoices/${invoiceId}/download/`, "_blank");
+  const handleDownload = (invoiceId: number, invoiceNumber: string) => {
+    downloadInvoicePDF(invoiceId, invoiceNumber);
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "paid":
         return <span className="badge bg-success-subtle text-success">Paid</span>;
-      case "pending":
-        return <span className="badge bg-warning-subtle text-warning-emphasis">Pending</span>;
+      case "partial":
+        return <span className="badge bg-primary-subtle text-primary">Partially Paid</span>;
+      case "overdue":
+        return <span className="badge bg-danger-subtle text-danger">Overdue</span>;
+      case "unpaid":
+        return <span className="badge bg-warning-subtle text-warning-emphasis">Unpaid</span>;
       default:
-        return <span className="badge bg-danger-subtle text-danger">{status}</span>;
+        return <span className="badge bg-secondary-subtle text-secondary">{status}</span>;
     }
   };
 
@@ -98,7 +103,7 @@ const ClientInvoicesPage: React.FC = () => {
                     <td className="text-end">
                       <button
                         className="btn btn-outline-primary btn-sm rounded-pill px-3"
-                        onClick={() => handleDownload(inv.id)}
+                        onClick={() => handleDownload(inv.id, inv.invoice_number)}
                       >
                         <i className="bi bi-download me-1"></i> Download PDF
                       </button>

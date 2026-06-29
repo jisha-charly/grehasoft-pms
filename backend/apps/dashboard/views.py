@@ -227,7 +227,7 @@ class ClientDocumentsListView(APIView):
         # 2. Invoices
         if not doc_type or doc_type == "invoice":
             from apps.invoices.models import Invoice
-            invoices = Invoice.objects.filter(client=client)
+            invoices = Invoice.get_for_user(user)
             for inv in invoices:
                 inv_date = inv.issue_date
                 if start_date_val and inv_date and inv_date < start_date_val:
@@ -489,7 +489,7 @@ class ClientDashboardOverviewView(APIView):
         current_m = milestones_qs.filter(status='in_progress').first() or milestones_qs.order_by('due_date').first()
         current_milestone = current_m.title if current_m else "N/A"
 
-        invoices_qs = Invoice.objects.filter(client=client).prefetch_related('payments')
+        invoices_qs = Invoice.get_for_user(user).prefetch_related('payments')
         all_invoices = list(invoices_qs)
         pending_invoices = sum(1 for inv in all_invoices if inv.status != 'paid')
         paid_invoices = sum(1 for inv in all_invoices if inv.status == 'paid')
@@ -576,7 +576,7 @@ class ClientDashboardOverviewView(APIView):
                 "timestamp": log.created_at.strftime("%Y-%m-%d %H:%M:%S")
             })
 
-        invoices = Invoice.objects.filter(client=client).prefetch_related('payments').order_by('-created_at')[:15]
+        invoices = Invoice.get_for_user(user).prefetch_related('payments').order_by('-created_at')[:15]
         for inv in invoices:
             recent_activities.append({
                 "module": "invoices",

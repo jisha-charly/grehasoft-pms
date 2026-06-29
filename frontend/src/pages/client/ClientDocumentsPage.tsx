@@ -61,7 +61,9 @@ const ClientDocumentsPage: React.FC = () => {
     if (!doc.download_url) return;
     
     try {
-      window.open(`${axiosInstance.defaults.baseURL}${doc.download_url.replace("/api/v1", "")}`, "_blank");
+      const token = localStorage.getItem("access");
+      const suffix = token ? `?token=${token}` : "";
+      window.open(`${axiosInstance.defaults.baseURL}${doc.download_url.replace("/api/v1", "")}${suffix}`, "_blank");
     } catch (err) {
       console.error("Download failed:", err);
       alert("Error initiating file download.");
