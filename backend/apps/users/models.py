@@ -1,7 +1,11 @@
 
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager
 from core.models import SoftDeleteModel
+
+class SoftDeleteUserManager(UserManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(deleted_at__isnull=True)
 
 class Role(SoftDeleteModel):
     # Strictly follows frontend enums: SUPER_ADMIN, PROJECT_MANAGER, TEAM_MEMBER, SALES_MANAGER, SALES_EXECUTIVE, CLIENT
@@ -36,6 +40,8 @@ class Department(SoftDeleteModel):
         return self.name
 
 class User(AbstractUser, SoftDeleteModel):
+    objects = SoftDeleteUserManager()
+
     # Extended fields from DB Design 3.1
     name = models.CharField(max_length=100)
     email = models.EmailField(unique=True, max_length=150) # Enforced uniqueness per design
