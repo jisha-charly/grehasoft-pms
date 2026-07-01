@@ -171,7 +171,7 @@ const ClientProposalDetailsPage: React.FC = () => {
   if (!proposal) return null;
 
   // Fallback for overview / description if empty
-  const projectOverview = proposal.projectOverview || "To develop a user-friendly, professional, and SEO-optimized website that enhances the client's online presence, improves visibility, and facilitates efficient product and order management.";
+  const projectOverview = proposal.project_overview || "To develop a user-friendly, professional, and SEO-optimized website that enhances the client's online presence, improves visibility, and facilitates efficient product and order management.";
   const descriptionIntro = proposal.description || "Thank you for considering GrehaSoft for your website development needs. As discussed, we have reviewed the reference website and are pleased to submit a proposal for your consideration.";
 
   return (

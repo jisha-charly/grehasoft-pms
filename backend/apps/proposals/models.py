@@ -38,6 +38,7 @@ class Proposal(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     last_sent_at = models.DateTimeField(null=True, blank=True)
     is_converted = models.BooleanField(default=False)
+    builder_config = models.JSONField(default=dict, blank=True, null=True)
 
     def __str__(self):
         return self.title

@@ -247,6 +247,39 @@ const LeadsPage: React.FC<LeadsPageProps> = ({
   const currentUserId = users?.[0]?.id || null;
   const [assignmentToDelete, setAssignmentToDelete] = useState<LeadAssignment | null>(null);
 const [assignmentDeleteModal, setAssignmentDeleteModal] = useState(false);
+
+  // New state variables for assignable Sales Executives
+  const [assignableUsers, setAssignableUsers] = useState<User[]>([]);
+  const [selectedExecId, setSelectedExecId] = useState<string | number>('');
+  const [assignmentToast, setAssignmentToast] = useState<{ type: 'success' | 'danger'; message: string } | null>(null);
+
+  const triggerAssignmentToast = (type: 'success' | 'danger', message: string) => {
+    setAssignmentToast({ type, message });
+    setTimeout(() => {
+      setAssignmentToast((prev) => (prev?.message === message ? null : prev));
+    }, 4000);
+  };
+
+  // Fetch assignable users on mount
+  useEffect(() => {
+    const fetchAssignableUsers = async () => {
+      try {
+        const res = await axiosInstance.get('/users/?all=true&role_name=SALES_EXECUTIVE,SALES_MANAGER&is_active=true');
+        const data = res.data.results || res.data || [];
+        const sorted = [...data].sort((a: User, b: User) => {
+          const nameA = (a.name || a.username || '').toLowerCase();
+          const nameB = (b.name || b.username || '').toLowerCase();
+          return nameA.localeCompare(nameB);
+        });
+        setAssignableUsers(sorted);
+      } catch (error) {
+        console.error('Failed to fetch assignable users:', error);
+        triggerAssignmentToast('danger', 'Failed to load assignable Sales Executives.');
+      }
+    };
+    fetchAssignableUsers();
+  }, []);
+
 const handleDeleteAssignmentClick = (assignment: LeadAssignment) => {
   setAssignmentToDelete(assignment);
   setAssignmentDeleteModal(true);
@@ -270,13 +303,6 @@ const handleConfirmAssignmentDelete = async () => {
   setAssignmentToDelete(null);
 };
 
-  const salesExecs = (users || []).filter(
-    (u) =>
-      u.role_name === UserRole.SALES_EXECUTIVE ||
-      u.role_name === UserRole.SALES_MANAGER ||
-      u.role_name === UserRole.SUPER_ADMIN
-  );
-
   useEffect(() => {
     if (selectedLead) {
       fetchLeadDetails(selectedLead.id);
@@ -291,8 +317,21 @@ const handleConfirmAssignmentDelete = async () => {
     ]);
 
     // ✅ FIX HERE
-    setAssignments(assignRes.data.results || assignRes.data || []);
+    const fetchedAssignments = assignRes.data.results || assignRes.data || [];
+    setAssignments(fetchedAssignments);
     setFollowups(followRes.data.results || followRes.data || []);
+
+    if (fetchedAssignments && fetchedAssignments.length > 0) {
+      const sortedAssignments = [...fetchedAssignments].sort((a, b) => b.id - a.id);
+      const latest = sortedAssignments[0];
+      if (latest && latest.sales_exec) {
+        setSelectedExecId(latest.sales_exec);
+      } else {
+        setSelectedExecId('');
+      }
+    } else {
+      setSelectedExecId('');
+    }
 
   } catch (error) {
     console.error('Error fetching lead details:', error);
@@ -622,24 +661,32 @@ const handleConfirmDelete = async () => {
   const handleAssignExec = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedLead) return;
-    const formData = new FormData(e.currentTarget);
-    const execId = Number(formData.get('sales_exec_id'));
+    const execId = Number(selectedExecId);
     if (!execId) return;
     try {
       await axiosInstance.post('/lead-assignments/', {
         lead: selectedLead.id,
         sales_exec: execId,
       });
-      fetchLeadDetails(selectedLead.id);
-      (e.target as HTMLFormElement).reset();
+      triggerAssignmentToast('success', 'Lead assigned successfully!');
+      await fetchLeadDetails(selectedLead.id);
+      await refetch();
     } catch (error) {
       console.error('Assignment failed:', error);
+      triggerAssignmentToast('danger', 'Failed to assign executive. Please try again.');
     }
   };
 
   const handleViewDetails = (lead: Lead) => {
     setSelectedLead(lead);
+    setAssignmentToast(null); // Clear toast when opening modal
     setDetailsModalOpen(true);
+  };
+
+  const handleCloseDetails = () => {
+    setDetailsModalOpen(false);
+    setSelectedLead(null);
+    setAssignmentToast(null); // Clear toast when closing modal
   };
   
  const stats = {
@@ -1273,7 +1320,7 @@ const filteredCategories = SERVICE_CATEGORIES.map(category => {
                   <h5 className="modal-title fw-bold text-dark">{selectedLead.name}</h5>
                   <p className="text-secondary smaller mb-0">{selectedLead.email} | {selectedLead.phone}</p>
                 </div>
-                <button type="button" className="btn-close" onClick={() => setDetailsModalOpen(false)}></button>
+                <button type="button" className="btn-close" onClick={handleCloseDetails}></button>
               </div>
               <div className="modal-body p-4 bg-light" style={{ flex: '1 1 auto', overflowY: 'auto', minHeight: 0 }}>
                 <div className="row g-4">
@@ -1367,11 +1414,35 @@ const filteredCategories = SERVICE_CATEGORIES.map(category => {
                   <div className="col-lg-6">
                     <div className="card border-0 shadow-sm h-100 p-3">
                       <h6 className="fw-bold mb-3"><i className="bi bi-person-badge me-2 text-primary"></i>Assignments</h6>
+                      
+                      {assignmentToast && (
+                        <div className={`alert alert-${assignmentToast.type} alert-dismissible fade show small py-2 px-3 mb-3 border-0 rounded-3 shadow-sm`} role="alert">
+                          {assignmentToast.message}
+                          <button type="button" className="btn-close py-2.5 px-3 small" onClick={() => setAssignmentToast(null)} style={{ fontSize: '0.65rem' }}></button>
+                        </div>
+                      )}
+
                       <form onSubmit={handleAssignExec} className="mb-3">
                         <div className="input-group input-group-sm">
-                          <select name="sales_exec_id" className="form-select bg-light border-0" required>
-                            <option value="">Assign Executive...</option>
-                            {salesExecs.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                          <select 
+                            name="sales_exec_id" 
+                            className="form-select bg-light border-0" 
+                            value={selectedExecId}
+                            onChange={(e) => setSelectedExecId(e.target.value)}
+                            required
+                          >
+                            {assignableUsers.length === 0 ? (
+                              <option value="">No Sales Executives Available</option>
+                            ) : (
+                              <>
+                                <option value="">Select Executive</option>
+                                {assignableUsers.map(u => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.name || u.username}
+                                  </option>
+                                ))}
+                              </>
+                            )}
                           </select>
                           <button type="submit" className="btn btn-primary"><i className="bi bi-plus"></i></button>
                         </div>

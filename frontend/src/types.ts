@@ -553,11 +553,12 @@ export interface ProposalItem {
 export interface Proposal {
   id: number;
   leadId: number;
+  lead?: number;
   leadName?: string;
   title: string;
   description: string;
-  projectOverview?: string;
-   project?: number | null;
+  project_overview?: string;
+  project?: number | null;
   items?: ProposalItem[];
   subtotal?: number;
   discount?: number;
@@ -569,6 +570,7 @@ export interface Proposal {
   updatedAt?: string;
   leadEmail?: string;
   leadPhone?: string;
+  builder_config?: any;
 }
 
 export enum ReminderType {

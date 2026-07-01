@@ -95,10 +95,17 @@ class UserViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(role_id=role_id)
 
         if role_name:
-            queryset = queryset.filter(role__name=role_name)
+            role_names = [r.strip() for r in role_name.split(',')]
+            queryset = queryset.filter(role__name__in=role_names)
 
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == "true")
+
+        from django.db.models import F, Value
+        from django.db.models.functions import Coalesce, NullIf
+        queryset = queryset.annotate(
+            sort_name=Coalesce(NullIf(F('name'), Value('')), F('username'))
+        ).order_by('sort_name')
 
         return queryset
 

@@ -3,11 +3,14 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
 from datetime import timedelta
+# pyrefly: ignore [missing-import]
 from apps.projects.serializers import ProjectSerializer
 from .models import Proposal
 from .serializers import ProposalSerializer, ClientProposalSerializer
+# pyrefly: ignore [missing-import]
 from apps.projects.models import Project, Client
 from core.permissions import IsClientOwner
+from .pdf_generator import ProposalPDFGenerator
 
 
 class ProposalViewSet(viewsets.ModelViewSet):
@@ -42,6 +45,7 @@ class ProposalViewSet(viewsets.ModelViewSet):
         super().check_permissions(request)
         role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
         if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:
+            # pyrefly: ignore [missing-import]
             from apps.projects.utils import log_failed_attempt
             log_failed_attempt(request.user, f"Tried to write proposal via {request.method}")
             self.permission_denied(request, message="Clients do not have permission to modify proposals.")
@@ -124,3 +128,73 @@ class ProposalViewSet(viewsets.ModelViewSet):
         "project": ProjectSerializer(project).data,
         "client": client.id   # ✅ ADD THIS
     })
+
+    @action(detail=True, methods=["get", "post"])
+    def download_pdf(self, request, pk=None):
+        proposal = self.get_object()
+        
+        builder_config = None
+        if request.method == "POST":
+            builder_config = request.data
+        else:
+            builder_config = proposal.builder_config
+
+        # Audit logging
+        # pyrefly: ignore [missing-import]
+        from apps.activity.models import ActivityLog
+        ActivityLog.objects.create(
+            user=request.user,
+            action=f"Downloaded proposal PDF for: {proposal.title}"
+        )
+
+        from django.http import HttpResponse
+        generator = ProposalPDFGenerator(proposal, builder_config)
+        pdf_path = generator.generate_pdf()
+        
+        try:
+            with open(pdf_path, "rb") as pdf:
+                response = HttpResponse(pdf.read(), content_type="application/pdf")
+                response["Content-Disposition"] = f'attachment; filename="proposal_{proposal.id}.pdf"'
+            return response
+        finally:
+            import os
+            if os.path.exists(pdf_path):
+                os.remove(pdf_path)
+
+    @action(detail=False, methods=["post"])
+    def preview_pdf(self, request):
+        from django.http import HttpResponse
+        proposal_id = request.data.get("id")
+        
+        if proposal_id:
+            try:
+                proposal = Proposal.objects.get(id=proposal_id)
+            except Proposal.DoesNotExist:
+                proposal = Proposal(
+                    title=request.data.get("title", "Project Proposal"),
+                    subtotal=request.data.get("subtotal", 0),
+                    discount=request.data.get("discount", 0),
+                    amount=request.data.get("amount", 0)
+                )
+        else:
+            proposal = Proposal(
+                title=request.data.get("title", "Project Proposal"),
+                subtotal=request.data.get("subtotal", 0),
+                discount=request.data.get("discount", 0),
+                amount=request.data.get("amount", 0)
+            )
+
+        builder_config = request.data.get("builder_config", {})
+        
+        generator = ProposalPDFGenerator(proposal, builder_config)
+        pdf_path = generator.generate_pdf()
+        
+        try:
+            with open(pdf_path, "rb") as pdf:
+                response = HttpResponse(pdf.read(), content_type="application/pdf")
+                response["Content-Disposition"] = 'inline; filename="proposal_preview.pdf"'
+            return response
+        finally:
+            import os
+            if os.path.exists(pdf_path):
+                os.remove(pdf_path)

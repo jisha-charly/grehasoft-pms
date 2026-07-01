@@ -32,9 +32,13 @@ def notification_post_save(sender, instance, created, **kwargs):
         logger.info(f"⏩ [SIGNAL] Email already sent for notification {instance.id}")
 
 
+# pyrefly: ignore [missing-import]
 from apps.tasks.models import Task
+# pyrefly: ignore [missing-import]
 from apps.projects.models import Milestone, Project
+# pyrefly: ignore [missing-import]
 from apps.invoices.models import Invoice
+# pyrefly: ignore [missing-import]
 from apps.seo.models import SEODailyWorkLog
 from .models import ClientNotification
 from django.contrib.auth import get_user_model

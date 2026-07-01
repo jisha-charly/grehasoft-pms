@@ -38,7 +38,7 @@ class ProposalSerializer(serializers.ModelSerializer):
             "leadEmail",
             "leadPhone",
             "leadId",
-            
+            "builder_config",
         ]
 
     def create(self, validated_data):
@@ -104,6 +104,7 @@ class ClientProposalSerializer(serializers.ModelSerializer):
             "leadName",
             "leadEmail",
             "leadPhone",
+            "builder_config",
         ]
         read_only_fields = fields
 

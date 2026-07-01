@@ -4,12 +4,186 @@ import { generateProposalPDF } from '../../utils/pdfGenerator';
 import { useLocation } from "react-router-dom";
 import axiosInstance from '../../api/axiosInstance';
 import { useCrud } from '../../hooks/useCrud';
+import { ProposalBuilderProvider } from '../../components/proposal-builder/ProposalBuilderContext';
+import ProposalBuilderWorkspace from '../../components/proposal-builder/ProposalBuilderWorkspace';
 
 interface ProposalsPageProps {
   leads: Lead[];
   setProjects?: (projects: any[]) => void;
   setLeads?: (leads: any[]) => void;
 }
+
+// Default Builder configuration structure
+const defaultBuilderConfig = {
+  template: 'corporate',
+  theme: 'blue',
+  colors: {
+    primary: '#0753F6',
+    secondary: '#6B7280',
+    accent: '#1AB728',
+    text: '#1F2937',
+    tableHeader: '#0753F6',
+    footer: '#6B7280',
+    link: '#0753F6',
+    bg_card: '#f8fafc'
+  },
+  typography: {
+    fontFamily: 'Helvetica',
+    titleSize: 36,
+    subtitleSize: 20,
+    headingSize: 16,
+    bodySize: 10,
+    lineHeight: 14,
+    letterSpacing: 0,
+    fontWeight: 'normal'
+  },
+  layout: {
+    topMargin: 54,
+    bottomMargin: 54,
+    leftMargin: 54,
+    rightMargin: 54,
+    headerHeight: 78,
+    headerSpacing: 15,
+    footerHeight: 45,
+    watermarkSize: 65,
+    watermarkOpacity: 15
+  },
+  branding: {
+    logo: { enabled: true, width: 320, position: 'center' },
+    watermark: { enabled: true, opacity: 15, size: 65 },
+    headerBanner: { enabled: true }
+  },
+  sections: [
+    'cover',
+    'cover_letter',
+    'company_profile',
+    'project_overview',
+    'scope',
+    'features',
+    'deliverables',
+    'pricing',
+    'payment_terms',
+    'why_us',
+    'terms',
+    'thank_you'
+  ],
+  cover_page: {
+    title: '',
+    autoTitle: true,
+    subtitle: 'Business Proposal',
+    showSubtitle: true,
+    preparedForCompany: '',
+    preparedForName: '',
+    preparedByCompany: 'Grehasoft Smart IT Solutions',
+    preparedByAddress: 'Kochi, Kerala',
+    preparedByEmail: 'info@grehasoft.com',
+    preparedByWebsite: 'www.grehasoft.com',
+    proposalId: '',
+    proposalDate: '',
+    place: 'Kochi'
+  },
+  cover_letter: `<p>Dear Sir,</p><p>Thank you for considering GrehaSoft for your software development needs. As discussed, we are pleased to submit a proposal for your consideration.</p><p>At GrehaSoft, we prioritize client satisfaction, delivering modern, secure, and SEO friendly solutions designed for scalability.</p><p>Best regards,</p><p><b>Grehasoft Smart IT Solutions</b></p>`,
+  company_profile: `<p>Grehasoft Smart IT Solutions is an enterprise software development agency based in Kochi, Infopark.</p><p>We provide comprehensive mobile app, web application, branding, and digital marketing services to clients worldwide.</p>`,
+  project_overview: '',
+  scope_of_work: '',
+  features: [
+    { title: 'Device Independence', desc: 'Fully responsive layouts suitable for desktops, tablets, and mobiles.' },
+    { title: 'SEO Friendliness', desc: 'Pre-configured SEO URLs, meta fields, and Google Search Console tags.' },
+    { title: 'Security & Encryption', desc: 'Pre-coded SSL certificate integration and encrypted user credentials.' }
+  ],
+  deliverables: [
+    { phase: 'Phase 1: Wireframes', timeline: 'Week 1', details: 'Initial layout mockups, user flow, and design review.' },
+    { phase: 'Phase 2: Core Development', timeline: 'Week 2-3', details: 'Frontend UI elements, backend database, and REST APIs.' },
+    { phase: 'Phase 3: UAT & Launch', timeline: 'Week 4', details: 'Unit testing, client acceptance testing, server deployment.' }
+  ],
+  timeline: `<p>The estimated delivery timeline is 4-6 weeks upon contract signoff and advance payment. Any change in scope may affect this estimate.</p>`,
+  pricing: { items: [] as ProposalItem[], subtotal: 0, discount: 0, amount: 0 },
+  payment_terms: { advance: 50, development: 30, deployment: 20 },
+  why_choose_us: `<p>• <b>Experienced Team:</b> Senior engineers with expertise in modern frameworks.</p><p>• <b>SEO Centric Coding:</b> Fast loading speeds and standards-compliant markups.</p><p>• <b>Pixel-Perfect UIs:</b> Premium design aesthetics that reflect your brand identity.</p><p>• <b>Post-launch Support:</b> Dedicated support windows for seamless maintenance.</p>`,
+  terms_conditions: `<p>1. <b>Validity:</b> This proposal remains valid for 30 days from issuance.</p><p>2. <b>Scope Change:</b> Features outside this specification will require a scope change request.</p><p>3. <b>Support:</b> Support is provided on business days between 9:00 AM and 6:00 PM IST.</p><p>4. <b>IP Ownership:</b> Intellectual property rights transfer upon final balance clearance.</p>`,
+  thank_you: {
+    message: 'For any queries or clarifications, please feel free to contact us.',
+    contact: 'info@grehasoft.com | +91 89215 40183',
+    rep_name: 'Raji T. Skariah',
+    rep_phone: '+91 89215 40183 | +91 98954 80145',
+    rep_email: 'info@grehasoft.com | grehasoft@gmail.com'
+  }
+};
+
+const contentLibrary = [
+  { name: 'Company Profile', text: `<p>Grehasoft Smart IT Solutions is an enterprise software development agency based in Kochi, Infopark.</p><p>We provide comprehensive mobile app, web application, branding, and digital marketing services to clients worldwide.</p>` },
+  { name: 'Technology Stack', text: `<p>We build our applications using a robust state-of-the-art stack: Django Rest Framework (Python) for secure backend APIs, React (TypeScript) and Vite for responsive frontends, PostgreSQL/MySQL/SQLite for databases, and AWS/Azure/DigitalOcean for scalable cloud hosting.</p>` },
+  { name: 'Why Choose Grehasoft', text: `<p>• <b>Experienced Team:</b> Senior engineers with expertise in modern frameworks.</p><p>• <b>SEO Centric Coding:</b> Fast loading speeds and standards-compliant markups.</p><p>• <b>Pixel-Perfect UIs:</b> Premium design aesthetics that reflect your brand identity.</p><p>• <b>Post-launch Support:</b> Dedicated support windows for seamless maintenance.</p>` },
+  { name: 'Terms & Conditions', text: `<p>1. <b>Validity:</b> This proposal remains valid for 30 days from issuance.</p><p>2. <b>Scope Change:</b> Features outside this specification will require a scope change request.</p><p>3. <b>Support:</b> Support is provided on business days between 9:00 AM and 6:00 PM IST.</p><p>4. <b>IP Ownership:</b> Intellectual property rights transfer upon final balance clearance.</p>` },
+  { name: 'Payment Terms', text: `<p>The payment for the project is scheduled as follows:<br/>• 50% Advance: payable immediately to kick off the development.<br/>• 30% Development Milestone: payable upon completion of core modules.<br/>• 20% Final Deployment: payable prior to launching the workspace.</p>` }
+];
+
+const colorPresets = [
+  { name: 'Blue', primary: '#1f4e79', secondary: '#2b6cb0' },
+  { name: 'Slate', primary: '#0f172a', secondary: '#3b82f6' },
+  { name: 'Green', primary: '#047857', secondary: '#10b981' },
+  { name: 'Purple', primary: '#701a75', secondary: '#a21caf' },
+  { name: 'Dark', primary: '#1e293b', secondary: '#475569' }
+];
+
+interface RichEditorProps {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+  rows?: number;
+}
+
+const RichEditor: React.FC<RichEditorProps> = ({ label, value, onChange, placeholder, rows = 5 }) => {
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  const insertTag = (tag: string, closeTag?: string) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const text = el.value;
+    const selected = text.substring(start, end);
+    
+    let replacement = '';
+    if (tag === 'bullet') {
+      replacement = `\n• ${selected || 'Bullet item'}`;
+    } else {
+      replacement = `<${tag}>${selected || ''}</${closeTag || tag}>`;
+    }
+    
+    const newVal = text.substring(0, start) + replacement + text.substring(end);
+    onChange(newVal);
+    
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + tag.length + 2, start + tag.length + 2 + selected.length);
+    }, 50);
+  };
+
+  return (
+    <div className="mb-3 text-start">
+      <div className="d-flex justify-content-between align-items-center mb-1 bg-light border p-2 rounded-top">
+        <label className="form-label small fw-bold mb-0 text-dark">{label}</label>
+        <div className="btn-group btn-group-sm">
+          <button type="button" className="btn btn-sm btn-outline-secondary py-0 px-2" onClick={() => insertTag('b')} title="Bold"><b>B</b></button>
+          <button type="button" className="btn btn-sm btn-outline-secondary py-0 px-2" onClick={() => insertTag('i')} title="Italic"><i>I</i></button>
+          <button type="button" className="btn btn-sm btn-outline-secondary py-0 px-2" onClick={() => insertTag('p')} title="Paragraph">P</button>
+          <button type="button" className="btn btn-sm btn-outline-secondary py-0 px-2" onClick={() => insertTag('bullet')} title="Bullet Point">• List</button>
+        </div>
+      </div>
+      <textarea
+        ref={textareaRef}
+        className="form-control form-control-sm rounded-0 rounded-bottom font-monospace text-dark"
+        style={{ fontSize: '13px', borderTop: 'none', backgroundColor: '#fff' }}
+        rows={rows}
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+    </div>
+  );
+};
 
 const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects, setLeads }) => {
   const {
@@ -35,6 +209,11 @@ const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects, setLe
   const [hasImported, setHasImported] = useState(false);
   const [importedLeadId, setImportedLeadId] = useState<number | ''>('');
   const [isItemsDirty, setIsItemsDirty] = useState(false);
+  
+  // Builder Workspace States
+  const [isBuilderActive, setIsBuilderActive] = useState(false);
+  const [builderConfig, setBuilderConfig] = useState<any>(null);
+
   const location = useLocation();
 
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -228,7 +407,7 @@ const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects, setLe
     leadName: selectedLead?.name,
     title: data.title,
     description: data.description,
-    projectOverview: data.projectOverview,
+    project_overview: data.project_overview,
     items: items,
     subtotal: subtotal,
     discount: discount,
@@ -291,6 +470,93 @@ const handleConvert = async (proposal: Proposal) => {
     alert(err.response?.data?.error || "Convert failed");
   }
 };
+
+  // ==========================================
+  // PROPOSAL BUILDER WORKSPACE HANDLERS
+  // ==========================================
+  const handleOpenBuilder = async (proposal: Proposal) => {
+    try {
+      // Fetch latest proposal details directly from Proposal API
+      const res = await axiosInstance.get(`/proposals/${proposal.id}/`);
+      const fetchedProposal = res.data;
+      
+      setEditingProposal(fetchedProposal);
+      
+      // Auto-generate cover page metadata if not present
+      const clientName = fetchedProposal.client?.name || fetchedProposal.leadName || "Valued Client";
+      const clientCompany = fetchedProposal.client?.company_name || "Client Company";
+      const coverTitle = fetchedProposal.title ? (fetchedProposal.title.toLowerCase().endsWith("proposal") ? fetchedProposal.title : `${fetchedProposal.title} Proposal`) : "Project Proposal";
+      const propDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      
+      const config = {
+        ...defaultBuilderConfig,
+        ...(fetchedProposal.builder_config || {}),
+        cover_page: {
+          ...defaultBuilderConfig.cover_page,
+          title: fetchedProposal.builder_config?.cover_page?.title || coverTitle,
+          preparedForName: fetchedProposal.builder_config?.cover_page?.preparedForName || clientName,
+          preparedForCompany: fetchedProposal.builder_config?.cover_page?.preparedForCompany || clientCompany,
+          proposalId: fetchedProposal.builder_config?.cover_page?.proposalId || `PROP-${String(fetchedProposal.id).padStart(4, '0')}`,
+          proposalDate: fetchedProposal.builder_config?.cover_page?.proposalDate || propDate,
+          ...(fetchedProposal.builder_config?.cover_page || {})
+        },
+        pricing: {
+          items: fetchedProposal.items || [],
+          subtotal: Number(fetchedProposal.subtotal) || 0,
+          discount: Number(fetchedProposal.discount) || 0,
+          amount: Number(fetchedProposal.amount) || 0
+        },
+        // Auto-populate empty sections with defaults
+        cover_letter: fetchedProposal.builder_config?.cover_letter || defaultBuilderConfig.cover_letter,
+        company_profile: fetchedProposal.builder_config?.company_profile || defaultBuilderConfig.company_profile,
+        project_overview: fetchedProposal.builder_config?.project_overview || defaultBuilderConfig.project_overview,
+        scope_of_work: fetchedProposal.builder_config?.scope_of_work || defaultBuilderConfig.scope_of_work,
+        timeline: fetchedProposal.builder_config?.timeline || defaultBuilderConfig.timeline,
+        why_choose_us: fetchedProposal.builder_config?.why_choose_us || defaultBuilderConfig.why_choose_us,
+        terms_conditions: fetchedProposal.builder_config?.terms_conditions || defaultBuilderConfig.terms_conditions,
+        features: (fetchedProposal.builder_config?.features && fetchedProposal.builder_config.features.length > 0) ? fetchedProposal.builder_config.features : defaultBuilderConfig.features,
+        deliverables: (fetchedProposal.builder_config?.deliverables && fetchedProposal.builder_config.deliverables.length > 0) ? fetchedProposal.builder_config.deliverables : defaultBuilderConfig.deliverables,
+        thank_you: {
+          ...defaultBuilderConfig.thank_you,
+          ...(fetchedProposal.builder_config?.thank_you || {})
+        }
+      };
+      
+      setBuilderConfig(config);
+      setIsBuilderActive(true);
+    } catch (err) {
+      console.error("Failed to load proposal details for builder:", err);
+      alert("Failed to load proposal builder data.");
+    }
+  };
+
+
+
+
+
+  if (isBuilderActive && editingProposal && builderConfig) {
+    return (
+      <ProposalBuilderProvider
+        proposal={editingProposal}
+        initialConfig={builderConfig}
+        onClose={() => {
+          setIsBuilderActive(false);
+          setEditingProposal(null);
+          setBuilderConfig(null);
+        }}
+        onUpdateSuccess={refetch}
+      >
+        <ProposalBuilderWorkspace
+          onClose={() => {
+            setIsBuilderActive(false);
+            setEditingProposal(null);
+            setBuilderConfig(null);
+          }}
+        />
+      </ProposalBuilderProvider>
+    );
+  }
+
   return (
     <div className="card shadow-sm border-0">
       <div className="card-header bg-white border-0 py-4 px-4 d-flex justify-content-between align-items-center">
@@ -349,7 +615,14 @@ const handleConvert = async (proposal: Proposal) => {
   </button>
 )}
 
-  
+  {/* Builder Workspace trigger */}
+                      <button
+                        className="btn btn-sm btn-primary me-2 shadow-sm"
+                        onClick={() => handleOpenBuilder(proposal)}
+                        title="Open Advanced Proposal Builder"
+                      >
+                        <i className="bi bi-palette-fill me-1"></i>Builder
+                      </button>
 
   {/* Download PDF */}
   <button
@@ -534,7 +807,7 @@ const handleConvert = async (proposal: Proposal) => {
 
                   <div className="mb-3">
                     <label className="form-label small fw-bold">Project Overview</label>
-                    <textarea name="projectOverview" className="form-control" rows={3} defaultValue={editingProposal?.projectOverview} placeholder="Project goals and objectives..."></textarea>
+                    <textarea name="project_overview" className="form-control" rows={3} defaultValue={editingProposal?.project_overview} placeholder="Project goals and objectives..."></textarea>
                   </div>
 
                   <div className="mb-3">
