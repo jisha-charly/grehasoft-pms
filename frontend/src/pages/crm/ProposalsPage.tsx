@@ -6,6 +6,9 @@ import axiosInstance from '../../api/axiosInstance';
 import { useCrud } from '../../hooks/useCrud';
 import { ProposalBuilderProvider } from '../../components/proposal-builder/ProposalBuilderContext';
 import ProposalBuilderWorkspace from '../../components/proposal-builder/ProposalBuilderWorkspace';
+import { useAlert } from '../../hooks/useAlert';
+import { AlertVariant } from '../../types/alert';
+import ConfirmModal from '../../components/ConfirmModal';
 
 interface ProposalsPageProps {
   leads: Lead[];
@@ -213,6 +216,9 @@ const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects, setLe
   // Builder Workspace States
   const [isBuilderActive, setIsBuilderActive] = useState(false);
   const [builderConfig, setBuilderConfig] = useState<any>(null);
+  const { showAlert } = useAlert();
+  const [pendingLeadId, setPendingLeadId] = useState<number | '' | null>(null);
+  const [showLeadChangeConfirm, setShowLeadChangeConfirm] = useState(false);
 
   const location = useLocation();
 
@@ -351,12 +357,24 @@ const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects, setLe
 
   const handleLeadChange = (newLeadId: number | '') => {
     if (!editingProposal && isItemsDirty) {
-      const confirmChange = window.confirm("You have edited the service items. Are you sure you want to change the selected lead and replace the current service list?");
-      if (!confirmChange) {
-        return;
-      }
+      setPendingLeadId(newLeadId);
+      setShowLeadChangeConfirm(true);
+    } else {
+      setSelectedLeadId(newLeadId);
     }
-    setSelectedLeadId(newLeadId);
+  };
+
+  const handleConfirmLeadChange = () => {
+    if (pendingLeadId !== null) {
+      setSelectedLeadId(pendingLeadId);
+      setPendingLeadId(null);
+    }
+    setShowLeadChangeConfirm(false);
+  };
+
+  const handleCancelLeadChange = () => {
+    setPendingLeadId(null);
+    setShowLeadChangeConfirm(false);
   };
   const [errors, setErrors] = useState<any>({});
   const validateForm = () => {
@@ -467,7 +485,10 @@ const handleConvert = async (proposal: Proposal) => {
 
   } catch (err: any) {
     console.error("❌ Convert error:", err.response?.data);
-    alert(err.response?.data?.error || "Convert failed");
+    showAlert({
+      variant: AlertVariant.ERROR,
+      message: err.response?.data?.error || "Convert failed"
+    });
   }
 };
 
@@ -526,7 +547,10 @@ const handleConvert = async (proposal: Proposal) => {
       setIsBuilderActive(true);
     } catch (err) {
       console.error("Failed to load proposal details for builder:", err);
-      alert("Failed to load proposal builder data.");
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Failed to load proposal builder data."
+      });
     }
   };
 
@@ -644,7 +668,10 @@ const handleConvert = async (proposal: Proposal) => {
       );
       window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
     } else {
-      alert("No phone number for this lead");
+      showAlert({
+        variant: AlertVariant.WARNING,
+        message: "No phone number for this lead"
+      });
     }
   }}
 >
@@ -662,7 +689,10 @@ const handleConvert = async (proposal: Proposal) => {
       );
       window.location.href = `mailto:${proposal.leadEmail}?subject=${subject}&body=${body}`;
     } else {
-      alert("No email for this lead");
+      showAlert({
+        variant: AlertVariant.WARNING,
+        message: "No email for this lead"
+      });
     }
   }}
 >
@@ -939,6 +969,14 @@ const handleConvert = async (proposal: Proposal) => {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={showLeadChangeConfirm}
+        onClose={handleCancelLeadChange}
+        onConfirm={handleConfirmLeadChange}
+        title="Change Lead"
+        message="You have edited the service items. Are you sure you want to change the selected lead and replace the current service list?"
+      />
     </div>
   );
 };

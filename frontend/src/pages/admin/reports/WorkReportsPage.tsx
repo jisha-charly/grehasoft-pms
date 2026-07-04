@@ -22,6 +22,8 @@ import {
   Eye,
   Coffee
 } from 'lucide-react';
+import { useAlert } from '../../../hooks/useAlert';
+import { AlertVariant } from '../../../types/alert';
 import { 
   ResponsiveContainer, 
   ComposedChart, 
@@ -54,6 +56,7 @@ interface Department {
 const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
 const WorkReportsPage: React.FC = () => {
+  const { showAlert } = useAlert();
   const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly' | 'employee'>('daily');
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -275,7 +278,10 @@ const WorkReportsPage: React.FC = () => {
       } else if (error.message) {
         errorMsg = error.message;
       }
-      alert(`Export failed: ${errorMsg}`);
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: `Export failed: ${errorMsg}`
+      });
     } finally {
       setExporting(false);
     }

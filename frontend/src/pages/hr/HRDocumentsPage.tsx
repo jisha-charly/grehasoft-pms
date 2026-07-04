@@ -4,6 +4,9 @@ import {  Permission, User } from "../../types";
 import { useAuth } from "../../context/AuthContext";
 import { useCrud } from "../../hooks/useCrud";
 import { downloadBlob } from "../../utils/download";
+import { useAlert } from "../../hooks/useAlert";
+import { AlertVariant } from "../../types/alert";
+import { getErrorMessage } from "../../utils/getErrorMessage";
 
 type OfferForm = {
   employeeId: string;
@@ -47,6 +50,7 @@ type InternshipForm = {
 };
 
 const HRDocumentsPage: React.FC = () => {
+  const { showAlert } = useAlert();
   const { hasPermission } = useAuth();
   const canGenerate = hasPermission(Permission.GENERATE_HR_DOCS);
 
@@ -219,9 +223,12 @@ const handleOfferUserChange = (id: string) => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(blobURL);
-    } catch(err) {
+    } catch(err: any) {
       console.error(err);
-      alert("Failed to generate document.");
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: getErrorMessage(err)
+      });
     }
   };
 

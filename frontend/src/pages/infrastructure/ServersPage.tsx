@@ -4,8 +4,12 @@ import { useCrud } from "../../hooks/useCrud";
 import { Pencil, Trash, Search, Plus } from "lucide-react";
 import axiosInstance from "@/api/axiosInstance";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
+import { useAlert } from "@/hooks/useAlert";
+import { AlertVariant } from "@/types/alert";
+import { getErrorMessage } from "@/utils/getErrorMessage";
 
 const ServersPage: React.FC = () => {
+  const { showAlert } = useAlert();
   const [searchTerm, setSearchTerm] = useState("");
   
   // Connect useCrud for API handling; using default pagination
@@ -84,7 +88,10 @@ const ServersPage: React.FC = () => {
       refetch();
     } catch (error: any) {
       console.error(error.response?.data);
-      alert(error.response?.data?.message || "Error saving server");
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: getErrorMessage(error)
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -104,17 +111,6 @@ const ServersPage: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleDelete = async (id: number) => {
-    if (window.confirm("Are you sure you want to delete this server?")) {
-      try {
-        await deleteServer(id);
-        refetch();
-      } catch (error) {
-        console.error("Error deleting server", error);
-        alert("Failed to delete server");
-      }
-    }
-  };
 
   const closeModal = () => {
     setShowModal(false);

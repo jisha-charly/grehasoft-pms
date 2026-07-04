@@ -277,20 +277,6 @@ try {
   }
 }};
 
- const handleTaskDelete = async (taskId: number) => {
-  if (!confirm("Are you sure you want to delete this task?")) return;
-
-  try {
-    await axiosInstance.delete(`/tasks/${taskId}/`);
-
-    // 🔥 Always reload from backend
-    const res = await axiosInstance.get(`/tasks/?project=${project.id}`);
-   setProjectTasks(getResults(res));
-
-  } catch (error) {
-    console.error("Error deleting task:", error);
-  }
-};
 
   const handleMilestoneSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

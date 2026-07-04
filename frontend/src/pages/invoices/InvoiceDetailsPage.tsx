@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom"
 import Layout from "../../components/layout/Layout"
 import api from "../../api/axiosInstance"
 import { downloadInvoicePDF } from "../../utils/pdfGenerator"
+import { useAlert } from "../../hooks/useAlert";
+import { AlertVariant } from "../../types/alert";
 
 
 interface InvoiceItem{
@@ -35,6 +37,7 @@ interface Invoice{
 }
 
 const InvoiceDetailsPage = ()=>{
+const { showAlert } = useAlert();
 
 const { id } = useParams()
 const navigate = useNavigate()
@@ -103,18 +106,19 @@ if (invoice) {
 }
 
 const sendInvoice = async()=>{
-
-try{
-
-await api.post(`/invoices/${id}/send-email/`)
-alert("Invoice sent to client")
-
-}catch(error){
-
-console.error("Error sending email",error)
-
-}
-
+  try {
+    await api.post(`/invoices/${id}/send-email/`);
+    showAlert({
+      variant: AlertVariant.SUCCESS,
+      message: "Invoice sent to client"
+    });
+  } catch(error) {
+    console.error("Error sending email",error);
+    showAlert({
+      variant: AlertVariant.ERROR,
+      message: "Failed to send invoice email."
+    });
+  }
 }
 
 if(!invoice) return <Layout><div className="container mt-4">Loading...</div></Layout>

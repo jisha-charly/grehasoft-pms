@@ -32,6 +32,7 @@ import TaskTypesPage from "./pages/admin/task-types/TaskTypesPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import ProfilePage from "./pages/profile/ProfilePage";
 import { NotificationProvider } from "./context/NotificationContext";
+import { AlertProvider } from "./context/AlertContext";
 import {
   TaskStatus,
   Task,
@@ -251,7 +252,8 @@ const App: React.FC = () => {
 
   return (
     <NotificationProvider>
-      <Router>
+      <AlertProvider>
+        <Router>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
 
@@ -455,6 +457,7 @@ const App: React.FC = () => {
           />
         </Routes>
       </Router>
+      </AlertProvider>
     </NotificationProvider>
 
   );

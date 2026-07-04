@@ -4,6 +4,9 @@ import axiosInstance from "../../api/axiosInstance";
 import { useCrud } from "../../hooks/useCrud";
 import { Eye, Pencil, Trash, Search, Plus } from "lucide-react";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
+import { useAlert } from "@/hooks/useAlert";
+import { AlertVariant } from "@/types/alert";
+import { getErrorMessage } from "@/utils/getErrorMessage";
 
 interface Domain {
   id: number;
@@ -19,6 +22,7 @@ interface Domain {
 }
 
 const DomainsPage: React.FC = () => {
+  const { showAlert } = useAlert();
   const [searchTerm, setSearchTerm] = useState("");
 
   const { 
@@ -114,7 +118,10 @@ const DomainsPage: React.FC = () => {
       refetch();
     } catch (error: any) {
       console.error(error.response?.data);
-      alert(error.response?.data?.message || "Error saving domain");
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: getErrorMessage(error)
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -136,17 +143,6 @@ const DomainsPage: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleDelete = async (id: number) => {
-    if (window.confirm("Are you sure you want to delete this domain?")) {
-      try {
-        await deleteDomain(id);
-        refetch();
-      } catch (error) {
-        console.error("Error deleting domain", error);
-        alert("Failed to delete domain");
-      }
-    }
-  };
 
   const closeModal = () => {
     setShowModal(false);

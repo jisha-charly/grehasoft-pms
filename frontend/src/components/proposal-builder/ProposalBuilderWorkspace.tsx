@@ -1,5 +1,6 @@
 import React, { useState, Suspense, useMemo } from 'react';
 import { useProposalBuilder } from './ProposalBuilderHooks';
+import ConfirmModal from '../ConfirmModal';
 import { SECTION_CONFIG, contentLibrary, colorPresets } from './SECTION_CONFIG';
 import { EDITOR_REGISTRY } from './EDITOR_REGISTRY';
 import ErrorBoundary from './ErrorBoundary';
@@ -40,6 +41,7 @@ const PreviewPane: React.FC<{ url: string; loading: boolean; onRefresh: () => vo
 
 // Sidebar styling properties pane
 const Sidebar: React.FC = React.memo(() => {
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
   const {
     builderConfig,
     setBuilderConfig,
@@ -81,7 +83,7 @@ const Sidebar: React.FC = React.memo(() => {
     <div className="bg-light border-end d-flex flex-column h-100" style={{ width: '320px', overflowY: 'auto' }}>
       <div className="p-3 border-bottom bg-white d-flex justify-content-between align-items-center">
         <h6 className="fw-bold mb-0 text-uppercase text-secondary small">Properties</h6>
-        <button className="btn btn-xs btn-outline-danger py-0 px-2 small" style={{ fontSize: '10px' }} onClick={restoreDefaults}>
+        <button className="btn btn-xs btn-outline-danger py-0 px-2 small" style={{ fontSize: '10px' }} onClick={() => setShowRestoreModal(true)}>
           Reset
         </button>
       </div>
@@ -244,6 +246,18 @@ const Sidebar: React.FC = React.memo(() => {
             </button>
           ))}
         </div>
+        <ConfirmModal
+          isOpen={showRestoreModal}
+          onClose={() => setShowRestoreModal(false)}
+          onConfirm={() => {
+            restoreDefaults();
+            setShowRestoreModal(false);
+          }}
+          title="Restore Defaults"
+          message="Are you sure you want to restore the entire workspace to fallback configuration?"
+          confirmText="Restore"
+          variant="warning"
+        />
       </div>
     </div>
   );
@@ -273,6 +287,7 @@ const ContentLibrary: React.FC = React.memo(() => {
 });
 
 const ProposalBuilderWorkspace: React.FC<ProposalBuilderWorkspaceProps> = ({ onClose }) => {
+  const [showExitModal, setShowExitModal] = useState(false);
   const {
     proposal,
     activeSections,
@@ -332,8 +347,11 @@ const ProposalBuilderWorkspace: React.FC<ProposalBuilderWorkspaceProps> = ({ onC
             <i className="bi bi-download me-1"></i>Download PDF
           </button>
           <button className="btn btn-sm btn-danger ms-2" onClick={() => {
-            if (unsavedChanges && !window.confirm("You have unsaved changes. Exit anyway?")) return;
-            onClose();
+            if (unsavedChanges) {
+              setShowExitModal(true);
+            } else {
+              onClose();
+            }
           }}>
             <i className="bi bi-x-lg me-1"></i>Exit
           </button>
@@ -412,7 +430,15 @@ const ProposalBuilderWorkspace: React.FC<ProposalBuilderWorkspaceProps> = ({ onC
             <PreviewPane url={previewUrl} loading={previewLoading} onRefresh={() => refreshPreview()} />
           </div>
         </div>
-
+        <ConfirmModal
+          isOpen={showExitModal}
+          onClose={() => setShowExitModal(false)}
+          onConfirm={onClose}
+          title="Unsaved Changes"
+          message="You have unsaved changes. Exit anyway?"
+          confirmText="Exit Anyway"
+          variant="warning"
+        />
       </div>
     </div>
   );

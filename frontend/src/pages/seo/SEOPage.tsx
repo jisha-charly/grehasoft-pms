@@ -15,9 +15,31 @@ import {
 import {
   SEOWebsite, SEOKeyword, SEODailyWorkLog, SEODailyWorkLogItem, SEOMonthlyTarget, SEOTask, SEOReminder, SEOActivityType, Client, User, SEOCredential
 } from "../../types";
+import { useAlert } from "../../hooks/useAlert";
+import { AlertVariant } from "../../types/alert";
+import { getErrorMessage } from "../../utils/getErrorMessage";
+import ConfirmModal from "../../components/ConfirmModal";
+import DeleteConfirmModal from "../../components/DeleteConfirmModal";
 
 const SEOPage: React.FC = () => {
   const { user } = useAuth();
+  const { showAlert } = useAlert();
+
+  // Deletion and Approval Modal States
+  const [showDeleteWebsiteModal, setShowDeleteWebsiteModal] = useState(false);
+  const [deleteWebsiteId, setDeleteWebsiteId] = useState<number | null>(null);
+
+  const [showDeleteKeywordModal, setShowDeleteKeywordModal] = useState(false);
+  const [deleteKeywordId, setDeleteKeywordId] = useState<number | null>(null);
+
+  const [showDeleteCredentialModal, setShowDeleteCredentialModal] = useState(false);
+  const [deleteCredentialId, setDeleteCredentialId] = useState<number | null>(null);
+
+  const [showDeleteTargetModal, setShowDeleteTargetModal] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [approveTargetId, setApproveTargetId] = useState<number | null>(null);
   const isManager = user?.is_superuser || user?.role === "SUPER_ADMIN" || user?.role === "SEO_MANAGER";
 
   // Tab State
@@ -226,7 +248,10 @@ const SEOPage: React.FC = () => {
       setWebsiteEditingId(null);
       loadAllData();
     } catch (err) {
-      alert("Error saving website. Make sure Client is selected.");
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Error saving website. Make sure Client is selected."
+      });
     }
   };
 
@@ -236,9 +261,14 @@ const SEOPage: React.FC = () => {
     setShowWebsiteModal(true);
   };
 
-  const handleDeleteWebsite = async (id: number) => {
-    if (window.confirm("Are you sure you want to delete this website? All related activities, keywords and targets will be removed.")) {
-      await axiosInstance.delete(`/websites/${id}/`);
+  const handleDeleteWebsiteClick = (id: number) => {
+    setDeleteWebsiteId(id);
+    setShowDeleteWebsiteModal(true);
+  };
+
+  const handleConfirmDeleteWebsite = async () => {
+    if (deleteWebsiteId !== null) {
+      await axiosInstance.delete(`/websites/${deleteWebsiteId}/`);
       loadAllData();
     }
   };
@@ -259,7 +289,10 @@ const SEOPage: React.FC = () => {
       setKeywordEditingId(null);
       loadKeywords(selectedWebsite.id);
     } catch (err) {
-      alert("Error saving keyword.");
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Error saving keyword."
+      });
     }
   };
 
@@ -269,9 +302,14 @@ const SEOPage: React.FC = () => {
     setShowKeywordModal(true);
   };
 
-  const handleDeleteKeyword = async (id: number) => {
-    if (window.confirm("Delete this keyword?")) {
-      await axiosInstance.delete(`/seo-keywords/${id}/`);
+  const handleDeleteKeywordClick = (id: number) => {
+    setDeleteKeywordId(id);
+    setShowDeleteKeywordModal(true);
+  };
+
+  const handleConfirmDeleteKeyword = async () => {
+    if (deleteKeywordId !== null) {
+      await axiosInstance.delete(`/seo-keywords/${deleteKeywordId}/`);
       if (selectedWebsite) loadKeywords(selectedWebsite.id);
     }
   };
@@ -298,7 +336,10 @@ const SEOPage: React.FC = () => {
       const res = await axiosInstance.get("/seo-credentials/");
       setCredentials(res.data.results || res.data || []);
     } catch (err) {
-      alert("Error saving credential.");
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Error saving credential."
+      });
     }
   };
 
@@ -313,11 +354,23 @@ const SEOPage: React.FC = () => {
     setShowCredentialModal(true);
   };
 
-  const handleDeleteCredential = async (id: number) => {
-    if (window.confirm("Are you sure you want to delete this credential?")) {
-      await axiosInstance.delete(`/seo-credentials/${id}/`);
+  const handleDeleteCredentialClick = (id: number) => {
+    setDeleteCredentialId(id);
+    setShowDeleteCredentialModal(true);
+  };
+
+  const handleConfirmDeleteCredential = async () => {
+    if (deleteCredentialId !== null) {
+      await axiosInstance.delete(`/seo-credentials/${deleteCredentialId}/`);
       const res = await axiosInstance.get("/seo-credentials/");
       setCredentials(res.data.results || res.data || []);
+    }
+  };
+
+  const handleConfirmDeleteTarget = async () => {
+    if (deleteTargetId !== null) {
+      await axiosInstance.delete(`/seo-monthly-targets/${deleteTargetId}/`);
+      loadAllData();
     }
   };
 
@@ -338,12 +391,18 @@ const SEOPage: React.FC = () => {
 
   const handleWorkLogSubmit = async (statusVal: "draft" | "submitted") => {
     if (!logForm.website) {
-      alert("Please select a website.");
+      showAlert({
+        variant: AlertVariant.WARNING,
+        message: "Please select a website."
+      });
       return;
     }
     const cleanItems = logItems.filter(item => item.activity_type && item.count);
     if (cleanItems.length === 0) {
-      alert("Please add at least one activity item.");
+      showAlert({
+        variant: AlertVariant.WARNING,
+        message: "Please add at least one activity item."
+      });
       return;
     }
 
@@ -401,9 +460,15 @@ const SEOPage: React.FC = () => {
       setIsEditingDraft(false);
       setVisibleSubmitPasswords({});
       loadAllData();
-      alert("Work log saved successfully.");
+      showAlert({
+        variant: AlertVariant.SUCCESS,
+        message: "Work log saved successfully."
+      });
     } catch (err: any) {
-      alert(err.response?.data?.non_field_errors?.[0] || err.response?.data?.proof_file?.[0] || "Error saving work log. Please make sure date is unique per website/exec.");
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: getErrorMessage(err)
+      });
     }
   };
 
@@ -433,9 +498,14 @@ const SEOPage: React.FC = () => {
     setShowWorkLogModal(true);
   };
 
-  const handleApproveLog = async (id: number) => {
-    if (window.confirm("Approve this work log?")) {
-      await axiosInstance.post(`/seo-daily-logs/${id}/approve/`);
+  const handleApproveLogClick = (id: number) => {
+    setApproveTargetId(id);
+    setShowApproveModal(true);
+  };
+
+  const handleConfirmApproveLog = async () => {
+    if (approveTargetId !== null) {
+      await axiosInstance.post(`/seo-daily-logs/${approveTargetId}/approve/`);
       loadAllData();
     }
   };
@@ -448,7 +518,10 @@ const SEOPage: React.FC = () => {
 
   const handleRejectLog = async () => {
     if (!rejectionRemarks) {
-      alert("Remarks are required.");
+      showAlert({
+        variant: AlertVariant.WARNING,
+        message: "Remarks are required."
+      });
       return;
     }
     try {
@@ -458,7 +531,10 @@ const SEOPage: React.FC = () => {
       setShowRejectModal(false);
       loadAllData();
     } catch (err) {
-      alert("Error rejecting log.");
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Error rejecting log."
+      });
     }
   };
 
@@ -478,7 +554,10 @@ const SEOPage: React.FC = () => {
       setTargetForm({ executive: "", website: "", month: new Date().toISOString().slice(0, 7), activity_type: "", target_count: 50 });
       loadAllData();
     } catch (err) {
-      alert("Error setting target.");
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Error setting target."
+      });
     }
   };
 
@@ -496,7 +575,10 @@ const SEOPage: React.FC = () => {
       setTaskForm({ title: "", description: "", website: "", assigned_executive: "", due_date: "", priority: "medium" });
       loadAllData();
     } catch (err) {
-      alert("Error creating task.");
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Error creating task."
+      });
     }
   };
 
@@ -513,7 +595,10 @@ const SEOPage: React.FC = () => {
       setReminderForm({ title: "", description: "", website: "", assigned_executive: "", due_date: "", priority: "medium" });
       loadAllData();
     } catch (err) {
-      alert("Error creating reminder.");
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Error creating reminder."
+      });
     }
   };
 
@@ -544,7 +629,10 @@ const SEOPage: React.FC = () => {
   const handleImportExcelSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!importFile) {
-      alert("Please select a file.");
+      showAlert({
+        variant: AlertVariant.WARNING,
+        message: "Please select a file."
+      });
       return;
     }
     const formData = new FormData();
@@ -563,7 +651,10 @@ const SEOPage: React.FC = () => {
       if (err.response?.data?.errors) {
         setImportErrors(err.response.data.errors);
       } else {
-        alert(err.response?.data?.error || "Error importing excel file.");
+        showAlert({
+          variant: AlertVariant.ERROR,
+          message: getErrorMessage(err)
+        });
       }
     }
   };
@@ -1262,7 +1353,7 @@ const SEOPage: React.FC = () => {
                                   <button className="btn btn-sm btn-light me-1" onClick={() => handleEditKeyword(kw)}>
                                     <Edit3 size={14} />
                                   </button>
-                                  <button className="btn btn-sm btn-light text-danger" onClick={() => handleDeleteKeyword(kw.id)}>
+                                  <button className="btn btn-sm btn-light text-danger" onClick={() => handleDeleteKeywordClick(kw.id)}>
                                     <Trash2 size={14} />
                                   </button>
                                 </td>
@@ -1305,7 +1396,7 @@ const SEOPage: React.FC = () => {
                                   <button className="btn btn-sm btn-light" onClick={() => handleEditCredential(cred)}>
                                     <Edit3 size={12} />
                                   </button>
-                                  <button className="btn btn-sm btn-light text-danger" onClick={() => handleDeleteCredential(cred.id)}>
+                                  <button className="btn btn-sm btn-light text-danger" onClick={() => handleDeleteCredentialClick(cred.id)}>
                                     <Trash2 size={12} />
                                   </button>
                                 </div>
@@ -1451,7 +1542,7 @@ const SEOPage: React.FC = () => {
                               <td className="text-end">
                                 {isManager && log.status === "submitted" && (
                                   <>
-                                    <button className="btn btn-sm btn-success me-1" onClick={() => handleApproveLog(log.id)}>Approve</button>
+                                    <button className="btn btn-sm btn-success me-1" onClick={() => handleApproveLogClick(log.id)}>Approve</button>
                                     <button className="btn btn-sm btn-danger" onClick={() => handleOpenRejectModal(log.id)}>Reject</button>
                                   </>
                                 )}
@@ -1655,7 +1746,7 @@ const SEOPage: React.FC = () => {
                             <button className="btn btn-sm btn-light me-1" onClick={() => handleEditWebsite(site)}>
                               <Edit3 size={14} />
                             </button>
-                            <button className="btn btn-sm btn-light text-danger" onClick={() => handleDeleteWebsite(site.id)}>
+                            <button className="btn btn-sm btn-light text-danger" onClick={() => handleDeleteWebsiteClick(site.id)}>
                               <Trash2 size={14} />
                             </button>
                           </>
@@ -1793,7 +1884,7 @@ const SEOPage: React.FC = () => {
                     <td className="text-end">
                       {isManager && log.status === "submitted" && (
                         <>
-                          <button className="btn btn-sm btn-success me-1" onClick={() => handleApproveLog(log.id)}>Approve</button>
+                          <button className="btn btn-sm btn-success me-1" onClick={() => handleApproveLogClick(log.id)}>Approve</button>
                           <button className="btn btn-sm btn-danger me-1" onClick={() => handleOpenRejectModal(log.id)}>Reject</button>
                         </>
                       )}
@@ -1915,11 +2006,9 @@ const SEOPage: React.FC = () => {
                             <td>{tg.activity_type_name}</td>
                             <td className="text-center fw-bold">{tg.target_count}</td>
                             <td className="text-end">
-                              <button className="btn btn-sm btn-light text-danger" onClick={async () => {
-                                if (window.confirm("Remove this target?")) {
-                                  await axiosInstance.delete(`/seo-monthly-targets/${tg.id}/`);
-                                  loadAllData();
-                                }
+                              <button className="btn btn-sm btn-light text-danger" onClick={() => {
+                                setDeleteTargetId(tg.id);
+                                setShowDeleteTargetModal(true);
                               }}>
                                 <Trash2 size={14} />
                               </button>
@@ -2797,6 +2886,49 @@ const SEOPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Standardized Modals */}
+      <DeleteConfirmModal
+        isOpen={showDeleteWebsiteModal}
+        onClose={() => { setShowDeleteWebsiteModal(false); setDeleteWebsiteId(null); }}
+        onConfirm={handleConfirmDeleteWebsite}
+        title="Delete Website"
+        message="Are you sure you want to delete this website? All related activities, keywords and targets will be removed."
+      />
+
+      <DeleteConfirmModal
+        isOpen={showDeleteKeywordModal}
+        onClose={() => { setShowDeleteKeywordModal(false); setDeleteKeywordId(null); }}
+        onConfirm={handleConfirmDeleteKeyword}
+        title="Delete Keyword"
+        message="Are you sure you want to delete this keyword?"
+      />
+
+      <DeleteConfirmModal
+        isOpen={showDeleteCredentialModal}
+        onClose={() => { setShowDeleteCredentialModal(false); setDeleteCredentialId(null); }}
+        onConfirm={handleConfirmDeleteCredential}
+        title="Delete Credential"
+        message="Are you sure you want to delete this credential?"
+      />
+
+      <DeleteConfirmModal
+        isOpen={showDeleteTargetModal}
+        onClose={() => { setShowDeleteTargetModal(false); setDeleteTargetId(null); }}
+        onConfirm={handleConfirmDeleteTarget}
+        title="Remove Target"
+        message="Are you sure you want to remove this target?"
+      />
+
+      <ConfirmModal
+        isOpen={showApproveModal}
+        onClose={() => { setShowApproveModal(false); setApproveTargetId(null); }}
+        onConfirm={handleConfirmApproveLog}
+        title="Approve Work Log"
+        message="Are you sure you want to approve this work log?"
+        confirmText="Approve"
+        variant="success"
+      />
 
     </div>
   );

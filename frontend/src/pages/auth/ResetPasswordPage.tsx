@@ -1,22 +1,34 @@
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axiosInstance from "../../api/axiosInstance";
+import { useAlert } from "../../hooks/useAlert";
+import { AlertVariant } from "../../types/alert";
 
 const ResetPasswordPage = () => {
-
+  const { showAlert } = useAlert();
   const { token } = useParams();
   const navigate = useNavigate();
 
   const [password, setPassword] = useState("");
 
   const resetPassword = async () => {
-    await axiosInstance.post("/password_reset/confirm/", {
-  token: token,
-  password: password
-});
+    try {
+      await axiosInstance.post("/password_reset/confirm/", {
+        token: token,
+        password: password
+      });
 
-    alert("Password updated");
-    navigate("/login");
+      await showAlert({
+        variant: AlertVariant.SUCCESS,
+        message: "Password updated"
+      });
+      navigate("/login");
+    } catch {
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Failed to reset password. The link may have expired."
+      });
+    }
   };
 
   return (

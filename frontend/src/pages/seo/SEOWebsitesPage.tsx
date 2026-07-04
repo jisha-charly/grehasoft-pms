@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../../api/axiosInstance";
 import { Plus, Trash2, Pencil } from "lucide-react";
+import DeleteConfirmModal from "../../components/DeleteConfirmModal";
 
 const SEOWebsitesPage: React.FC = () => {
 
@@ -10,6 +11,8 @@ const SEOWebsitesPage: React.FC = () => {
   const [showModal,setShowModal] = useState(false);
 
   const [editingId,setEditingId] = useState<number|null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
   const [form,setForm] = useState({
     client:"",
@@ -66,9 +69,14 @@ const SEOWebsitesPage: React.FC = () => {
     setShowModal(true);
   };
 
-  const deleteWebsite = async (id:number)=>{
-    if(window.confirm("Delete this website?")){
-      await axiosInstance.delete(`/websites/${id}/`);
+  const handleDeleteClick = (id: number) => {
+    setDeleteTargetId(id);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deleteTargetId !== null) {
+      await axiosInstance.delete(`/websites/${deleteTargetId}/`);
       fetchWebsites();
     }
   };
@@ -134,7 +142,7 @@ const SEOWebsitesPage: React.FC = () => {
 
                 <button
                   className="btn btn-sm btn-light text-danger"
-                  onClick={()=>deleteWebsite(site.id)}
+                  onClick={()=>handleDeleteClick(site.id)}
                 >
                   <Trash2 size={16}/>
                 </button>
@@ -149,9 +157,7 @@ const SEOWebsitesPage: React.FC = () => {
         </table>
 
       </div>
-
     </div>
-
 
 {/* MODAL */}
 
@@ -274,12 +280,17 @@ Save
 </div>
 </div>
 </div>
-
 )}
 
-</div>
-
-);
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => { setShowDeleteModal(false); setDeleteTargetId(null); }}
+        onConfirm={handleConfirmDelete}
+        title="Delete Website"
+        message="Are you sure you want to delete this website?"
+      />
+    </div>
+  );
 
 };
 

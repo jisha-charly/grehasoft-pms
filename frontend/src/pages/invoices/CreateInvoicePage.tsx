@@ -3,6 +3,8 @@ import api from "../../api/axiosInstance"
 import { useNavigate, useParams } from "react-router-dom"
 import { getResults } from "@/utils/apiHelper"
 import axiosInstance from "../../api/axiosInstance";
+import { useAlert } from "../../hooks/useAlert";
+import { AlertVariant } from "../../types/alert";
 interface Client {
   id:number
   name:string
@@ -25,6 +27,7 @@ invoiceId?: number | null
 isEdit?: boolean
 }
 const CreateInvoicePage:React.FC<Props> = ({invoiceId,isEdit}) => {
+const { showAlert } = useAlert();
 
 const { id } = useParams()
 const navigate = useNavigate()
@@ -233,7 +236,10 @@ const handleProjectChange = (projId: string) => {
     // Check if duplicate item (already has this description)
     const isDuplicate = items.some(item => item.description === targetDesc);
     if (isDuplicate) {
-      alert("This project has already been added.");
+      showAlert({
+        variant: AlertVariant.WARNING,
+        message: "This project has already been added."
+      });
       setSelectedProject(""); // Reset dropdown
       return;
     }
@@ -393,7 +399,10 @@ await api.post("/invoices/",payload)
 
 }
 
-alert("Invoice saved successfully")
+await showAlert({
+  variant: AlertVariant.SUCCESS,
+  message: "Invoice saved successfully"
+});
 
 navigate("/invoices")
 

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import axiosInstance from "../../api/axiosInstance";
 import { FileText, Download, Eye, Folder, Filter, Calendar } from "lucide-react";
+import { useAlert } from "../../hooks/useAlert";
+import { AlertVariant } from "../../types/alert";
 
 type Document = {
   id: string;
@@ -15,6 +17,7 @@ type Document = {
 };
 
 const ClientDocumentsPage: React.FC = () => {
+  const { showAlert } = useAlert();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -66,7 +69,10 @@ const ClientDocumentsPage: React.FC = () => {
       window.open(`${axiosInstance.defaults.baseURL}${doc.download_url.replace("/api/v1", "")}${suffix}`, "_blank");
     } catch (err) {
       console.error("Download failed:", err);
-      alert("Error initiating file download.");
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Error initiating file download."
+      });
     }
   };
 

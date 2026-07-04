@@ -2,6 +2,8 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Proposal } from '../types';
 import axiosInstance from '../api/axiosInstance';
+import { alertService } from '../services/alertService';
+import { AlertVariant } from '../types/alert';
 
 export const generateProposalPDF = async (proposal: Proposal) => {
   try {
@@ -22,7 +24,10 @@ export const generateProposalPDF = async (proposal: Proposal) => {
     window.URL.revokeObjectURL(url);
   } catch (error) {
     console.error('Error downloading proposal PDF:', error);
-    alert('Failed to download proposal PDF. Please try again.');
+    alertService.showAlert({
+      variant: AlertVariant.ERROR,
+      message: 'Failed to download proposal PDF. Please try again.',
+    });
   }
 };
 
@@ -45,7 +50,10 @@ export const downloadInvoicePDF = async (invoiceId: number, invoiceNumber: strin
     window.URL.revokeObjectURL(url);
   } catch (error) {
     console.error('Error downloading invoice PDF:', error);
-    alert('Failed to download invoice PDF. Please try again.');
+    alertService.showAlert({
+      variant: AlertVariant.ERROR,
+      message: 'Failed to download invoice PDF. Please try again.',
+    });
   }
 };
 

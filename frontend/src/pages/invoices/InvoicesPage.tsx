@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import api from "../../api/axiosInstance";
 import Layout from "../../components/layout/Layout";
 import axiosInstance from "../../api/axiosInstance";
+import { useAlert } from "../../hooks/useAlert";
+import { AlertVariant } from "../../types/alert";
 import CreateInvoicePage from "./CreateInvoicePage";
 import DeleteConfirmModal from "../../components/DeleteConfirmModal";
 interface Invoice {
@@ -21,6 +23,7 @@ interface Invoice {
 }
 
 const InvoicesPage = () => {
+  const { showAlert } = useAlert();
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   
@@ -97,8 +100,18 @@ const downloadInvoice = (id:number)=>{
 }
 
 const sendInvoice = async(id:number)=>{
-  await api.post(`/invoices/${id}/send-email/`)
-  alert("Invoice sent")
+  try {
+    await api.post(`/invoices/${id}/send-email/`);
+    showAlert({
+      variant: AlertVariant.SUCCESS,
+      message: "Invoice sent"
+    });
+  } catch {
+    showAlert({
+      variant: AlertVariant.ERROR,
+      message: "Failed to send invoice."
+    });
+  }
 }
 const pageNumbers: number[] = Array.from(
   { length: totalPages },

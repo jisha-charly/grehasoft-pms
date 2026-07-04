@@ -3,6 +3,9 @@ import axiosInstance from "../../api/axiosInstance";
 import { Eye, Pencil, Trash, Search, Plus } from "lucide-react";
 import { useCrud } from "../../hooks/useCrud";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
+import { useAlert } from "@/hooks/useAlert";
+import { AlertVariant } from "@/types/alert";
+import { getErrorMessage } from "@/utils/getErrorMessage";
 
 interface Project {
   id: number;
@@ -43,6 +46,7 @@ interface CredentialsPageProps {
 }
 
 const CredentialsPage: React.FC<CredentialsPageProps> = ({ projects = [], domains = [] }) => {
+  const { showAlert } = useAlert();
   const [searchTerm, setSearchTerm] = useState("");
   
   // Custom Hook replaces standalone endpoints for consistent behavior
@@ -133,7 +137,10 @@ const CredentialsPage: React.FC<CredentialsPageProps> = ({ projects = [], domain
       refetch();
     } catch (error: any) {
       console.error(error.response?.data);
-      alert(error.response?.data?.message || "Error saving credential");
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: getErrorMessage(error)
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -165,17 +172,6 @@ const CredentialsPage: React.FC<CredentialsPageProps> = ({ projects = [], domain
     setShowModal(true);
   };
 
-  const handleDelete = async (id: number) => {
-    if (window.confirm("Are you sure you want to delete this credential?")) {
-      try {
-        await deleteCredential(id);
-        refetch();
-      } catch (error) {
-        console.error("Error deleting credential", error);
-        alert("Failed to delete credential");
-      }
-    }
-  };
 
   const closeModal = () => {
     setShowModal(false);

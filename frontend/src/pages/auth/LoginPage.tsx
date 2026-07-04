@@ -4,7 +4,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, getDefaultRoute } from '../../context/AuthContext';
 import { UserRole } from '../../types';
 import axiosInstance from "../../api/axiosInstance";
+import { useAlert } from '../../hooks/useAlert';
+import { AlertVariant } from '../../types/alert';
+
 const LoginPage: React.FC = () => {
+  const { showAlert } = useAlert();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>(UserRole.SUPER_ADMIN);
@@ -53,11 +57,17 @@ const sendResetLink = async () => {
       email: email
     });
 
-    alert("Reset link sent to your email");
+    showAlert({
+      variant: AlertVariant.SUCCESS,
+      message: "Reset link sent to your email"
+    });
     setShowReset(false);
 
   } catch {
-    alert("Email not found");
+    showAlert({
+      variant: AlertVariant.ERROR,
+      message: "Email not found"
+    });
   }
 };
 

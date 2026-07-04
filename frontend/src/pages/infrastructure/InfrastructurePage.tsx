@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import { useCrud } from "../../hooks/useCrud";
 import { useAuth } from "../../context/AuthContext";
 import { Permission, Project, UserRole } from "../../types";
+import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 
 type DomainRow = {
   id: number;
@@ -47,6 +48,8 @@ const InfrastructurePage: React.FC = () => {
   const { user, hasPermission } = useAuth();
 
   const isAdmin = hasPermission(Permission.MANAGE_INFRASTRUCTURE);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [domainToDelete, setDomainToDelete] = useState<DomainRow | null>(null);
 
   const {
     items: domains,
@@ -186,11 +189,16 @@ const InfrastructurePage: React.FC = () => {
     await refetchDomains();
   };
 
-  const handleDelete = async (domain: DomainRow) => {
-    if (!confirm(`Delete infrastructure for domain ${domain.domain_name}?`))
-      return;
-    await deleteDomain(domain.id);
-    await refetchDomains();
+  const handleDeleteClick = (domain: DomainRow) => {
+    setDomainToDelete(domain);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (domainToDelete) {
+      await deleteDomain(domainToDelete.id);
+      await refetchDomains();
+    }
   };
 
   const mask = (value?: string) => (value ? "••••••••" : "");
@@ -370,7 +378,7 @@ const InfrastructurePage: React.FC = () => {
                             <button
                               type="button"
                               className="btn btn-sm btn-light text-danger"
-                              onClick={() => handleDelete(domain)}
+                              onClick={() => handleDeleteClick(domain)}
                               title="Delete"
                             >
                               <i className="bi bi-trash" />
@@ -1029,6 +1037,14 @@ const InfrastructurePage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        title="Delete Infrastructure"
+        message={domainToDelete ? `Are you sure you want to delete the infrastructure for domain ${domainToDelete.domain_name}?` : ""}
+        onClose={() => { setShowDeleteModal(false); setDomainToDelete(null); }}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 };

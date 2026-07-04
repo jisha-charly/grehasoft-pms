@@ -3,6 +3,8 @@ import { BuilderConfig } from './BuilderSchema';
 import { validateBuilderConfig } from './Validation';
 import axiosInstance from '../../api/axiosInstance';
 import { generateProposalPDF } from '../../utils/pdfGenerator';
+import { useAlert } from '../../hooks/useAlert';
+import { AlertVariant } from '../../types/alert';
 
 interface ProposalBuilderContextProps {
   proposal: any;
@@ -54,6 +56,7 @@ export const ProposalBuilderProvider: React.FC<ProviderProps> = ({
   onUpdateSuccess,
   children
 }) => {
+  const { showAlert } = useAlert();
   const [builderConfig, setBuilderConfig] = useState<BuilderConfig>(initialConfig);
   const [builderReady, setBuilderReady] = useState<boolean>(false);
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(
@@ -131,7 +134,10 @@ export const ProposalBuilderProvider: React.FC<ProviderProps> = ({
     setValidationErrors(errors);
     if (Object.keys(errors).length > 0) {
       if (!silent) {
-        alert("Please fix validation errors before saving.");
+        showAlert({
+          variant: AlertVariant.WARNING,
+          message: "Please fix validation errors before saving."
+        });
       }
       return false;
     }
@@ -178,7 +184,10 @@ export const ProposalBuilderProvider: React.FC<ProviderProps> = ({
       return true;
     } catch (err) {
       console.error("Save builder draft error:", err);
-      alert("Failed to save draft.");
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Failed to save draft."
+      });
       setSaveStatus('idle');
       return false;
     }
@@ -212,13 +221,11 @@ export const ProposalBuilderProvider: React.FC<ProviderProps> = ({
   };
 
   const restoreDefaults = () => {
-    if (window.confirm("Restore entire workspace to fallback configuration?")) {
-      setBuilderConfig((prev) => ({
-        ...initialConfig,
-        pricing: prev.pricing // preserve pricing rows
-      }));
-      setUnsavedChanges(true);
-    }
+    setBuilderConfig((prev) => ({
+      ...initialConfig,
+      pricing: prev.pricing // preserve pricing rows
+    }));
+    setUnsavedChanges(true);
   };
 
   const insertLibraryContent = (text: string, targetField: string) => {
