@@ -170,7 +170,7 @@ def generate_invoice_pdf(invoice):
 
     try:
         header = ImageReader(header_path)
-        p.drawImage(header, 0, height-110, width=width, height=110)
+        p.drawImage(header, 0, height-90, width=width, height=90)
     except Exception as e:
         print("Header image error:", e)
 
@@ -258,7 +258,7 @@ def generate_invoice_pdf(invoice):
         "Phone: +91 89215 40183<br/>"
         "Email: info@grehasoft.com<br/>"
         "Website: www.grehasoft.com<br/>"
-        "GSTIN: 32ABCDE1234F1Z5<br/>"
+        # "GSTIN: 32ABCDE1234F1Z5<br/>"
         "PAN: ABCDE1234F"
     )
 

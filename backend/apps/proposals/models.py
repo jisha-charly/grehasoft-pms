@@ -1,5 +1,7 @@
 from django.db import models
+# pyrefly: ignore [missing-import]
 from apps.crm.models import Lead
+# pyrefly: ignore [missing-import]
 from apps.projects.models import Client, Project
 
 

@@ -31,14 +31,14 @@ def draw_hr_document_template(p, width, height):
     # Header
     header_path = os.path.join(settings.BASE_DIR, 'media/logo/invoice_header.png')
     if os.path.exists(header_path):
-        p.drawImage(header_path, 0, height - 100, width=width, height=110, mask='auto')
+        p.drawImage(header_path, 0, height - 90, width=width, height=90, mask='auto')
 
     # Watermark
     logo_path = os.path.join(settings.BASE_DIR, 'media/icons/logo.png')
     if os.path.exists(logo_path):
         p.saveState()
         p.setFillAlpha(0.06)
-        p.drawImage(logo_path, width/2 - 220, height/2 - 220, width=440, height=440, mask='auto')
+        p.drawImage(logo_path, width/2 - 220, height/2 - 220, width=420, height=440, mask='auto')
         p.restoreState()
 
     # Footer line
