@@ -106,10 +106,10 @@ const App: React.FC = () => {
         
         if (hasPermission(Permission.MANAGE_USERS)) {
           promises.push(axiosInstance.get("/users?all=true").then(res => setUsers(safeData(res))).catch(() => {}));
-          promises.push(axiosInstance.get("/departments").then(res => setDepartments(safeData(res))).catch(() => {}));
+          promises.push(axiosInstance.get("/departments?all=true").then(res => setDepartments(safeData(res))).catch(() => {}));
         }
-        if (hasPermission(Permission.MANAGE_SETTINGS)) {
-          promises.push(axiosInstance.get("/roles").then(res => setRoles(safeData(res))).catch(() => {}));
+        if (hasPermission(Permission.MANAGE_SETTINGS) || hasPermission(Permission.MANAGE_USERS)) {
+          promises.push(axiosInstance.get("/roles?all=true").then(res => setRoles(safeData(res))).catch(() => {}));
         }
         promises.push(axiosInstance.get("/task-types").then(res => setTaskTypes(safeData(res))).catch(() => {}));
         

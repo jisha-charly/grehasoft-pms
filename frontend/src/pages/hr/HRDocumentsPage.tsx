@@ -54,7 +54,10 @@ const HRDocumentsPage: React.FC = () => {
   const { hasPermission } = useAuth();
   const canGenerate = hasPermission(Permission.GENERATE_HR_DOCS);
 
- const { items: users } = useCrud<User>({ endpoint: "/users" });
+ const { items: users } = useCrud<User>({ 
+   endpoint: "/users",
+   queryParams: { all: "true" }
+ });
 
   const userById = useMemo(() => {
   const map = new Map<number, User>();

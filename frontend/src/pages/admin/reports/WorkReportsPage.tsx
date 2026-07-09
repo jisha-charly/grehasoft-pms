@@ -109,8 +109,8 @@ const WorkReportsPage: React.FC = () => {
     const fetchMasters = async () => {
       try {
         const [usersRes, deptsRes] = await Promise.all([
-          axiosInstance.get('/users'),
-          axiosInstance.get('/departments')
+          axiosInstance.get('/users?all=true'),
+          axiosInstance.get('/departments?all=true')
         ]);
         
         const safeData = (res: any) =>

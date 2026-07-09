@@ -20,6 +20,23 @@ class RoleViewSet(viewsets.ModelViewSet):
     permission_classes = [HasPermission]
     required_permission = 'MANAGE_SETTINGS'
 
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            class ReadRolePermission(permissions.BasePermission):
+                def has_permission(self, request, view):
+                    from core.permissions import has_permission
+                    return (
+                        has_permission(request.user, 'MANAGE_SETTINGS') or 
+                        has_permission(request.user, 'MANAGE_USERS')
+                    )
+            return [ReadRolePermission()]
+        return super().get_permissions()
+
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('all') == 'true':
+            return None
+        return super().paginate_queryset(queryset)
+
     def create(self, request, *args, **kwargs):
         name = request.data.get("name")
         description = request.data.get("description", "")
@@ -64,6 +81,11 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     serializer_class = DepartmentSerializer
     permission_classes = [HasPermission]
     required_permission = 'MANAGE_USERS'
+
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('all') == 'true':
+            return None
+        return super().paginate_queryset(queryset)
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
