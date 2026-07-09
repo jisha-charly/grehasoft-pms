@@ -36,6 +36,33 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
         extra_kwargs = {'password': {'write_only': True}}
         read_only_fields = ['id']
 
+    def validate(self, attrs):
+        """
+        Centralized security validation:
+        - Prevents non-Super-Admins from assigning the SUPER_ADMIN role.
+        - Prevents non-Super-Admins from modifying or demoting existing SUPER_ADMIN users.
+        """
+        request = self.context.get('request')
+        if not request:
+            return attrs
+
+        req_user = request.user
+        req_is_super = req_user.is_superuser or (req_user.role and req_user.role.name == 'SUPER_ADMIN')
+
+        # 1. Role assignment check
+        role = attrs.get('role')
+        if role and role.name == 'SUPER_ADMIN':
+            if not req_is_super:
+                raise serializers.ValidationError({"role": "Only Super Admins can assign the SUPER_ADMIN role."})
+
+        # 2. Modify existing Super Admin account check
+        if self.instance:
+            instance_is_super = self.instance.is_superuser or (self.instance.role and self.instance.role.name == 'SUPER_ADMIN')
+            if instance_is_super and req_user.id != self.instance.id and not req_is_super:
+                raise serializers.ValidationError({"role": "Only Super Admins can modify other Super Admin accounts."})
+
+        return attrs
+
     def create(self, validated_data):
         password = validated_data.pop('password', None)
         instance = self.Meta.model(**validated_data)
@@ -70,6 +97,25 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
             instance.set_password(password)
         instance.save()
         return instance
+
+class UserProfileUpdateSerializer(serializers.ModelSerializer):
+    """
+    Dedicated profile serializer containing only safe, self-service fields.
+    Excludes all administrative, privilege, and salary fields to block privilege escalation.
+    """
+    class Meta:
+        model = User
+        fields = ['name', 'username', 'email', 'address', 'profile_photo']
+
+    def validate(self, attrs):
+        allowed = ['name', 'username', 'email', 'address', 'profile_photo']
+        for field in self.initial_data.keys():
+            if field not in allowed:
+                raise serializers.ValidationError(
+                    {field: f"Modifying the field '{field}' is prohibited."}
+                )
+        return attrs
+
 class UserProfileSerializer(serializers.ModelSerializer):
     role_permissions = serializers.JSONField(source='role.permissions', read_only=True)
 
@@ -89,4 +135,4 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "client",
             "profile_photo"
         ]
-        read_only_fields = ["role", "department", "date_joined", "last_login", "is_superuser"]
+        read_only_fields = ["role", "department", "date_joined", "last_login", "is_superuser"]

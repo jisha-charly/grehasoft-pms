@@ -549,7 +549,7 @@ const handleConfirmDelete = async () => {
     setConvertingLead(lead);
     convertForm.setValues({
       clientName: lead.name,
-      companyName: '',
+      companyName: lead.company_name || '',
       email: lead.email,
       phone: lead.phone || '',
       address: '',
@@ -630,18 +630,8 @@ const handleConfirmDelete = async () => {
       createdBy: number | null;
     }
   ) => {
-    const clientRes = await axiosInstance.post('/clients/', {
-      name: clientData.name,
-      company_name: clientData.companyName,
-      email: clientData.email,
-      phone: clientData.phone,
-      address: clientData.address,
-    });
-    const clientId = clientRes.data.id ?? clientRes.data.data?.id;
-    await axiosInstance.patch(`/leads/${leadId}/`, { client: clientId });
     const convertRes = await axiosInstance.post(`/leads/${leadId}/convert_to_project/`, {
       name: projectData.name,
-      client: clientId,
       department: projectData.departmentId,
       project_manager: projectData.projectManagerId,
       created_by: projectData.createdBy,
@@ -649,6 +639,7 @@ const handleConfirmDelete = async () => {
       end_date: projectData.endDate,
       status: projectData.status,
       progress_percentage: projectData.progressPercentage,
+      client_address: clientData.address,
     });
     await refetch();
     if (setProjects) {
@@ -657,6 +648,7 @@ const handleConfirmDelete = async () => {
     }
     return convertRes.data;
   };
+
 
   const handleAssignExec = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

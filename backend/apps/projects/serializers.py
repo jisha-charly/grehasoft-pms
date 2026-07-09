@@ -13,6 +13,15 @@ class ClientSerializer(serializers.ModelSerializer):
         model = Client
         fields = '__all__'
 
+    def validate_email(self, value):
+        qs = Client.objects.filter(email=value)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError("A client with this email address already exists.")
+        return value
+
+
 class MilestoneSerializer(serializers.ModelSerializer):
     progress_percentage = serializers.IntegerField(source='progress', read_only=True)
 

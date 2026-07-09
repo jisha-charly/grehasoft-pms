@@ -10,6 +10,8 @@ from apps.reminders.models import Reminder
 from datetime import date
 from rest_framework.views import APIView
 from rest_framework.pagination import PageNumberPagination
+from core.permissions import HasPermission
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -112,6 +114,35 @@ def dashboard_stats(request):
         Q(project_manager=user) |
         Q(members__user=user)
     ).distinct()
+
+    if role_name == 'TEAM_MEMBER':
+        assigned_tasks = Task.objects.filter(assignments__employee=user)
+        completed_tasks_count = assigned_tasks.filter(status='done').count()
+        pending_tasks_count = assigned_tasks.exclude(status='done').count()
+        total_tasks = completed_tasks_count + pending_tasks_count
+        productivity = int((completed_tasks_count / total_tasks) * 100) if total_tasks > 0 else 0
+        
+        data = {
+            "projects": {
+                "active": project_queryset.filter(status='in_progress').count(),
+                "completed": project_queryset.filter(status='completed').count(),
+                "total": project_queryset.count(),
+            },
+            "tasks": {
+                "completed": completed_tasks_count,
+                "pending": pending_tasks_count,
+            },
+            "reminders": {
+                "pending": Reminder.objects.filter(user=user, is_completed=False, due_date__gte=today).count(),
+                "overdue": Reminder.objects.filter(user=user, is_completed=False, due_date__lt=today).count(),
+                "completed": Reminder.objects.filter(user=user, is_completed=True).count(),
+            },
+            "clients": {
+                "active": 0
+            },
+            "productivity": productivity
+        }
+        return Response(data)
     
     active_clients = Client.objects.filter(
         projects__status='in_progress'
@@ -140,9 +171,11 @@ def dashboard_stats(request):
     return Response(data)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, HasPermission])
 def quarterly_report(request):
+    from django.db.models import Sum
     user = request.user
+
 
     start_date = date(date.today().year, 4, 1)
     end_date = date(date.today().year, 6, 30)
@@ -156,7 +189,8 @@ def quarterly_report(request):
         efficiency = int((completed_tasks.count() / tasks.count()) * 100)
 
     invoices = Invoice.objects.filter(created_at__range=[start_date, end_date])
-    revenue = sum(inv.amount for inv in invoices)
+    revenue = invoices.aggregate(Sum('total'))['total__sum'] or 0
+
 
     data = {
         "project_summary": projects.filter(status='in_progress').count(),
@@ -168,6 +202,8 @@ def quarterly_report(request):
     }
 
     return Response(data)
+quarterly_report.cls.required_permission = 'MANAGE_SETTINGS'
+
 
 class ClientDocumentPagination(PageNumberPagination):
     page_size = 10

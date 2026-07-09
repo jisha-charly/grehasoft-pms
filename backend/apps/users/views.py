@@ -210,7 +210,9 @@ class ProfileView(APIView):
         from apps.activity.models import ActivityLog
         ActivityLog.objects.create(user=user, action="Updated profile photo")
 
-        serializer = UserSerializer(
+        # Security check: Use the dedicated UserProfileUpdateSerializer to filter out administrative fields
+        from .serializers import UserProfileUpdateSerializer
+        serializer = UserProfileUpdateSerializer(
             request.user,
             data=request.data,
             partial=True
@@ -218,9 +220,12 @@ class ProfileView(APIView):
 
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
+            # Return read representation formatted via UserSerializer to maintain full backward compatibility
+            read_serializer = UserSerializer(request.user)
+            return Response(read_serializer.data)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])

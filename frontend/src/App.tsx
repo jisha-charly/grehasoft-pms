@@ -66,7 +66,7 @@ import WorkTrackingDashboard from "./components/WorkTrackingDashboard";
 import WorkReportsPage from "./pages/admin/reports/WorkReportsPage";
 
 const App: React.FC = () => {
-  const { isAuthenticated, loading, user } = useAuth();
+  const { isAuthenticated, loading, user, hasPermission } = useAuth();
   if (loading) return null;
 
   /* ================= STATE ================= */
@@ -102,34 +102,31 @@ const App: React.FC = () => {
     const fetchMasterData = async () => {
       if (user?.role_name === "CLIENT") return;
       try {
-        const [
-          usersRes,
-          rolesRes,
-          deptsRes,
-          typesRes,
-          projectsRes,
-          clientsRes,
-          tasksRes,
-          leadsRes,
-        ] = await Promise.all([
-          axiosInstance.get("/users?all=true"),
-          axiosInstance.get("/roles"),
-          axiosInstance.get("/departments"),
-          axiosInstance.get("/task-types"),
-          axiosInstance.get("/projects"),
-          axiosInstance.get("/clients"),
-          axiosInstance.get("/tasks"),
-          axiosInstance.get("/leads"),
-        ]);
-
-        setUsers(safeData(usersRes));
-        setRoles(safeData(rolesRes));
-        setDepartments(safeData(deptsRes));
-        setTaskTypes(safeData(typesRes));
-        setProjects(projectsRes.data?.results ?? []);
-        setClients(safeData(clientsRes));
-        setTasks(safeData(tasksRes));
-        setLeads(safeData(leadsRes));
+        const promises = [];
+        
+        if (hasPermission(Permission.MANAGE_USERS)) {
+          promises.push(axiosInstance.get("/users?all=true").then(res => setUsers(safeData(res))).catch(() => {}));
+          promises.push(axiosInstance.get("/departments").then(res => setDepartments(safeData(res))).catch(() => {}));
+        }
+        if (hasPermission(Permission.MANAGE_SETTINGS)) {
+          promises.push(axiosInstance.get("/roles").then(res => setRoles(safeData(res))).catch(() => {}));
+        }
+        promises.push(axiosInstance.get("/task-types").then(res => setTaskTypes(safeData(res))).catch(() => {}));
+        
+        if (hasPermission(Permission.VIEW_PROJECTS)) {
+          promises.push(axiosInstance.get("/projects").then(res => setProjects(res.data?.results ?? [])).catch(() => {}));
+        }
+        if (hasPermission(Permission.VIEW_CLIENTS)) {
+          promises.push(axiosInstance.get("/clients").then(res => setClients(safeData(res))).catch(() => {}));
+        }
+        if (hasPermission(Permission.VIEW_TASKS)) {
+          promises.push(axiosInstance.get("/tasks").then(res => setTasks(safeData(res))).catch(() => {}));
+        }
+        if (hasPermission(Permission.VIEW_LEADS)) {
+          promises.push(axiosInstance.get("/leads").then(res => setLeads(safeData(res))).catch(() => {}));
+        }
+        
+        await Promise.all(promises);
       } catch (error) {
         console.error("Error fetching master data:", error);
       }
@@ -204,17 +201,19 @@ const App: React.FC = () => {
 
     } catch (error) {
       console.error("Error updating password:", error);
+      throw error;
     }
   };
 
   const handleUpdateProfile = async (data: any) => {
     try {
 
-      await axiosInstance.patch(`/users/${data.id}/`, {
+      await axiosInstance.patch("/users/profile/", {
         name: data.name,
         email: data.email,
         username: data.username
       });
+
 
       const logRes = await axiosInstance.post("/activity-logs/", {
         action: "Updated Profile",

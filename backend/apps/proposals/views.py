@@ -53,31 +53,88 @@ class ProposalViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def send(self, request, pk=None):
+        import os
+        import socket
+        import smtplib
+        import logging
+        from django.db import transaction
+        from rest_framework import status
+        
+        logger = logging.getLogger(__name__)
         proposal = self.get_object()
 
-        proposal.status = "sent"
-        proposal.last_sent_at = timezone.now()
-        proposal.save()
+        # Check if already sent to return a clear resend message later
+        is_resend = proposal.status == "sent"
 
-        return Response({"message": "Proposal sent"})
+        # 1. Generate Proposal PDF
+        try:
+            generator = ProposalPDFGenerator(proposal, proposal.builder_config)
+            pdf_path = generator.generate_pdf()
+        except Exception as e:
+            logger.critical(f"❌ Failed to generate Proposal PDF: {str(e)}", exc_info=True)
+            return Response({"error": "Failed to compile and generate proposal PDF."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # 2. Email Dispatch
+        try:
+            from .email_service import send_proposal_email
+            send_proposal_email(proposal, pdf_path)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except (smtplib.SMTPAuthenticationError, smtplib.SMTPConnectError, socket.timeout) as e:
+            logger.critical(f"❌ SMTP connection/authentication failure: {str(e)}")
+            return Response({"error": "Email service is temporarily unavailable. Please check configuration/auth settings."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except (smtplib.SMTPException, OSError) as e:
+            logger.error(f"❌ Network or protocol error sending proposal email: {str(e)}")
+            return Response({"error": "Failed to send email. Please verify SMTP server settings."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            logger.error(f"❌ Unexpected email dispatch error: {str(e)}", exc_info=True)
+            return Response({"error": "An unexpected error occurred during email transmission."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        finally:
+            # Always clean up temporary files
+            if os.path.exists(pdf_path):
+                try:
+                    os.remove(pdf_path)
+                    logger.info(f"🗑️ Temporary PDF cleaned up: {pdf_path}")
+                except Exception as cleanup_err:
+                    logger.warning(f"⚠️ Failed to remove temporary PDF file: {str(cleanup_err)}")
+
+        # 3. Database Write Transaction (short & atomic)
+        with transaction.atomic():
+            proposal.status = "sent"
+            proposal.last_sent_at = timezone.now()
+            proposal.save()
+
+        msg = "Proposal resent successfully." if is_resend else "Proposal sent successfully."
+        return Response({"message": msg})
+
     @action(detail=True, methods=["post"])
     def convert_to_client(self, request, pk=None):
-     lead = self.get_object()
+     proposal = self.get_object()
+     lead = proposal.lead
 
-     if lead.client:
+     if proposal.client or (lead and lead.client):
         return Response({"message": "Already converted"})
 
-     client = Client.objects.create(
-        name=lead.name,
-        email=lead.email,
-        phone=lead.phone
-    )
+     # pyrefly: ignore [missing-import]
+     from apps.projects.utils import get_or_create_active_client
+     client, _ = get_or_create_active_client(
+        email=lead.email if lead else "",
+        name=lead.name if lead else "",
+        phone=lead.phone if lead else "",
+        company_name=lead.company_name if (lead and lead.company_name) else "",
+        address=""
+     )
 
-     lead.client = client
-     lead.status = "converted"
-     lead.save()
+     proposal.client = client
+     proposal.save()
+
+     if lead:
+         lead.client = client
+         lead.status = "converted"
+         lead.save()
 
      return Response({"client_id": client.id})
+
    
     @action(detail=True, methods=["post"])
     def convert(self, request, pk=None):
@@ -86,21 +143,31 @@ class ProposalViewSet(viewsets.ModelViewSet):
      lead = proposal.lead
 
      # ✅ STEP 1: GET OR CREATE CLIENT
-     client = proposal.client or lead.client
+     client = proposal.client or (lead.client if lead else None)
 
      if not client:
-        client = Client.objects.create(
-            name=lead.name,
-            email=lead.email,
-            phone=lead.phone,
-        )
+        if lead:
+            # pyrefly: ignore [missing-import]
+            from apps.projects.utils import get_or_create_active_client
+            client, _ = get_or_create_active_client(
+                email=lead.email,
+                name=lead.name,
+                phone=lead.phone,
+                company_name=lead.company_name or "",
+                address=""
+            )
+        else:
+            # Fallback if no lead exists
+            client = Client.objects.create(name="", email="", phone="", company_name="", address="")
 
         # 🔥 VERY IMPORTANT: update lead + proposal
-        lead.client = client
-        lead.save()
+        if lead:
+            lead.client = client
+            lead.save()
         
         proposal.client = client
         proposal.save()
+
  
      # ✅ STEP 2: CREATE PROJECT
      project = Project.objects.create(
@@ -169,7 +236,17 @@ class ProposalViewSet(viewsets.ModelViewSet):
         if proposal_id:
             try:
                 proposal = Proposal.objects.get(id=proposal_id)
+                # Enforce ownership check for CLIENT users to prevent cross-client BOLA leaks
+                role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
+                if role_name == 'CLIENT':
+                    client = request.user.get_associated_client()
+                    if not client or proposal.client != client:
+                        from rest_framework.exceptions import PermissionDenied
+                        raise PermissionDenied("You do not have permission to preview this proposal.")
             except Proposal.DoesNotExist:
+
+
+
                 proposal = Proposal(
                     title=request.data.get("title", "Project Proposal"),
                     subtotal=request.data.get("subtotal", 0),

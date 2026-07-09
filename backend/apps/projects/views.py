@@ -40,6 +40,10 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return base_qs.filter(members__user=user)
 
     def check_permissions(self, request):
+        if request.method not in permissions.SAFE_METHODS:
+            self.required_permission = 'MANAGE_PROJECTS'
+        else:
+            self.required_permission = 'VIEW_PROJECTS'
         super().check_permissions(request)
         role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
         if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:
@@ -183,9 +187,15 @@ class MilestoneViewSet(viewsets.ModelViewSet):
             if client:
                 return Milestone.objects.filter(project__client=client)
             return Milestone.objects.none()
+        if role_name == 'TEAM_MEMBER':
+            return Milestone.objects.filter(project__members__user=user).distinct()
         return Milestone.objects.all()
 
     def check_permissions(self, request):
+        if request.method not in permissions.SAFE_METHODS:
+            self.required_permission = 'MANAGE_PROJECTS'
+        else:
+            self.required_permission = 'VIEW_PROJECTS'
         super().check_permissions(request)
         role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
         if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:
@@ -221,16 +231,22 @@ class ProjectMemberViewSet(viewsets.ModelViewSet):
     queryset = ProjectMember.objects.all()
     serializer_class = ProjectMemberSerializer
     permission_classes = [HasPermission]
-    required_permission = 'MANAGE_PROJECTS'
+    required_permission = 'VIEW_PROJECTS'
 
     def get_queryset(self):
         user = self.request.user
         role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
         if role_name == 'CLIENT':
             return ProjectMember.objects.none()
+        if role_name == 'TEAM_MEMBER':
+            return ProjectMember.objects.filter(project__members__user=user).distinct()
         return ProjectMember.objects.all()
 
     def check_permissions(self, request):
+        if request.method not in permissions.SAFE_METHODS:
+            self.required_permission = 'MANAGE_PROJECTS'
+        else:
+            self.required_permission = 'VIEW_PROJECTS'
         super().check_permissions(request)
         role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
         if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:

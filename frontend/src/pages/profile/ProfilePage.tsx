@@ -3,6 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { User, ActivityLog } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import axiosInstance from '../../api/axiosInstance';
+import FormField from '../../components/FormField';
+import useAlert from '../../hooks/useAlert';
+import { AlertVariant } from '../../types/alert';
 interface ProfilePageProps {
   activityLogs: ActivityLog[];
   onUpdatePassword: (newPassword: string, currentPassword: string) => Promise<void>;
@@ -11,6 +14,7 @@ interface ProfilePageProps {
 
 const ProfilePage: React.FC<ProfilePageProps> = ({ activityLogs, onUpdatePassword, onUpdateProfile }) => {
   const { user, updateUser } = useAuth();
+  const { showAlert } = useAlert();
   
   // Profile details state
   const [name, setName] = useState('');
@@ -134,19 +138,22 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ activityLogs, onUpdatePasswor
     return Object.keys(newErrors).length === 0;
   };
 
- const handlePasswordChange = async (e: React.FormEvent) => {
+  const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validatePassword()) return;
     
-  await onUpdatePassword(newPassword, currentPassword);
-    setMessage({ type: 'success', text: 'Password updated successfully' });
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setErrors({});
-    
-    // Clear message after 3 seconds
-    setTimeout(() => setMessage(null), 3000);
+    try {
+      await onUpdatePassword(newPassword, currentPassword);
+      showAlert({ variant: AlertVariant.SUCCESS, title: 'Success', message: 'Password updated successfully.' });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setErrors({});
+    } catch (err: any) {
+      const errMsg = err.response?.data?.error || err.response?.data?.detail || "Failed to update password.";
+      setErrors({ currentPassword: errMsg });
+      showAlert({ variant: AlertVariant.ERROR, title: 'Error', message: errMsg });
+    }
   };
 
   return (
@@ -203,36 +210,33 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ activityLogs, onUpdatePasswor
             </div>
             <div className="card-body p-4">
               <form onSubmit={handlePasswordChange}>
-                <div className="mb-3">
-                  <label className="form-label small fw-bold">Current Password</label>
-                  <input 
-                    type="password" 
-                    className={`form-control form-control-sm ${errors.currentPassword ? 'is-invalid' : ''}`}
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                  />
-                  {errors.currentPassword && <div className="invalid-feedback small">{errors.currentPassword}</div>}
-                </div>
-                <div className="mb-3">
-                  <label className="form-label small fw-bold">New Password</label>
-                  <input 
-                    type="password" 
-                    className={`form-control form-control-sm ${errors.newPassword ? 'is-invalid' : ''}`}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                  />
-                  {errors.newPassword && <div className="invalid-feedback small">{errors.newPassword}</div>}
-                </div>
-                <div className="mb-4">
-                  <label className="form-label small fw-bold">Confirm New Password</label>
-                  <input 
-                    type="password" 
-                    className={`form-control form-control-sm ${errors.confirmPassword ? 'is-invalid' : ''}`}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                  />
-                  {errors.confirmPassword && <div className="invalid-feedback small">{errors.confirmPassword}</div>}
-                </div>
+                <FormField
+                  label="Current Password"
+                  name="currentPassword"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(_, val) => setCurrentPassword(val)}
+                  error={errors.currentPassword}
+                  required
+                />
+                <FormField
+                  label="New Password"
+                  name="newPassword"
+                  type="password"
+                  value={newPassword}
+                  onChange={(_, val) => setNewPassword(val)}
+                  error={errors.newPassword}
+                  required
+                />
+                <FormField
+                  label="Confirm New Password"
+                  name="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(_, val) => setConfirmPassword(val)}
+                  error={errors.confirmPassword}
+                  required
+                />
                 <button type="submit" className="btn btn-primary btn-sm w-100 fw-bold">
                   Update Password
                 </button>

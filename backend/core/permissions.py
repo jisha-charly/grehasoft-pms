@@ -86,6 +86,7 @@ class IsClientOwner(permissions.BasePermission):
                 return False
             
             # Check if obj itself is Client
+            # pyrefly: ignore [missing-import]
             from apps.projects.models import Client
             if isinstance(obj, Client):
                 return obj == client

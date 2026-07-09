@@ -93,6 +93,7 @@ class TaskSerializer(serializers.ModelSerializer):
         write_only=True, 
         required=False
     )
+    progress_percentage = serializers.IntegerField(write_only=True, required=False)
 
     class Meta:
         model = Task
@@ -125,12 +126,25 @@ class TaskSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         assignees_data = validated_data.pop('assignees', None)
+        progress_percentage = validated_data.pop('progress_percentage', None)
         
         if 'description' in validated_data and not validated_data['description']:
             validated_data['description'] = ''
             
         task = super().update(instance, validated_data)
         
+        if progress_percentage is not None:
+            current_progress_record = task.progress_history.order_by('-updated_at').first()
+            current_val = current_progress_record.progress_percentage if current_progress_record else 0
+            if progress_percentage != current_val:
+                request = self.context.get('request')
+                user = request.user if request else task.created_by
+                TaskProgress.objects.create(
+                    task=task,
+                    progress_percentage=progress_percentage,
+                    updated_by=user
+                )
+
         if assignees_data is not None:
             request = self.context.get('request')
             user_id = request.user.id if request else task.created_by_id

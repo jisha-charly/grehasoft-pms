@@ -5,9 +5,11 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell 
 } from 'recharts';
-import { Project, Task, TaskStatus, ProjectStatus } from '../../types';
+import { Project, Task, TaskStatus, ProjectStatus, Permission } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 
 const Dashboard: React.FC<{ projects: Project[]; tasks: Task[] }> = ({ projects, tasks }) => {
+  const { user, hasPermission } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState<any>(null);
   const activeCount = stats?.projects?.active || 0;
@@ -211,18 +213,24 @@ const activityData = useMemo(() => {
     <div className="container-fluid p-0">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
-          <h3 className="fw-bold mb-1 text-dark">Company Overview</h3>
-          <p className="text-secondary small">Real-time performance metrics across all departments</p>
+          <h3 className="fw-bold mb-1 text-dark">
+            {user?.role_name === 'TEAM_MEMBER' ? 'My Dashboard' : 'Company Overview'}
+          </h3>
+          <p className="text-secondary small">
+            {user?.role_name === 'TEAM_MEMBER' ? 'Real-time personal performance metrics and tasks' : 'Real-time performance metrics across all departments'}
+          </p>
         </div>
-      <button 
-          className="btn btn-primary shadow-sm fw-bold px-4"
-       onClick={() => {
-  setReportModalOpen(true);
-  fetchQuarterlyReport();
-}}
-        >
-          <i className="bi bi-calendar3 me-2"></i>Q2 2026 Report
-        </button>
+        {hasPermission(Permission.MANAGE_SETTINGS) && (
+          <button 
+              className="btn btn-primary shadow-sm fw-bold px-4"
+           onClick={() => {
+             setReportModalOpen(true);
+             fetchQuarterlyReport();
+           }}
+          >
+            <i className="bi bi-calendar3 me-2"></i>Q2 2026 Report
+          </button>
+        )}
       </div>
       
       {/* Report Modal */}
@@ -345,13 +353,17 @@ const activityData = useMemo(() => {
 )}
 
       <div className="row g-4 mb-4">
-        {[
+        {(user?.role_name === 'TEAM_MEMBER' ? [
+          { label: 'My Assigned Projects', value: stats?.projects?.active || 0, icon: 'bi-briefcase', color: 'primary' },
+          { label: 'My Completed Tasks', value: completedTasksCount, icon: 'bi-check2-circle', color: 'success' },
+          { label: 'My Pending Tasks', value: pendingTasksCount, icon: 'bi-clock-history', color: 'warning' },
+          { label: 'My Productivity', value: stats?.productivity !== undefined ? `${stats.productivity}%` : '0%', icon: 'bi-lightning-charge', color: 'info' }
+        ] : [
           { label: 'Active Projects', value: activeCount, icon: 'bi-briefcase', color: 'primary' },
           { label: 'Completed Tasks', value: completedTasksCount, icon: 'bi-check2-circle', color: 'success' },
           { label: 'Pending Tasks', value: pendingTasksCount, icon: 'bi-clock-history', color: 'warning' },
           { label: 'Active Clients', value: activeClients, icon: 'bi-people', color: 'info' }
-        
-        ].map((stat, i) => (
+        ]).map((stat, i) => (
           <div className="col-md-3" key={i}>
             <div className="card p-4 h-100 border-0 shadow-sm">
               <div className="d-flex justify-content-between align-items-start mb-3">
@@ -409,15 +421,14 @@ const activityData = useMemo(() => {
                     <span className="fw-bold small">{s.value}%</span>
                   </div>
                 ))}
-              </div>
             </div>
           </div>
         </div>
       </div>
-     
-      {/* NEW SECTION: Reminders & Domain Alerts */}
+    </div>
+    {/* NEW SECTION: Reminders & Domain Alerts */}
       <div className="row g-4 mb-4">
-        <div className="col-md-6">
+        <div className={hasPermission(Permission.MANAGE_INFRASTRUCTURE) ? "col-md-6" : "col-12"}>
           <div 
             className={`card p-4 h-100 border-0 shadow-sm shadow-hover ${reminderStats.overdue > 0 ? 'border-start border-danger border-4' : ''}`}
             onClick={() => navigate('/reminders')}
@@ -452,52 +463,53 @@ const activityData = useMemo(() => {
           </div>
         </div>
 
-        <div className="col-md-6">
-          <div 
-            className={`card p-4 h-100 border-0 shadow-sm shadow-hover ${(expiringDomains.length > 0 && expiringDomains[0].daysRemaining <= 7) ? 'border-start border-warning border-4' : ''}`}
-            onClick={() => navigate('/infrastructure/domains')}
-            style={{ cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s' }}
-          >
-            <div className="d-flex justify-content-between align-items-start mb-3">
-              <h5 className="fw-bold mb-0 text-dark d-flex align-items-center">
-                <i className={`bi bi-exclamation-triangle${(expiringDomains.length > 0 && expiringDomains[0].daysRemaining <= 7) ? '-fill text-warning' : ' text-info'} me-2`}></i>
-                Domain Renewal Alerts
-              </h5>
-              {(expiringDomains.filter(d => d.daysRemaining <= 7).length) > 0 && (
-                <span className="badge bg-warning text-dark rounded-pill shadow-sm">
-                  {(expiringDomains.filter(d => d.daysRemaining <= 7).length)} Expiring Soon
-                </span>
-              )}
-            </div>
-            
-            <div className="mt-2">
-              {expiringDomains.length > 0 ? (
-                <ul className="list-unstyled mb-0 gap-2 d-flex flex-column">
-                  {expiringDomains.slice(0, 2).map((domain, idx) => (
-                    <li key={idx} className="d-flex justify-content-between align-items-center bg-light p-2 rounded-3">
-                      <span className="fw-medium text-dark text-truncate me-3">{domain.domain_name}</span>
-                      <span className={`badge ${domain.daysRemaining <= 7 ? 'bg-danger text-white' : 'bg-warning text-dark'} rounded-pill`}>
-                        {domain.daysRemaining} days left
-                      </span>
-                    </li>
-                  ))}
-                  {expiringDomains.length > 2 && (
-                    <li className="text-center text-muted small mt-1">
-                      +{expiringDomains.length - 2} more expiring
-                    </li>
-                  )}
-                </ul>
-              ) : (
-                <div className="text-center text-muted py-3">
-                  <i className="bi bi-shield-check fs-2 text-success opacity-50 d-block mb-2"></i>
-                  No domains expiring soon
-                </div>
-              )}
+        {hasPermission(Permission.MANAGE_INFRASTRUCTURE) && (
+          <div className="col-md-6">
+            <div 
+              className={`card p-4 h-100 border-0 shadow-sm shadow-hover ${(expiringDomains.length > 0 && expiringDomains[0].daysRemaining <= 7) ? 'border-start border-warning border-4' : ''}`}
+              onClick={() => navigate('/infrastructure/domains')}
+              style={{ cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s' }}
+            >
+              <div className="d-flex justify-content-between align-items-start mb-3">
+                <h5 className="fw-bold mb-0 text-dark d-flex align-items-center">
+                  <i className="bi bi-exclamation-triangle me-2 text-info"></i>
+                  Domain Renewal Alerts
+                </h5>
+                {(expiringDomains.filter(d => d.daysRemaining <= 7).length) > 0 && (
+                  <span className="badge bg-warning text-dark rounded-pill shadow-sm">
+                    {(expiringDomains.filter(d => d.daysRemaining <= 7).length)} Expiring Soon
+                  </span>
+                )}
+              </div>
+              
+              <div className="mt-2">
+                {expiringDomains.length > 0 ? (
+                  <ul className="list-unstyled mb-0 gap-2 d-flex flex-column">
+                    {expiringDomains.slice(0, 2).map((domain, idx) => (
+                      <li key={idx} className="d-flex justify-content-between align-items-center bg-light p-2 rounded-3">
+                        <span className="fw-medium text-dark text-truncate me-3">{domain.domain_name}</span>
+                        <span className={`badge ${domain.daysRemaining <= 7 ? 'bg-danger text-white' : 'bg-warning text-dark'} rounded-pill`}>
+                          {domain.daysRemaining} days left
+                        </span>
+                      </li>
+                    ))}
+                    {expiringDomains.length > 2 && (
+                      <li className="text-center text-muted small mt-1">
+                        +{expiringDomains.length - 2} more expiring
+                      </li>
+                    )}
+                  </ul>
+                ) : (
+                  <div className="text-center text-muted py-3">
+                    <i className="bi bi-shield-check fs-2 text-success opacity-50 d-block mb-2"></i>
+                    No domains expiring soon
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
-    
     </div>
   );
 };

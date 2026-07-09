@@ -31,7 +31,7 @@ def send_domain_alert_email(domain, alert_type):
 Alert Type: {alert_type}
 Domain Name: {domain.domain_name}
 Expiry Date: {domain.expiry_date}
-Registrar: {domain.registrar if domain.registrar else 'Not specified'}
+Provider: {domain.provider if domain.provider else 'Not specified'}
 
 Please login to Grehasoft PMS to renew the domain.
 """

@@ -3,9 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import KanbanBoard from '../../components/KanbanBoard';
 import TaskDetailsModal from '../../components/TaskDetailsModal';
-import { Task, Project, TaskType, User, TaskStatus, Milestone, TaskFile, TaskReview } from '../../types';
+import { Task, Project, TaskType, User, TaskStatus, Milestone, TaskFile, TaskReview, Permission } from '../../types';
 import axiosInstance from '../../api/axiosInstance';
 import { getResults } from '@/utils/apiHelper';
+import { useAuth } from '../../context/AuthContext';
 
 interface ProjectKanbanPageProps {
   projects: Project[];
@@ -21,6 +22,8 @@ interface ProjectKanbanPageProps {
 const ProjectKanbanPage: React.FC<ProjectKanbanPageProps> = ({ 
   projects: initialProjects, tasks: initialTasks, setTasks, users, milestones: initialMilestones, crud, taskTypes, currentUser 
 }) => {
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission(Permission.MANAGE_PROJECTS);
   const { id } = useParams<{ id: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [projectTasks, setProjectTasks] = useState<Task[]>([]);
@@ -126,9 +129,11 @@ setProjectTasks(normalized);
         </div>
         <div className="d-flex gap-2">
           <Link to={`/projects/${project.id}`} className="btn btn-outline-secondary btn-sm fw-bold px-3 shadow-sm bg-white border">Back to Project</Link>
-          <button className="btn btn-primary fw-bold btn-sm px-3 shadow-sm" onClick={() => setModalOpen(true)}>
-            <i className="bi bi-plus-lg me-2"></i>New Task
-          </button>
+          {canManage && (
+            <button className="btn btn-primary fw-bold btn-sm px-3 shadow-sm" onClick={() => setModalOpen(true)}>
+              <i className="bi bi-plus-lg me-2"></i>New Task
+            </button>
+          )}
         </div>
       </div>
 

@@ -20,7 +20,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const [files, setFiles] = useState<TaskFile[]>([]);
   const [reviews, setReviews] = useState<TaskReview[]>([]);
   const [comments, setComments] = useState<TaskComment[]>([]);
-  const [progress, setProgress] = useState<TaskProgress[]>([]);
+  const [progressVal, setProgressVal] = useState<number>(task.latest_progress || 0);
   const [assignments, setAssignments] = useState<TaskAssignment[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -48,24 +48,50 @@ setReviews(Array.isArray(reviewsRes.data) ? reviewsRes.data : reviewsRes.data.re
   fetchTaskData();
 }, [task.id]);
 
-  const latestProgress = progress.length > 0 ? progress[progress.length - 1] : { progressPercentage: 0 };
-
   const handleProgressUpdate = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const newPercentage = Number(e.target.value);
+    setProgressVal(newPercentage);
     try {
-      const res = await axiosInstance.post('/task-progress/', {
-        task: task.id,
-        progress_percentage: newPercentage,
-        updated_by: currentUser.id
+      await axiosInstance.patch(`/tasks/${task.id}/`, {
+        progress_percentage: newPercentage
       });
-      setProgress(prev => [...prev, res.data]);
     } catch (error) {
       console.error("Error updating progress:", error);
     }
   };
 
-const getFileReviews = (fileId: number) =>
-  reviews.filter(r => r.task_file === fileId);
+  const handleDownload = async (fileId: number, fileName: string) => {
+    try {
+      const response = await axiosInstance.get(`/task-files/${fileId}/download/`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("Download failed:", error);
+    }
+  };
+
+  const handlePreview = async (fileId: number, fileType: string) => {
+    try {
+      const response = await axiosInstance.get(`/task-files/${fileId}/preview/`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: fileType });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (error) {
+      console.error("Preview failed:", error);
+    }
+  };
+
+  const getFileReviews = (fileId: number) =>
+    reviews.filter(r => r.task_file === fileId);
 
   // File Upload Form
   const fileUploadForm = useForm({
@@ -208,14 +234,14 @@ const getFileReviews = (fileId: number) =>
                     <div className="small fw-bold text-dark"><i className="bi bi-calendar3 me-2 text-primary"></i>{task.dueDate}</div>
                   </div>
                   <div className="mb-3">
-                    <h6 className="fw-bold text-secondary small text-uppercase mb-2">Task Progress ({latestProgress.progressPercentage}%)</h6>
+                    <h6 className="fw-bold text-secondary small text-uppercase mb-2">Task Progress ({progressVal}%)</h6>
                     <input 
                       type="range" 
                       className="form-range" 
                       min="0" 
                       max="100" 
                       step="5"
-                      value={latestProgress.progressPercentage}
+                      value={progressVal}
                       onChange={handleProgressUpdate}
                     />
                   </div>
@@ -256,7 +282,32 @@ const getFileReviews = (fileId: number) =>
                                 <i className={`bi fs-3 me-3 text-primary ${(file.file_type || '').includes('pdf') ? 'bi-file-earmark-pdf' : 'bi-file-earmark-image'}`}></i>
                                 <div>
                                   <div className="fw-bold small text-dark">{file.file_path}</div>
-                                  <div className="smaller text-secondary">Version {file.revision_no} • {file.uploaded_at}</div>
+                                  <div className="smaller text-secondary mb-2">Version {file.revision_no} • {file.uploaded_at}</div>
+                                  <div className="d-flex gap-2">
+                                    <button 
+                                      className="btn btn-sm btn-outline-primary px-3 py-1 fw-bold"
+                                      onClick={() => handlePreview(file.id, file.file_type)}
+                                      style={{ fontSize: '0.75rem' }}
+                                    >
+                                      <i className="bi bi-eye me-1"></i>View
+                                    </button>
+                                    <button 
+                                      className="btn btn-sm btn-outline-secondary px-3 py-1 fw-bold"
+                                      onClick={() => handleDownload(file.id, file.file_path)}
+                                      style={{ fontSize: '0.75rem' }}
+                                    >
+                                      <i className="bi bi-download me-1"></i>Download
+                                    </button>
+                                    {isReviewer && !latestReview?.status?.includes("approved") && (
+                                      <button 
+                                        className="btn btn-sm btn-primary px-3 py-1 fw-bold"
+                                        onClick={() => setReviewFileId(file.id)}
+                                        style={{ fontSize: '0.75rem' }}
+                                      >
+                                        <i className="bi bi-pencil-square me-1"></i>Review
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                               <div className="text-end">
@@ -266,9 +317,6 @@ const getFileReviews = (fileId: number) =>
                                   </span>
                                 ) : (
                                   <span className="badge rounded-pill bg-light text-secondary fw-bold border">PENDING</span>
-                                )}
-                                {isReviewer && !latestReview?.status?.includes("approved")  && (
-                                  <button className="btn btn-sm btn-link text-primary p-0 ms-2 text-decoration-none fw-bold" onClick={() => setReviewFileId(file.id)}>Review</button>
                                 )}
                               </div>
                             </div>

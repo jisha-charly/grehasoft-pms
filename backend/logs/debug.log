@@ -250,3 +250,35 @@ INFO 2026-05-20 12:08:40,969 utils 📤 [EMAIL] Sending email via SMTP...
 INFO 2026-05-20 12:08:40,987 signals 📩 [SIGNAL] Notification post_save fired for: Reminder Due: today
 INFO 2026-05-20 12:08:40,987 signals ⏩ [SIGNAL] Email already sent for notification 12
 INFO 2026-05-20 12:08:40,987 utils ✅ [EMAIL] Email sent successfully and marked as sent in DB for notification 12
+ERROR 2026-07-08 11:37:13,497 tasks [ERROR] Failed to send domain alert email: AttributeError: 'Domain' object has no attribute 'registrar'
+Traceback (most recent call last):
+  File "D:\grehasoft pms 28_3_26\jisha\grehasoftnew\backend\apps\infrastructure\tasks.py", line 34, in send_domain_alert_email
+    Registrar: {domain.registrar if domain.registrar else 'Not specified'}
+                                    ^^^^^^^^^^^^^^^^
+AttributeError: 'Domain' object has no attribute 'registrar'
+ERROR 2026-07-08 11:38:09,597 tasks [ERROR] Failed to send domain alert email: AttributeError: 'Domain' object has no attribute 'registrar'
+Traceback (most recent call last):
+  File "D:\grehasoft pms 28_3_26\jisha\grehasoftnew\backend\apps\infrastructure\tasks.py", line 34, in send_domain_alert_email
+    Registrar: {domain.registrar if domain.registrar else 'Not specified'}
+                                    ^^^^^^^^^^^^^^^^
+AttributeError: 'Domain' object has no attribute 'registrar'
+ERROR 2026-07-08 12:09:17,170 tasks [ERROR] Failed to send domain alert email: AttributeError: 'Domain' object has no attribute 'registrar'
+Traceback (most recent call last):
+  File "D:\grehasoft pms 28_3_26\jisha\grehasoftnew\backend\apps\infrastructure\tasks.py", line 34, in send_domain_alert_email
+    Registrar: {domain.registrar if domain.registrar else 'Not specified'}
+                                    ^^^^^^^^^^^^^^^^
+AttributeError: 'Domain' object has no attribute 'registrar'
+INFO 2026-07-08 12:50:10,629 tasks [SUCCESS] Domain alert email sent for test-renewal-task.com to 1 admins
+INFO 2026-07-08 15:32:02,066 email_service 📨 [PROPOSAL EMAIL] Preparing proposal email for proposal_verify@example.com
+INFO 2026-07-08 15:32:17,101 email_service ✅ [PROPOSAL EMAIL] Email sent successfully to proposal_verify@example.com
+INFO 2026-07-08 15:32:17,106 views 🗑️ Temporary PDF cleaned up: C:\Users\user\AppData\Local\Temp\tmp_yojob1g.pdf
+INFO 2026-07-08 15:32:50,195 email_service 📨 [PROPOSAL EMAIL] Preparing proposal email for proposal_verify@example.com
+INFO 2026-07-08 15:32:50,577 email_service ✅ [PROPOSAL EMAIL] Email sent successfully to proposal_verify@example.com
+INFO 2026-07-08 15:32:50,578 views 🗑️ Temporary PDF cleaned up: C:\Users\user\AppData\Local\Temp\tmp0n_qclfd.pdf
+INFO 2026-07-08 15:32:51,216 email_service 📨 [PROPOSAL EMAIL] Preparing proposal email for proposal_verify@example.com
+INFO 2026-07-08 15:32:51,533 email_service ✅ [PROPOSAL EMAIL] Email sent successfully to proposal_verify@example.com
+INFO 2026-07-08 15:32:51,534 views 🗑️ Temporary PDF cleaned up: C:\Users\user\AppData\Local\Temp\tmp2dkf9wd8.pdf
+INFO 2026-07-08 15:32:52,163 email_service 📨 [PROPOSAL EMAIL] Preparing proposal email for proposal_verify@example.com
+ERROR 2026-07-08 15:32:52,469 email_service ❌ [PROPOSAL EMAIL] SMTP Connection failed: (500, 'Connection refused')
+CRITICAL 2026-07-08 15:32:52,469 views ❌ SMTP connection/authentication failure: (500, 'Connection refused')
+INFO 2026-07-08 15:32:52,470 views 🗑️ Temporary PDF cleaned up: C:\Users\user\AppData\Local\Temp\tmpbs_tu5sb.pdf

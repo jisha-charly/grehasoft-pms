@@ -7,6 +7,9 @@ import axiosInstance from '../../api/axiosInstance';
 import DeleteConfirmModal from "../../components/DeleteConfirmModal";
 import { getResults } from '@/utils/apiHelper';
 import { getClientDisplayName } from '../../utils/clientDisplay';
+import { useAuth } from '../../context/AuthContext';
+import { Permission } from '../../types';
+
 interface ProjectDetailsPageProps {
   projects: Project[];
   tasks: Task[];
@@ -28,6 +31,8 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
   members: initialMembers, activity: initialActivity, projectCrud, milestoneCrud, memberCrud, taskCrud, taskTypes,
   currentUser 
 }) => {
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission(Permission.MANAGE_PROJECTS);
   const { id } = useParams<{ id: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [projectTasks, setProjectTasks] = useState<Task[]>([]);
@@ -490,16 +495,18 @@ try {
             <div>
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h6 className="fw-bold mb-0">Project Deliverables</h6>
-                <button className="btn btn-primary btn-sm fw-bold px-3" onClick={() => { setEditingTask(null); setTaskErrors({}); setTaskModalOpen(true); }}>
-                  <i className="bi bi-plus-lg me-2"></i>New Task
-                </button>
+                {canManage && (
+                  <button className="btn btn-primary btn-sm fw-bold px-3" onClick={() => { setEditingTask(null); setTaskErrors({}); setTaskModalOpen(true); }}>
+                    <i className="bi bi-plus-lg me-2"></i>New Task
+                  </button>
+                )}
               </div>
               <div className="table-responsive">
                 <table className="table table-professional align-middle mb-0">
-                  <thead><tr><th>Task Name</th><th>Status</th><th>Priority</th><th>Due Date</th><th className="text-end">Action</th></tr></thead>
+                  <thead><tr><th>Task Name</th><th>Status</th><th>Priority</th><th>Due Date</th>{canManage && <th className="text-end">Action</th>}</tr></thead>
                   <tbody>
                     {projectTasks.length === 0 ? (
-                      <tr><td colSpan={5} className="text-center py-5 text-muted small">No tasks assigned to this project yet.</td></tr>
+                      <tr><td colSpan={canManage ? 5 : 4} className="text-center py-5 text-muted small">No tasks assigned to this project yet.</td></tr>
                     ) : (
                       projectTasks.map(t => (
                         <tr key={t.id} onClick={() => setSelectedTask(t)} style={{cursor: 'pointer'}}>
@@ -507,19 +514,21 @@ try {
                           <td><span className={`badge ${t.status === 'done' ? 'bg-success-subtle text-success' : 'bg-primary-subtle text-primary'}`}>{t.status}</span></td>
                           <td><span className={`badge ${t.priority === 'high' ? 'bg-danger' : 'bg-info'}`}>{t.priority}</span></td>
                           <td className="small text-secondary">{t.dueDate}</td>
-                          <td className="text-end">
-                            <div className="btn-group">
-                              <button className="btn btn-sm btn-light" onClick={(e) => { e.stopPropagation(); setEditingTask(t); setTaskErrors({}); setTaskModalOpen(true); }}>
-                                <i className="bi bi-pencil"></i>
-                              </button>
-                              <button className="btn btn-sm btn-light text-danger" onClick={(e) => {
-  e.stopPropagation();
-  setTaskToDelete(t);
-}}>
-                                <i className="bi bi-trash"></i>
-                              </button>
-                            </div>
-                          </td>
+                          {canManage && (
+                            <td className="text-end">
+                              <div className="btn-group">
+                                <button className="btn btn-sm btn-light" onClick={(e) => { e.stopPropagation(); setEditingTask(t); setTaskErrors({}); setTaskModalOpen(true); }}>
+                                  <i className="bi bi-pencil"></i>
+                                </button>
+                                <button className="btn btn-sm btn-light text-danger" onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTaskToDelete(t);
+                                }}>
+                                  <i className="bi bi-trash"></i>
+                                </button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       ))
                     )}
@@ -533,9 +542,11 @@ try {
             <div>
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h6 className="fw-bold mb-0">Strategic Milestones</h6>
-                <button className="btn btn-dark btn-sm fw-bold px-3" onClick={() => { setEditingMilestone(null); setMilestoneErrors({}); setMilestoneModalOpen(true); }}>
-                  <i className="bi bi-flag me-2"></i>Add Milestone
-                </button>
+                {canManage && (
+                  <button className="btn btn-dark btn-sm fw-bold px-3" onClick={() => { setEditingMilestone(null); setMilestoneErrors({}); setMilestoneModalOpen(true); }}>
+                    <i className="bi bi-flag me-2"></i>Add Milestone
+                  </button>
+                )}
               </div>
               <div className="list-group list-group-flush">
                 {projectMilestones.length === 0 ? (
@@ -547,8 +558,8 @@ try {
                         <div className="d-flex align-items-center">
                           <div 
                             className={`p-2 rounded-circle me-3 shadow-sm border d-flex align-items-center justify-content-center ${m.status === 'completed' ? 'bg-success text-white' : 'bg-white text-secondary'}`}
-                            style={{width: '32px', height: '32px', cursor: 'pointer', fontSize: '0.8rem'}}
-                            onClick={() => handleMilestoneToggle(m)}
+                            style={{width: '32px', height: '32px', cursor: canManage ? 'pointer' : 'default', fontSize: '0.8rem'}}
+                            onClick={() => canManage && handleMilestoneToggle(m)}
                           >
                             <i className={`bi ${m.status === 'completed' ? 'bi-check-lg' : 'bi-circle'}`}></i>
                           </div>
@@ -559,17 +570,19 @@ try {
                         </div>
                         <div className="text-end">
                           <div className="small fw-bold text-dark mb-1">{m.progress_percentage}% Complete</div>
-                          <div className="btn-group">
-                            <button className="btn btn-sm btn-light py-0 px-2" onClick={() => { setEditingMilestone(m); setMilestoneErrors({}); setMilestoneModalOpen(true); }}>
-                              <i className="bi bi-pencil smaller"></i>
-                            </button>
-                            <button className="btn btn-sm btn-light text-danger py-0 px-2" onClick={() => {
-  setSelectedMilestoneId(m.id);
-  setDeleteModalOpen(true);
-}}>
-                              <i className="bi bi-trash smaller"></i>
-                            </button>
-                          </div>
+                          {canManage && (
+                            <div className="btn-group">
+                              <button className="btn btn-sm btn-light py-0 px-2" onClick={() => { setEditingMilestone(m); setMilestoneErrors({}); setMilestoneModalOpen(true); }}>
+                                <i className="bi bi-pencil smaller"></i>
+                              </button>
+                              <button className="btn btn-sm btn-light text-danger py-0 px-2" onClick={() => {
+                                setSelectedMilestoneId(m.id);
+                                setDeleteModalOpen(true);
+                              }}>
+                                <i className="bi bi-trash smaller"></i>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="progress mt-2" style={{height: '6px'}}>
@@ -586,9 +599,11 @@ try {
             <div>
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h6 className="fw-bold mb-0">Assigned Team Members</h6>
-                <button className="btn btn-primary btn-sm fw-bold px-3" onClick={() => { setEditingMember(null); setMemberModalOpen(true); }}>
-                  <i className="bi bi-person-plus me-2"></i>Add Member
-                </button>
+                {canManage && (
+                  <button className="btn btn-primary btn-sm fw-bold px-3" onClick={() => { setEditingMember(null); setMemberModalOpen(true); }}>
+                    <i className="bi bi-person-plus me-2"></i>Add Member
+                  </button>
+                )}
               </div>
               <div className="row g-3">
                 {projectMembers.length === 0 ? (
@@ -617,24 +632,26 @@ try {
           </div>
         </div>
 
-        <div className="d-flex flex-column gap-1">
-          <button
-            className="btn btn-link text-primary p-0 text-decoration-none"
-            onClick={() => {
-              setEditingMember(m);
-              setMemberModalOpen(true);
-            }}
-          >
-            <i className="bi bi-pencil smaller"></i>
-          </button>
+        {canManage && (
+          <div className="d-flex flex-column gap-1">
+            <button
+              className="btn btn-link text-primary p-0 text-decoration-none"
+              onClick={() => {
+                setEditingMember(m);
+                setMemberModalOpen(true);
+              }}
+            >
+              <i className="bi bi-pencil smaller"></i>
+            </button>
 
-          <button
-            className="btn btn-link text-danger p-0 text-decoration-none"
-            onClick={() => setMemberToDelete(m.id)}
-          >
-            <i className="bi bi-person-dash fs-6"></i>
-          </button>
-        </div>
+            <button
+              className="btn btn-link text-danger p-0 text-decoration-none"
+              onClick={() => setMemberToDelete(m.id)}
+            >
+              <i className="bi bi-person-dash fs-6"></i>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

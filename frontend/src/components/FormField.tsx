@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 
 interface FormFieldProps {
   label: string;
@@ -21,6 +21,7 @@ const FormField: React.FC<FormFieldProps> = ({
   label, error, required, children, className = '',
   name, type = 'text', value, onChange, placeholder, options = [], rows = 3, disabled = false
 }) => {
+  const [showPassword, setShowPassword] = useState(false);
   const inputClassName = `form-control ${error ? 'is-invalid' : ''}`;
 
   const renderInput = () => {
@@ -72,6 +73,28 @@ const FormField: React.FC<FormFieldProps> = ({
             onChange={(e) => onChange(name, e.target.files?.[0] || null)}
             disabled={disabled}
           />
+        );
+      case 'password':
+        return (
+          <div className="input-group">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              name={name}
+              className={inputClassName}
+              value={value}
+              onChange={(e) => onChange(name, e.target.value)}
+              placeholder={placeholder}
+              disabled={disabled}
+            />
+            <button
+              type="button"
+              className="btn btn-outline-secondary d-flex align-items-center"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+            </button>
+          </div>
         );
       default:
         return (

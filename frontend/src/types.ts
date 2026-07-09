@@ -302,9 +302,10 @@ export interface Task {
   task_type_name?: string;
 
   createdBy?: number;
- created_at?: string;
+  created_at?: string;
   updatedAt?: string;
   deletedAt?: string;
+  latest_progress?: number;
 }
 
 export interface TaskAssignment {

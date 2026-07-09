@@ -19,7 +19,8 @@ from .email_service import send_invoice_email
 import tempfile
 from rest_framework.decorators import api_view, permission_classes
 from apps.projects.utils import log_failed_attempt
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
+
 from django.views.decorators.csrf import csrf_exempt
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -30,7 +31,8 @@ from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 from num2words import num2words
 from django_filters.rest_framework import DjangoFilterBackend
-from core.permissions import IsClientOwner
+from core.permissions import IsClientOwner, HasPermission
+
 
 class InvoiceViewSet(viewsets.ModelViewSet):
 
@@ -48,11 +50,18 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         user = self.request.user
         role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
         
+        base_qs = Invoice.objects.select_related('client').prefetch_related('items', 'payments').order_by("-id")
+        
         if role_name == 'CLIENT':
-            if self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
-                return Invoice.objects.all().order_by("-id")
+            client = user.get_associated_client()
+            if client:
+                if self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+                    return base_qs
+                return base_qs.filter(client=client)
+            return Invoice.objects.none()
             
-        return Invoice.get_for_user(user).order_by("-id")
+        return base_qs
+
 
     def check_permissions(self, request):
         super().check_permissions(request)
@@ -92,7 +101,9 @@ class InvoicePaymentViewSet(viewsets.ModelViewSet):
             self.permission_denied(request, message="Clients do not have permission to modify invoice payments.")
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated, HasPermission])
 def invoice_analytics(request):
+
 
     invoices = Invoice.objects.all()
 
@@ -114,8 +125,12 @@ def invoice_analytics(request):
         "total_paid": total_paid,
         "total_balance": total_balance
     })
+invoice_analytics.cls.required_permission = 'MANAGE_SETTINGS'
+
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def download_invoice(request, pk):
+
     try:
         user = request.user
         if not user or not user.is_authenticated:
@@ -554,8 +569,9 @@ def generate_invoice_pdf(invoice):
     return tmp_file.name
 @csrf_exempt
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, HasPermission])
 def send_invoice_email_view(request, pk):
+
     try:
         invoice = Invoice.objects.get(id=pk)
     except Invoice.DoesNotExist:
@@ -567,3 +583,4 @@ def send_invoice_email_view(request, pk):
         return Response({"message": "Email sent"})
     except Exception as e:
         return Response({"error": f"Failed to send email: {str(e)}"}, status=500)
+send_invoice_email_view.cls.required_permission = 'MANAGE_SETTINGS'

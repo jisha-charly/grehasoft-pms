@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from apps.projects.utils import log_system_activity, log_failed_attempt
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.decorators import action
 class TaskTypeViewSet(viewsets.ModelViewSet):
     queryset = TaskType.objects.all()
     serializer_class = TaskTypeSerializer
@@ -92,6 +93,29 @@ class TaskViewSet(viewsets.ModelViewSet):
         if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:
             log_failed_attempt(request.user, f"Tried to write task via {request.method}")
             self.permission_denied(request, message="Clients do not have permission to modify task data.")
+        if role_name == 'TEAM_MEMBER':
+            if self.action in ['create', 'destroy']:
+                self.permission_denied(request, message="Team Members do not have permission to create or delete tasks.")
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
+        if role_name == 'TEAM_MEMBER':
+            if request.method not in permissions.SAFE_METHODS:
+                # 1. Must be assigned to the task
+                is_assigned = obj.assignments.filter(employee=request.user).exists()
+                if not is_assigned:
+                    from rest_framework.exceptions import PermissionDenied
+                    raise PermissionDenied("You can only modify tasks assigned to you.")
+                # 2. Can only update status and progress_percentage
+                allowed_fields = {'status', 'progress_percentage'}
+                payload_keys = set(request.data.keys())
+                unauthorized_fields = payload_keys - allowed_fields
+                if unauthorized_fields:
+                    from rest_framework.exceptions import PermissionDenied
+                    raise PermissionDenied(
+                        f"Team Members can only update status and progress. Unauthorized fields: {', '.join(unauthorized_fields)}"
+                    )
 
     def perform_create(self, serializer):
         task = serializer.save(created_by=self.request.user)
@@ -134,6 +158,14 @@ class TaskFileViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(task__project__client=client)
             else:
                 queryset = queryset.none()
+        elif role_name not in ['SUPER_ADMIN', 'ADMIN', 'PROJECT_MANAGER', 'SALES_MANAGER']:
+            # Non-client, non-admin users must belong to the project members/PM/creator
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(task__project__members__user=user) |
+                Q(task__project__project_manager=user) |
+                Q(task__project__created_by=user)
+            ).distinct()
 
         task_id = self.request.query_params.get("task")
         if task_id:
@@ -143,9 +175,67 @@ class TaskFileViewSet(viewsets.ModelViewSet):
     def check_permissions(self, request):
         super().check_permissions(request)
         role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
-        if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:
-            log_failed_attempt(request.user, f"Tried to write task file via {request.method}")
-            self.permission_denied(request, message="Clients do not have permission to modify task files.")
+        
+        if role_name == 'CLIENT':
+            if request.method not in permissions.SAFE_METHODS:
+                log_failed_attempt(request.user, f"Tried to write task file via {request.method}")
+                self.permission_denied(request, message="Clients do not have permission to modify task files.")
+        elif role_name not in ['SUPER_ADMIN', 'ADMIN', 'PROJECT_MANAGER', 'SALES_MANAGER']:
+            if request.method not in permissions.SAFE_METHODS and self.action == 'create':
+                task_id = request.data.get('task')
+                if task_id:
+                    from apps.tasks.models import Task
+                    from rest_framework.exceptions import PermissionDenied
+                    try:
+                        task = Task.objects.get(id=task_id)
+                        is_pm = task.project.project_manager == request.user or task.project.created_by == request.user
+                        is_member = task.project.members.filter(user=request.user).exists()
+                        if not is_pm and not is_member:
+                            raise PermissionDenied("You are not a member of the project for this task.")
+                    except Task.DoesNotExist:
+                        pass
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
+        
+        if role_name == 'CLIENT':
+            client = request.user.get_associated_client()
+            if not client or obj.task.project.client != client:
+                self.permission_denied(request, message="Clients do not have access to this file.")
+        elif role_name not in ['SUPER_ADMIN', 'ADMIN', 'PROJECT_MANAGER', 'SALES_MANAGER']:
+            task = obj.task
+            is_pm = task.project.project_manager == request.user or task.project.created_by == request.user
+            is_member = task.project.members.filter(user=request.user).exists()
+            is_uploader = obj.uploaded_by == request.user
+            if not is_pm and not is_member and not is_uploader:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("You do not have access to this file.")
+
+    @action(detail=True, methods=['get'])
+    def download(self, request, pk=None):
+        task_file = self.get_object()
+        if not task_file.file or not task_file.file.storage.exists(task_file.file.name):
+            from django.http import Http404
+            raise Http404("Physical file does not exist on disk.")
+        
+        from django.http import FileResponse
+        response = FileResponse(task_file.file.open(), content_type=task_file.file_type)
+        response['Content-Disposition'] = f'attachment; filename="{task_file.file_path}"'
+        return response
+
+    @action(detail=True, methods=['get'])
+    def preview(self, request, pk=None):
+        task_file = self.get_object()
+        if not task_file.file or not task_file.file.storage.exists(task_file.file.name):
+            from django.http import Http404
+            raise Http404("Physical file does not exist on disk.")
+        
+        from django.http import FileResponse
+        response = FileResponse(task_file.file.open(), content_type=task_file.file_type)
+        response['Content-Disposition'] = f'inline; filename="{task_file.file_path}"'
+        return response
+
 
 class TaskCommentViewSet(viewsets.ModelViewSet):
     queryset = TaskComment.objects.all()
@@ -177,6 +267,15 @@ class TaskCommentViewSet(viewsets.ModelViewSet):
             if request.method not in permissions.SAFE_METHODS and self.action != 'create':
                 log_failed_attempt(request.user, f"Tried to edit/delete task comment via {request.method}")
                 self.permission_denied(request, message="Clients do not have permission to edit or delete comments.")
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
+        if request.method not in permissions.SAFE_METHODS:
+            if role_name not in ['SUPER_ADMIN', 'ADMIN', 'PROJECT_MANAGER']:
+                if obj.user != request.user:
+                    from rest_framework.exceptions import PermissionDenied
+                    raise PermissionDenied("You can only modify or delete your own comments.")
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -219,6 +318,10 @@ class TaskReviewViewSet(viewsets.ModelViewSet):
         return queryset
 
     def check_permissions(self, request):
+        if request.method not in permissions.SAFE_METHODS:
+            self.required_permission = 'MANAGE_PROJECTS'
+        else:
+            self.required_permission = 'VIEW_TASKS'
         super().check_permissions(request)
         role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
         if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:

@@ -191,7 +191,7 @@ const confirmDelete = async () => {
                 <th className="px-4">Client / Contact</th>
                 <th>Company & GST</th>
                 <th>Contact Info</th>
-                <th>Mailing Address</th>
+                <th>Address</th>
                 <th className="text-end px-4">Actions</th>
               </tr>
             </thead>

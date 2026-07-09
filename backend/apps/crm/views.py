@@ -15,12 +15,31 @@ class LeadViewSet(viewsets.ModelViewSet):
     permission_classes = [HasPermission]
     required_permission = 'VIEW_LEADS'
 
+
+
+    def check_permissions(self, request):
+        if request.method not in permissions.SAFE_METHODS:
+            self.required_permission = 'MANAGE_LEADS'
+        else:
+            self.required_permission = 'VIEW_LEADS'
+        super().check_permissions(request)
+
+
     def get_queryset(self):
         user = self.request.user
-        if user.role.name in ['SUPER_ADMIN', 'SALES_MANAGER']:
-            return Lead.objects.all()
+        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+        
+        base_qs = Lead.objects.select_related(
+            'client', 'converted_project'
+        ).prefetch_related(
+            'followups', 'assignments__sales_exec'
+        )
+        
+        if role_name in ['SUPER_ADMIN', 'SALES_MANAGER']:
+            return base_qs.all()
         # Sales Executives only see leads assigned to them
-        return Lead.objects.filter(assignments__sales_exec=user)
+        return base_qs.filter(assignments__sales_exec=user)
+
  
     @action(detail=True, methods=['post'])
     def convert_to_project(self, request, pk=None):
@@ -36,17 +55,23 @@ class LeadViewSet(viewsets.ModelViewSet):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-     if not lead.client:
-        return Response(
-            {"error": "Lead must be linked to a client before conversion"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
      with transaction.atomic():
+        client = lead.client
+        if not client:
+            from apps.projects.utils import get_or_create_active_client
+            client, _ = get_or_create_active_client(
+                email=lead.email,
+                name=lead.name,
+                phone=lead.phone,
+                company_name=lead.company_name or "",
+                address=request.data.get("client_address") or ""
+            )
+            lead.client = client
+            lead.save()
 
         project = Project.objects.create(
            name=request.data.get("name"),
-    client=lead.client,
+    client=client,
     department_id=request.data.get("department"),
     project_manager_id=request.data.get("project_manager"),
     created_by=request.user,
@@ -73,6 +98,15 @@ class LeadFollowupViewSet(viewsets.ModelViewSet):
     serializer_class = LeadFollowupSerializer
     permission_classes = [HasPermission]
     required_permission = 'VIEW_LEADS'
+
+
+    def check_permissions(self, request):
+        if request.method not in permissions.SAFE_METHODS:
+            self.required_permission = 'MANAGE_LEADS'
+        else:
+            self.required_permission = 'VIEW_LEADS'
+        super().check_permissions(request)
+
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['lead', 'status', 'followup_type']
     search_fields = ['notes']
@@ -91,6 +125,15 @@ class LeadAssignmentViewSet(viewsets.ModelViewSet):
     serializer_class = LeadAssignmentSerializer
     permission_classes = [HasPermission]
     required_permission = 'VIEW_LEADS'
+
+
+    def check_permissions(self, request):
+        if request.method not in permissions.SAFE_METHODS:
+            self.required_permission = 'MANAGE_LEADS'
+        else:
+            self.required_permission = 'VIEW_LEADS'
+        super().check_permissions(request)
+
 
     def get_queryset(self):
         lead_id = self.request.query_params.get('lead_id')

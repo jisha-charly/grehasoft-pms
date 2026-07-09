@@ -82,6 +82,8 @@ urlpatterns = [
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path("api/v1/invoices/analytics/", views.invoice_analytics),
+    path("api/v1/users/profile/", ProfileView.as_view()),
+    path("api/v1/users/change-password/", change_password),
     path('api/v1/', include(router.urls)),
     path("api/v1/", include("apps.hr_documents.urls")),
     path("api/v1/infrastructure/", include("apps.infrastructure.urls")),
@@ -93,8 +95,6 @@ urlpatterns = [
     path('api/v1/dashboard/stats/', DashboardStatsView.as_view(), name='dashboard-stats'),
     path('api/v1/auth/', include('rest_framework.urls')), 
     path('api/v1/password_reset/', include('django_rest_passwordreset.urls', namespace='password_reset')),
-    path("api/v1/users/profile/", ProfileView.as_view()),
-    path("api/v1/users/change-password/", change_password),
     path("api/v1/invoices/<int:pk>/download/",views.download_invoice),
     path("api/v1/invoices/<int:pk>/send-email/", views.send_invoice_email_view,),
   

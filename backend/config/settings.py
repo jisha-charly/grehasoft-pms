@@ -8,9 +8,11 @@ from dotenv import load_dotenv
 load_dotenv()
 SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-grehasoft-dev-key")
 
-DEBUG =True
+DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1")
 
-ALLOWED_HOSTS = ["*"]
+hosts_env = os.environ.get("ALLOWED_HOSTS", "*")
+ALLOWED_HOSTS = [h.strip() for h in hosts_env.split(",") if h.strip()]
+
 
 
 # ==============================
@@ -115,8 +117,9 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.AllowAny',  # 🔥 CHANGE THIS
+        'rest_framework.permissions.IsAuthenticated',
     ),
+
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend'
     ],
@@ -208,10 +211,9 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes hard limit
 CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 25 minutes soft limit
 # Use 'solo' pool for Windows (prefork doesn't work on Windows)
 CELERY_WORKER_POOL = 'solo'
-# IMPORTANT: For development/testing, execute tasks immediately (synchronously)
-# This allows testing without needing a running worker
-CELERY_ALWAYS_EAGER = True
+CELERY_ALWAYS_EAGER = os.environ.get("CELERY_ALWAYS_EAGER", "True").lower() in ("true", "1")
 CELERY_EAGER_PROPAGATES_EXCEPTIONS = True
+
 
 from celery.schedules import crontab
 CELERY_BEAT_SCHEDULE = {

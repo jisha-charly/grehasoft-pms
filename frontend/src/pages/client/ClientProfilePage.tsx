@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import axiosInstance from "../../api/axiosInstance";
 import { useAuth } from "../../context/AuthContext";
+import FormField from "../../components/FormField";
+import useAlert from "../../hooks/useAlert";
+import { AlertVariant } from "../../types/alert";
 
 type ClientData = {
   id: number;
@@ -13,6 +16,7 @@ type ClientData = {
 
 const ClientProfilePage: React.FC = () => {
   const { user, updateUser } = useAuth();
+  const { showAlert } = useAlert();
   
   // Profile state
   const [clientData, setClientData] = useState<ClientData | null>(null);
@@ -24,6 +28,7 @@ const ClientProfilePage: React.FC = () => {
   const [currentPassword, setCurrentPassword] = useState<string>("");
   const [newPassword, setNewPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
+  const [errors, setErrors] = useState<any>({});
   
   const [loading, setLoading] = useState<boolean>(true);
   const [submittingProfile, setSubmittingProfile] = useState<boolean>(false);
@@ -98,10 +103,11 @@ const ClientProfilePage: React.FC = () => {
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage(null);
+    setErrors({});
 
     if (newPassword !== confirmPassword) {
-      setMessage({ type: "danger", text: "Passwords do not match." });
+      setErrors({ confirmPassword: "Passwords do not match." });
+      showAlert({ variant: AlertVariant.ERROR, title: "Error", message: "Passwords do not match." });
       return;
     }
 
@@ -114,10 +120,12 @@ const ClientProfilePage: React.FC = () => {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setMessage({ type: "success", text: "Password changed successfully." });
+      setErrors({});
+      showAlert({ variant: AlertVariant.SUCCESS, title: "Success", message: "Password changed successfully." });
     } catch (err: any) {
-      console.error("Error updating password:", err);
-      setMessage({ type: "danger", text: err.response?.data?.error || "Failed to change password." });
+      const errMsg = err.response?.data?.error || err.response?.data?.detail || "Failed to change password.";
+      setErrors({ currentPassword: errMsg });
+      showAlert({ variant: AlertVariant.ERROR, title: "Error", message: errMsg });
     } finally {
       setSubmittingPassword(false);
     }
@@ -239,41 +247,38 @@ const ClientProfilePage: React.FC = () => {
             <div className="card border-0 shadow-sm rounded-4 p-4 bg-white h-100">
               <h5 className="fw-bold text-dark mb-4">Change Password</h5>
 
-              <div className="mb-3">
-                <label className="form-label small text-secondary fw-bold">Current Password</label>
-                <input
-                  type="password"
-                  className="form-control rounded-pill btn-sm"
-                  placeholder="Enter current password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  required
-                />
-              </div>
+              <FormField
+                label="Current Password"
+                name="currentPassword"
+                type="password"
+                placeholder="Enter current password"
+                value={currentPassword}
+                onChange={(_, val) => setCurrentPassword(val)}
+                error={errors.currentPassword}
+                required
+              />
 
-              <div className="mb-3">
-                <label className="form-label small text-secondary fw-bold">New Password</label>
-                <input
-                  type="password"
-                  className="form-control rounded-pill btn-sm"
-                  placeholder="Enter new password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                />
-              </div>
+              <FormField
+                label="New Password"
+                name="newPassword"
+                type="password"
+                placeholder="Enter new password"
+                value={newPassword}
+                onChange={(_, val) => setNewPassword(val)}
+                error={errors.newPassword}
+                required
+              />
 
-              <div className="mb-4">
-                <label className="form-label small text-secondary fw-bold">Confirm New Password</label>
-                <input
-                  type="password"
-                  className="form-control rounded-pill btn-sm"
-                  placeholder="Confirm new password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
-              </div>
+              <FormField
+                label="Confirm New Password"
+                name="confirmPassword"
+                type="password"
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={(_, val) => setConfirmPassword(val)}
+                error={errors.confirmPassword}
+                required
+              />
 
               <button type="submit" className="btn btn-outline-danger rounded-pill w-100 mt-2" disabled={submittingPassword}>
                 {submittingPassword ? "Updating Password..." : "Update Password"}
