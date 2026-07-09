@@ -33,7 +33,10 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'name', 'username', 'email', 'password', 'role', 'department', 'status','position', 'joining_date', 'salary_monthly','address', 'client', 'profile_photo']
-        extra_kwargs = {'password': {'write_only': True}}
+        extra_kwargs = {
+            'password': {'write_only': True},
+            'department': {'required': False, 'allow_null': True}
+        }
         read_only_fields = ['id']
 
     def validate(self, attrs):
@@ -41,6 +44,7 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
         Centralized security validation:
         - Prevents non-Super-Admins from assigning the SUPER_ADMIN role.
         - Prevents non-Super-Admins from modifying or demoting existing SUPER_ADMIN users.
+        - Dynamic validation for CLIENT vs Employee roles.
         """
         request = self.context.get('request')
         if not request:
@@ -60,6 +64,24 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
             instance_is_super = self.instance.is_superuser or (self.instance.role and self.instance.role.name == 'SUPER_ADMIN')
             if instance_is_super and req_user.id != self.instance.id and not req_is_super:
                 raise serializers.ValidationError({"role": "Only Super Admins can modify other Super Admin accounts."})
+
+        # 3. Dynamic validation based on Role (CLIENT vs Employee)
+        target_role = attrs.get('role', self.instance.role if self.instance else None)
+        if target_role:
+            if target_role.name == 'CLIENT':
+                # Automatically clear employee fields for Client users
+                attrs['department'] = None
+                attrs['position'] = None
+                attrs['joining_date'] = None
+                attrs['salary_monthly'] = None
+            else:
+                # Employee roles must specify a department
+                target_dept = attrs.get('department', self.instance.department if self.instance else None)
+                if target_dept is None:
+                    raise serializers.ValidationError({"department": "Department is required for employee roles."})
+        else:
+            if not self.instance:
+                raise serializers.ValidationError({"role": "Role is required."})
 
         return attrs
 

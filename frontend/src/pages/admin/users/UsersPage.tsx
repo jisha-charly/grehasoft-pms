@@ -52,36 +52,46 @@ const UsersPage: React.FC<UsersPageProps> = ({ roles, departments }) => {
       message: 'Password validation failed.'
     },
     role: { required: true, message: 'Please select an access role.' },
-    departmentId: { required: true, message: 'Please choose a department.' }
+    departmentId: {
+      validate: (v, formValues) => {
+        const selectedRole = roles.find(r => r.id === Number(formValues.role));
+        if (selectedRole?.name === 'CLIENT') return true;
+        if (!v) return 'Please choose a department.';
+        return true;
+      },
+      message: 'Please choose a department.'
+    }
   };
 
   const { values, errors, handleChange, handleSubmit, setValues, resetForm, isSubmitting } = useForm({
-   initialValues: {
-  name: '',
-  username: '',
-  email: '',
-  password: '',
-  role: '' as any,
-  departmentId: '' as any,
-  status: 'active' as 'active' | 'inactive',
-  position: '',
-  joining_date: '',
-  salary_monthly: '',
-  address: "",
-},
+    initialValues: {
+      name: '',
+      username: '',
+      email: '',
+      password: '',
+      role: '' as any,
+      departmentId: '' as any,
+      status: 'active' as 'active' | 'inactive',
+      position: '',
+      joining_date: '',
+      salary_monthly: '',
+      address: "",
+    },
     validationSchema,
     onSubmit: async (formValues) => {
+      const selectedRole = roles.find(r => r.id === Number(formValues.role));
+      const isClient = selectedRole?.name === 'CLIENT';
       const data: any = {
         name: formValues.name,
         username: formValues.username,
         role: Number(formValues.role),
-        department: Number(formValues.departmentId),
+        department: isClient ? null : Number(formValues.departmentId),
         status: formValues.status,
-        position: formValues.position || null,
-        joining_date: formValues.joining_date || null,
-        salary_monthly: formValues.salary_monthly
+        position: isClient ? null : (formValues.position || null),
+        joining_date: isClient ? null : (formValues.joining_date || null),
+        salary_monthly: isClient ? null : (formValues.salary_monthly
           ? Number(formValues.salary_monthly)
-          : null,
+          : null),
         address: formValues.address || null,
       };
 
@@ -114,6 +124,9 @@ const UsersPage: React.FC<UsersPageProps> = ({ roles, departments }) => {
       handleCloseModal();
     }
   });
+
+  const clientRole = roles.find(r => r.name === 'CLIENT');
+  const isClient = !!(clientRole && String(values.role) === String(clientRole.id));
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -398,52 +411,56 @@ const UsersPage: React.FC<UsersPageProps> = ({ roles, departments }) => {
                         </select>
                       </FormField>
                     </div>
-                    <div className="col-md-6">
-                      <FormField label="Assigned Department" error={errors.departmentId} required>
-                        <select 
-                          name="departmentId" 
-                          className="form-select form-select-lg border-light bg-light" 
-                          value={values.departmentId} 
-                          onChange={(e) => handleChange('departmentId', e.target.value)}
-                        >
-                          <option value="">Choose department...</option>
-                          {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                        </select>
-                      </FormField>
-                    </div>
-                    <div className="col-md-6">
-  <FormField label="Position">
-    <input
-      className="form-control form-control-lg border-light bg-light"
-      value={values.position}
-      onChange={(e) => handleChange('position', e.target.value)}
-      placeholder="e.g. Software Developer"
-    />
-  </FormField>
-</div>
+                    {!isClient && (
+                      <>
+                        <div className="col-md-6">
+                          <FormField label="Assigned Department" error={errors.departmentId} required>
+                            <select 
+                              name="departmentId" 
+                              className="form-select form-select-lg border-light bg-light" 
+                              value={values.departmentId} 
+                              onChange={(e) => handleChange('departmentId', e.target.value)}
+                            >
+                              <option value="">Choose department...</option>
+                              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </select>
+                          </FormField>
+                        </div>
+                        <div className="col-md-6">
+                          <FormField label="Position">
+                            <input
+                              className="form-control form-control-lg border-light bg-light"
+                              value={values.position}
+                              onChange={(e) => handleChange('position', e.target.value)}
+                              placeholder="e.g. Software Developer"
+                            />
+                          </FormField>
+                        </div>
 
-<div className="col-md-6">
-  <FormField label="Joining Date">
-    <input
-      type="date"
-      className="form-control form-control-lg border-light bg-light"
-      value={values.joining_date}
-      onChange={(e) => handleChange('joining_date', e.target.value)}
-    />
-  </FormField>
-</div>
+                        <div className="col-md-6">
+                          <FormField label="Joining Date">
+                            <input
+                              type="date"
+                              className="form-control form-control-lg border-light bg-light"
+                              value={values.joining_date}
+                              onChange={(e) => handleChange('joining_date', e.target.value)}
+                            />
+                          </FormField>
+                        </div>
 
-<div className="col-md-6">
-  <FormField label="Monthly Salary">
-    <input
-      type="number"
-      className="form-control form-control-lg border-light bg-light"
-      value={values.salary_monthly}
-      onChange={(e) => handleChange('salary_monthly', e.target.value)}
-      placeholder="Optional"
-    />
-  </FormField>
-</div>
+                        <div className="col-md-6">
+                          <FormField label="Monthly Salary">
+                            <input
+                              type="number"
+                              className="form-control form-control-lg border-light bg-light"
+                              value={values.salary_monthly}
+                              onChange={(e) => handleChange('salary_monthly', e.target.value)}
+                              placeholder="Optional"
+                            />
+                          </FormField>
+                        </div>
+                      </>
+                    )}
                     <div className="col-12">
                       <FormField label="Account Visibility & Status">
                         <select 
