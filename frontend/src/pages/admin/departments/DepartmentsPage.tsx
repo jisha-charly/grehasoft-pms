@@ -33,13 +33,13 @@ const DepartmentsPage: React.FC = () => {
   const { values, errors, isSubmitting, handleChange, handleSubmit, resetForm, setValues } = useForm({
     initialValues: {
       name: '',
-      parentId: '' as string | number
+      parent: '' as string | number
     },
     validationSchema,
     onSubmit: async (formData) => {
       const data = {
         name: formData.name,
-        parentId: formData.parentId ? Number(formData.parentId) : null
+        parent: formData.parent ? Number(formData.parent) : null
       };
       
       if (editingDept) {
@@ -56,7 +56,7 @@ const DepartmentsPage: React.FC = () => {
     if (editingDept) {
       setValues({
         name: editingDept.name,
-        parentId: editingDept.parentId || ''
+        parent: editingDept.parent || ''
       });
     } else {
       resetForm();
@@ -68,11 +68,6 @@ const DepartmentsPage: React.FC = () => {
       dept.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [departments, searchTerm]);
-
-  const getParentName = (parentId?: number) => {
-    if (!parentId) return null;
-    return departments.find(d => d.id === parentId)?.name;
-  };
 
   const handleOpenModal = (dept: Department | null = null) => {
     setEditingDept(dept);
@@ -131,19 +126,18 @@ const DepartmentsPage: React.FC = () => {
                 </tr>
               ) : (
               departments.map(dept => {
-                  const parentName = getParentName(dept.parentId);
                   return (
                     <tr key={dept.id} className="hover-bg-light transition">
                       <td className="px-4">
                         <div className="d-flex align-items-center">
-                          {dept.parentId && <i className="bi bi-arrow-return-right text-muted me-2 smaller"></i>}
-                          <span className={`fw-bold ${dept.parentId ? 'text-secondary small' : 'text-dark'}`}>{dept.name}</span>
+                          {dept.parent && <i className="bi bi-arrow-return-right text-muted me-2 smaller"></i>}
+                          <span className={`fw-bold ${dept.parent ? 'text-secondary small' : 'text-dark'}`}>{dept.name}</span>
                         </div>
                       </td>
                       <td>
-                        {parentName ? (
+                        {dept.parent ? (
                           <span className="badge bg-light text-primary border fw-normal py-1 px-2">
-                            <i className="bi bi-layers me-1"></i>Sub of {parentName}
+                            <i className="bi bi-layers me-1"></i>Sub Unit of {dept.parent_name}
                           </span>
                         ) : (
                           <span className="badge bg-primary-subtle text-primary border-0 fw-bold py-1 px-2 uppercase smaller">
@@ -151,7 +145,9 @@ const DepartmentsPage: React.FC = () => {
                           </span>
                         )}
                       </td>
-                      <td className="small text-muted">{dept.createdAt || 'N/A'}</td>
+                      <td className="small text-muted">
+                        {dept.created_at ? new Date(dept.created_at).toLocaleDateString() : 'N/A'}
+                      </td>
                       <td className="text-end px-4">
                         <div className="btn-group shadow-sm rounded-3 overflow-hidden border">
                           <button className="btn btn-sm btn-white border-end" onClick={() => handleOpenModal(dept)} title="Modify Configuration">
@@ -246,10 +242,10 @@ const DepartmentsPage: React.FC = () => {
                   <div className="mb-0">
                     <label className="form-label smaller fw-bold text-secondary uppercase tracking-wider">Parent Division</label>
                     <select 
-                      name="parentId" 
-                      className={`form-select form-select-lg border-light bg-light ${errors.parentId ? 'is-invalid' : ''}`}
-                      value={values.parentId}
-                      onChange={(e) => handleChange('parentId', e.target.value)}
+                      name="parent" 
+                      className={`form-select form-select-lg border-light bg-light ${errors.parent ? 'is-invalid' : ''}`}
+                      value={values.parent}
+                      onChange={(e) => handleChange('parent', e.target.value)}
                     >
                       <option value="">None (Primary Department)</option>
                       {departments
@@ -259,7 +255,7 @@ const DepartmentsPage: React.FC = () => {
                         ))
                       }
                     </select>
-                    {errors.parentId && <div className="invalid-feedback">{errors.parentId}</div>}
+                    {errors.parent && <div className="invalid-feedback">{errors.parent}</div>}
                     <div className="form-text smaller text-muted">Nested departments help organize sub-services and specialized teams.</div>
                   </div>
                 </div>

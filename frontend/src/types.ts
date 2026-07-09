@@ -167,9 +167,10 @@ export interface Role {
 export interface Department {
   id: number;
   name: string;
-  parentId?: number;
-  createdAt?: string;
-  updatedAt?: string;
+  parent?: number | null;
+  parent_name?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface TaskType {
