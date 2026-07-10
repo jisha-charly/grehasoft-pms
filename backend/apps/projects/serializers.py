@@ -9,9 +9,26 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
         model = ProjectMember
         fields = "__all__"
 class ClientSerializer(serializers.ModelSerializer):
+    gst_number = serializers.CharField(
+        source="gst_no",
+        allow_blank=True,
+        allow_null=True,
+        required=False
+    )
+
     class Meta:
         model = Client
-        fields = '__all__'
+        fields = [
+            'id',
+            'name',
+            'email',
+            'phone',
+            'company_name',
+            'gst_number',
+            'address',
+            'created_at',
+            'updated_at'
+        ]
 
     def validate_email(self, value):
         qs = Client.objects.filter(email=value)
