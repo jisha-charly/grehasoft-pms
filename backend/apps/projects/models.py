@@ -27,8 +27,8 @@ class Project(SoftDeleteModel):
 
     name = models.CharField(max_length=200)
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='projects')
-    department = models.ForeignKey('users.Department', on_delete=models.PROTECT)
-    project_manager = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='managed_projects')
+    department = models.ForeignKey('users.Department', on_delete=models.SET_NULL, null=True, blank=True)
+    project_manager = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='managed_projects')
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='created_projects')
     start_date = models.DateField()
     end_date = models.DateField()

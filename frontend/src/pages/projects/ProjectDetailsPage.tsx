@@ -465,10 +465,8 @@ try {
                 <h6 className="fw-bold mb-3">Project Summary</h6>
                 <p className="text-muted small">Comprehensive oversight of {project.name}. All functional requirements and milestones are tracked here.</p>
                 <div className="row g-3 mt-4">
-                  <div className="col-md-6"><div className="p-3 rounded bg-light border-0"><div className="small text-secondary fw-bold uppercase mb-1" style={{fontSize: '0.6rem'}}>Department</div><div className="fw-bold">{departments.find(d => d.id === project.department
-                    
-                  )?.name || 'N/A'}</div></div></div>
-                  <div className="col-md-6"><div className="p-3 rounded bg-light border-0"><div className="small text-secondary fw-bold uppercase mb-1" style={{fontSize: '0.6rem'}}>Project Manager</div><div className="fw-bold">{users.find(u => u.id === project.project_manager)?.name || 'N/A'}</div></div></div>
+                  <div className="col-md-6"><div className="p-3 rounded bg-light border-0"><div className="small text-secondary fw-bold uppercase mb-1" style={{fontSize: '0.6rem'}}>Department</div><div className="fw-bold">{project.department ? (departments.find(d => d.id === project.department)?.name || 'Not Assigned') : 'Not Assigned'}</div></div></div>
+                  <div className="col-md-6"><div className="p-3 rounded bg-light border-0"><div className="small text-secondary fw-bold uppercase mb-1" style={{fontSize: '0.6rem'}}>Project Manager</div><div className="fw-bold">{project.project_manager ? (users.find(u => u.id === project.project_manager)?.name || 'Not Assigned') : 'Not Assigned'}</div></div></div>
                 </div>
               </div>
               <div className="col-lg-4">

@@ -157,4 +157,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "client",
             "profile_photo"
         ]
-        read_only_fields = ["role", "department", "date_joined", "last_login", "is_superuser"]
+        read_only_fields = ["role", "department", "date_joined", "last_login", "is_superuser"]
+
+class MinimalUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'name', 'username', 'email', 'role']

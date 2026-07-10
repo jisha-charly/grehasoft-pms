@@ -91,7 +91,7 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     
     def get_permissions(self):
-        if self.action == 'me':
+        if self.action in ['me', 'project_managers']:
             return [permissions.IsAuthenticated()]
         return [HasPermission()]
 
@@ -106,15 +106,22 @@ class UserViewSet(viewsets.ModelViewSet):
         queryset = User.objects.all()
 
         dept_id = self.request.query_params.get("department")
-        role_id = self.request.query_params.get("role")
+        role = self.request.query_params.get("role")
         role_name = self.request.query_params.get("role_name")
         is_active = self.request.query_params.get("is_active")
 
         if dept_id:
             queryset = queryset.filter(department_id=dept_id)
 
-        if role_id:
-            queryset = queryset.filter(role_id=role_id)
+        if role:
+            if role.isdigit():
+                queryset = queryset.filter(role_id=role)
+            elif role == 'PROJECT_MANAGER':
+                from django.conf import settings
+                eligible_roles = getattr(settings, 'ELIGIBLE_PM_ROLES', ['PROJECT_MANAGER'])
+                queryset = queryset.filter(role__name__in=eligible_roles)
+            else:
+                queryset = queryset.filter(role__name=role)
 
         if role_name:
             role_names = [r.strip() for r in role_name.split(',')]
@@ -130,6 +137,17 @@ class UserViewSet(viewsets.ModelViewSet):
         ).order_by('sort_name')
 
         return queryset
+
+    @action(detail=False, methods=["get"], url_path="project-managers")
+    def project_managers(self, request):
+        from django.conf import settings
+        from apps.users.serializers import MinimalUserSerializer
+        
+        eligible_roles = getattr(settings, 'ELIGIBLE_PM_ROLES', ['PROJECT_MANAGER'])
+        queryset = self.get_queryset().filter(role__name__in=eligible_roles, is_active=True)
+        
+        serializer = MinimalUserSerializer(queryset, many=True, context=self.get_serializer_context())
+        return Response(serializer.data)
 
     def list(self, request, *args, **kwargs):
         if request.query_params.get('all') == 'true':

@@ -204,13 +204,13 @@ class ProposalViewSet(viewsets.ModelViewSet):
      project = Project.objects.create(
         name=proposal.title,
         client=client,
-        department_id=1,
-        project_manager=request.user,
+        department=None,
+        project_manager=None,
         created_by=request.user,
         start_date=timezone.now().date(),
         end_date=timezone.now().date() + timedelta(days=30),
         status="not_started"
-    )
+     )
 
      # ✅ STEP 3: UPDATE STATUS
      proposal.is_converted = True

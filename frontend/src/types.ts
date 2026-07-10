@@ -264,8 +264,8 @@ export interface Project {
     email?: string;
   };
   client_id?: number;
-  department: number;
-  project_manager: number;
+  department: number | null;
+  project_manager: number | null;
   createdBy: number;
   startDate: string;
   endDate: string;

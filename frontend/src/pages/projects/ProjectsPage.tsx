@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Project, ProjectStatus, User, Department, Client, Permission } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -7,6 +7,7 @@ import { useCrud } from '../../hooks/useCrud';
 import FormField from '../../components/FormField';
 import DeleteConfirmModal from '@/components/DeleteConfirmModal';
 import { getClientDisplayName } from '../../utils/clientDisplay';
+import axiosInstance from '../../api/axiosInstance';
 
 interface ProjectsPageProps {
   users: User[];
@@ -27,6 +28,14 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({
     update,
     delete: deleteProject,
   } = useCrud<Project>({ endpoint: '/projects' });
+
+  const [projectManagers, setProjectManagers] = useState<User[]>([]);
+
+  useEffect(() => {
+    axiosInstance.get('/users/project-managers/')
+      .then(res => setProjectManagers(Array.isArray(res.data) ? res.data : []))
+      .catch(err => console.error("Error loading project managers", err));
+  }, []);
 
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -91,25 +100,25 @@ const handleDeleteConfirm = async () => {
       name: '',
       clientId: '',
       departmentId: '',
-      projectManagerId: users[0]?.id || '',
+      projectManagerId: '',
       startDate: '',
       endDate: '',
       status: 'not_started' as ProjectStatus,
       progressPercentage: 0
     },
     validationSchema,
-  onSubmit: async (values) => {
+    onSubmit: async (values) => {
       const payload = {
-  name: values.name,
-  client: Number(values.clientId),
-  department: Number(values.departmentId),
-  project_manager: Number(values.projectManagerId),
-  created_by: currentUser?.id,
-  start_date: values.startDate,
-  end_date: values.endDate,
-  status: values.status,
-  progress_percentage: values.progressPercentage   // ADD THIS
-};
+        name: values.name,
+        client: Number(values.clientId),
+        department: Number(values.departmentId),
+        project_manager: values.projectManagerId ? Number(values.projectManagerId) : null,
+        created_by: currentUser?.id,
+        start_date: values.startDate,
+        end_date: values.endDate,
+        status: values.status,
+        progress_percentage: values.progressPercentage
+      };
 
   if (editingProject) {
         await update(editingProject.id!, payload);
@@ -133,26 +142,34 @@ const handleDeleteConfirm = async () => {
   // Pagination (filter is client-side on current page results)
   const paginatedProjects = filteredProjects;
 
- const handleOpenModal = (project: Project | null = null) => {
-  setEditingProject(project);
+  const handleOpenModal = (project: Project | null = null) => {
+    setEditingProject(project);
 
-  if (project) {
-    setValues({
-      name: project.name || '',
-      clientId: String(project.clientId || project.clientId || ''),
-      departmentId: String(project.department || ''),
-      projectManagerId: String(project.project_manager || ''),
-      startDate: project.startDate || '',
-      endDate: project.endDate || '',
-      status: project.status || 'not_started',
-      progressPercentage: project.progress_percentage || 0
-    });
-  } else {
-    resetForm();
-  }
+    if (project) {
+      const getFieldId = (val: any): string => {
+        if (!val) return '';
+        if (typeof val === 'object' && val !== null && 'id' in val) {
+          return String(val.id);
+        }
+        return String(val);
+      };
 
-  setModalOpen(true);
-};
+      setValues({
+        name: project.name || '',
+        clientId: getFieldId(project.client || (project as any).clientId || (project as any).client_id),
+        departmentId: getFieldId(project.department),
+        projectManagerId: getFieldId(project.project_manager),
+        startDate: (project as any).start_date || project.startDate || '',
+        endDate: (project as any).end_date || project.endDate || '',
+        status: project.status || 'not_started',
+        progressPercentage: project.progress_percentage !== undefined ? project.progress_percentage : ((project as any).progressPercentage || 0)
+      });
+    } else {
+      resetForm();
+    }
+
+    setModalOpen(true);
+  };
 const pageNumbers: number[] = Array.from(
   { length: totalPages },
   (_, i) => i + 1
@@ -406,19 +423,27 @@ const pageNumbers: number[] = Array.from(
                   <select
                     name="projectManagerId"
                     value={values.projectManagerId}
-                   onChange={(e) =>
-  handleChange(
-    e.target.name as keyof typeof values,
-    e.target.value
-  )
-}
+                    onChange={(e) =>
+                      handleChange(
+                        e.target.name as keyof typeof values,
+                        e.target.value
+                      )
+                    }
                     className="form-select"
+                    disabled={projectManagers.length === 0}
                   >
-                    {users.map(u => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
+                    {projectManagers.length === 0 ? (
+                      <option value="">No Project Managers Available</option>
+                    ) : (
+                      <>
+                        <option value="">Select Project Manager</option>
+                        {projectManagers.map(u => (
+                          <option key={u.id} value={u.id}>
+                            {u.name} ({u.email || u.username})
+                          </option>
+                        ))}
+                      </>
+                    )}
                   </select>
                 </FormField>
               </div>
