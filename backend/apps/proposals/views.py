@@ -13,6 +13,26 @@ from core.permissions import IsClientOwner
 from .pdf_generator import ProposalPDFGenerator
 
 
+from django.http import FileResponse
+import os
+
+class DeleteOnCloseFileResponse(FileResponse):
+    def __init__(self, open_file, filename, as_attachment=True, *args, **kwargs):
+        self.temp_file_path = open_file.name
+        super().__init__(open_file, *args, **kwargs)
+        self['Content-Type'] = 'application/pdf'
+        disposition = 'attachment' if as_attachment else 'inline'
+        self['Content-Disposition'] = f'{disposition}; filename="{filename}"'
+
+    def close(self):
+        super().close()
+        try:
+            if os.path.exists(self.temp_file_path):
+                os.remove(self.temp_file_path)
+        except Exception:
+            pass
+
+
 class ProposalViewSet(viewsets.ModelViewSet):
 
     queryset = Proposal.objects.all().order_by("-created_at")
@@ -34,12 +54,16 @@ class ProposalViewSet(viewsets.ModelViewSet):
             client = user.get_associated_client()
             if not client:
                 return Proposal.objects.none()
-            if getattr(self, 'detail', False) or self.action in ['retrieve', 'update', 'partial_update', 'destroy', 'send', 'convert'] or 'pk' in self.kwargs:
+            if getattr(self, 'detail', False) or self.action in ['retrieve', 'update', 'partial_update', 'destroy', 'send', 'convert', 'download_pdf', 'preview_pdf'] or 'pk' in self.kwargs:
                 return Proposal.objects.all().order_by("-created_at")
             return Proposal.objects.filter(client=client).order_by("-created_at")
             
         return Proposal.objects.all().order_by("-created_at")
 
+    def get_permissions(self):
+        if self.action in ['download_pdf', 'preview_pdf']:
+            return [permissions.AllowAny()]
+        return super().get_permissions()
 
     def check_permissions(self, request):
         super().check_permissions(request)
@@ -76,8 +100,15 @@ class ProposalViewSet(viewsets.ModelViewSet):
 
         # 2. Email Dispatch
         try:
+            from django.core.signing import TimestampSigner
+            from django.conf import settings
+            signer = TimestampSigner()
+            token = signer.sign(str(proposal.id))
+            site_url = getattr(settings, 'SITE_URL', 'http://127.0.0.1:8000').rstrip('/')
+            secure_link = f"{site_url}/api/v1/proposals/{proposal.id}/download_pdf/?token={token}"
+
             from .email_service import send_proposal_email
-            send_proposal_email(proposal, pdf_path)
+            send_proposal_email(proposal, pdf_path, secure_link=secure_link)
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except (smtplib.SMTPAuthenticationError, smtplib.SMTPConnectError, socket.timeout) as e:
@@ -200,37 +231,77 @@ class ProposalViewSet(viewsets.ModelViewSet):
     def download_pdf(self, request, pk=None):
         proposal = self.get_object()
         
+        # 1. Signature / Auth check
+        token = request.query_params.get('token')
+        authenticated = False
+        token_error = None
+        
+        if token:
+            from django.core.signing import TimestampSigner, SignatureExpired
+            signer = TimestampSigner()
+            try:
+                # 2 days = 172800 seconds
+                proposal_id = signer.unsign(token, max_age=172800)
+                if int(proposal_id) == proposal.id:
+                    authenticated = True
+                else:
+                    token_error = "Invalid signature token."
+            except SignatureExpired:
+                token_error = "This secure link has expired."
+            except Exception:
+                token_error = "Invalid signature token."
+                
+        if token and not authenticated:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied(token_error or "Invalid signature token.")
+            
+        if not authenticated:
+            # Fall back to standard DRF authentication
+            user = request.user
+            if not user or not user.is_authenticated:
+                from rest_framework.exceptions import NotAuthenticated
+                raise NotAuthenticated("Authentication credentials were not provided.")
+            
+            # Manually enforce IsClientOwner object permission since we bypassed view permission
+            from core.permissions import IsClientOwner
+            permission = IsClientOwner()
+            if not permission.has_object_permission(request, self, proposal):
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("You do not have permission to access this proposal.")
+        
         builder_config = None
         if request.method == "POST":
             builder_config = request.data
         else:
             builder_config = proposal.builder_config
 
-        # Audit logging
-        # pyrefly: ignore [missing-import]
-        from apps.activity.models import ActivityLog
-        ActivityLog.objects.create(
-            user=request.user,
-            action=f"Downloaded proposal PDF for: {proposal.title}"
-        )
+        # Audit logging (only if user is authenticated)
+        if request.user and request.user.is_authenticated:
+            # pyrefly: ignore [missing-import]
+            from apps.activity.models import ActivityLog
+            ActivityLog.objects.create(
+                user=request.user,
+                action=f"Downloaded proposal PDF for: {proposal.title}"
+            )
 
-        from django.http import HttpResponse
         generator = ProposalPDFGenerator(proposal, builder_config)
         pdf_path = generator.generate_pdf()
         
         try:
-            with open(pdf_path, "rb") as pdf:
-                response = HttpResponse(pdf.read(), content_type="application/pdf")
-                response["Content-Disposition"] = f'attachment; filename="proposal_{proposal.id}.pdf"'
-            return response
-        finally:
-            import os
+            pdf_file = open(pdf_path, "rb")
+            return DeleteOnCloseFileResponse(pdf_file, f"proposal_{proposal.id}.pdf", as_attachment=True)
+        except Exception as e:
             if os.path.exists(pdf_path):
                 os.remove(pdf_path)
+            raise e
 
     @action(detail=False, methods=["post"])
     def preview_pdf(self, request):
-        from django.http import HttpResponse
+        user = request.user
+        if not user or not user.is_authenticated:
+            from rest_framework.exceptions import NotAuthenticated
+            raise NotAuthenticated("Authentication credentials were not provided.")
+
         proposal_id = request.data.get("id")
         
         if proposal_id:
@@ -244,9 +315,6 @@ class ProposalViewSet(viewsets.ModelViewSet):
                         from rest_framework.exceptions import PermissionDenied
                         raise PermissionDenied("You do not have permission to preview this proposal.")
             except Proposal.DoesNotExist:
-
-
-
                 proposal = Proposal(
                     title=request.data.get("title", "Project Proposal"),
                     subtotal=request.data.get("subtotal", 0),
@@ -267,11 +335,9 @@ class ProposalViewSet(viewsets.ModelViewSet):
         pdf_path = generator.generate_pdf()
         
         try:
-            with open(pdf_path, "rb") as pdf:
-                response = HttpResponse(pdf.read(), content_type="application/pdf")
-                response["Content-Disposition"] = 'inline; filename="proposal_preview.pdf"'
-            return response
-        finally:
-            import os
+            pdf_file = open(pdf_path, "rb")
+            return DeleteOnCloseFileResponse(pdf_file, "proposal_preview.pdf", as_attachment=False)
+        except Exception as e:
             if os.path.exists(pdf_path):
                 os.remove(pdf_path)
+            raise e

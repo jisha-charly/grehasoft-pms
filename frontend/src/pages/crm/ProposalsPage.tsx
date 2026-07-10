@@ -219,6 +219,56 @@ const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects, setLe
   const { showAlert } = useAlert();
   const [pendingLeadId, setPendingLeadId] = useState<number | '' | null>(null);
   const [showLeadChangeConfirm, setShowLeadChangeConfirm] = useState(false);
+  const [proposalToDelete, setProposalToDelete] = useState<Proposal | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    if (!proposalToDelete || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await axiosInstance.delete(`/proposals/${proposalToDelete.id}/`);
+      showAlert({
+        variant: AlertVariant.SUCCESS,
+        message: "Proposal deleted successfully."
+      });
+      setProposalToDelete(null);
+      refetch();
+    } catch (err: any) {
+      console.error("Failed to delete proposal:", err);
+      if (err.response?.status === 404) {
+        showAlert({
+          variant: AlertVariant.ERROR,
+          message: "This proposal no longer exists."
+        });
+        setProposalToDelete(null);
+        refetch();
+      } else {
+        showAlert({
+          variant: AlertVariant.ERROR,
+          message: "Failed to delete proposal. Please try again."
+        });
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!proposalToDelete) return;
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isDeleting) {
+        setProposalToDelete(null);
+      } else if (e.key === "Enter" && !isDeleting) {
+        handleConfirmDelete();
+      }
+    };
+
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleGlobalKeyDown);
+    };
+  }, [proposalToDelete, isDeleting, handleConfirmDelete]);
 
   const location = useLocation();
 
@@ -661,19 +711,40 @@ const handleConvert = async (proposal: Proposal) => {
  <button
   className="btn btn-sm btn-outline-success me-2 shadow-sm"
   onClick={() => {
-    if (proposal.leadPhone) {
-      const phone = proposal.leadPhone.replace(/\D/g, '');
-      const message = encodeURIComponent(
-        `Hi ${proposal.leadName}, here is the proposal for "${proposal.title}".`
-      );
-      window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
-    } else {
+    try {
+      if (proposal.leadPhone) {
+        const phone = proposal.leadPhone.replace(/\D/g, '');
+        showAlert({
+          variant: AlertVariant.INFO,
+          message: "Direct file attachment is not supported by browsers. Sharing a secure download link instead."
+        });
+        const clientName = proposal.leadName || "Client";
+        const proposalTitle = proposal.title;
+        const securePdfLink = proposal.secure_pdf_link || '';
+        
+        const rawMessage = `Hello ${clientName},\n\nPlease find your proposal for "${proposalTitle}".\n\nYou can securely view or download the proposal using the link below:\n\n${securePdfLink}\n\n⚠️ This secure link will expire in 2 days.\n\nRegards,\nGrehasoft Team`;
+        
+        const message = encodeURIComponent(rawMessage);
+        window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
+        showAlert({
+          variant: AlertVariant.SUCCESS,
+          message: "Secure proposal link shared via WhatsApp."
+        });
+      } else {
+        showAlert({
+          variant: AlertVariant.WARNING,
+          message: "No phone number for this lead"
+        });
+      }
+    } catch (err) {
+      console.error("Failed to share proposal:", err);
       showAlert({
-        variant: AlertVariant.WARNING,
-        message: "No phone number for this lead"
+        variant: AlertVariant.ERROR,
+        message: "Failed to share proposal."
       });
     }
   }}
+  title="Share Proposal via WhatsApp"
 >
   <i className="bi bi-whatsapp"></i>
 </button>
@@ -681,13 +752,26 @@ const handleConvert = async (proposal: Proposal) => {
   {/* Email */}
   <button
   className="btn btn-sm btn-outline-primary me-2 shadow-sm"
-  onClick={() => {
+  onClick={async () => {
     if (proposal.leadEmail) {
-      const subject = encodeURIComponent(`Proposal: ${proposal.title}`);
-      const body = encodeURIComponent(
-        `Hi ${proposal.leadName},\n\nPlease find the attached proposal.\n\nThanks.`
-      );
-      window.location.href = `mailto:${proposal.leadEmail}?subject=${subject}&body=${body}`;
+      try {
+        showAlert({
+          variant: AlertVariant.INFO,
+          message: "Sending proposal email..."
+        });
+        await axiosInstance.post(`/proposals/${proposal.id}/send/`);
+        showAlert({
+          variant: AlertVariant.SUCCESS,
+          message: "Proposal emailed successfully."
+        });
+        refetch();
+      } catch (err) {
+        console.error("Failed to send proposal email:", err);
+        showAlert({
+          variant: AlertVariant.ERROR,
+          message: "Failed to send proposal email."
+        });
+      }
     } else {
       showAlert({
         variant: AlertVariant.WARNING,
@@ -695,6 +779,7 @@ const handleConvert = async (proposal: Proposal) => {
       });
     }
   }}
+  title="Email Proposal to Lead"
 >
   <i className="bi bi-envelope"></i>
 </button>
@@ -714,7 +799,8 @@ const handleConvert = async (proposal: Proposal) => {
   {/* Delete */}
   <button
     className="btn btn-sm btn-light text-danger border shadow-sm"
-    onClick={() => remove(proposal.id)}
+    onClick={() => setProposalToDelete(proposal)}
+    title="Delete Proposal"
   >
     <i className="bi bi-trash"></i>
   </button>
@@ -977,8 +1063,133 @@ const handleConvert = async (proposal: Proposal) => {
         title="Change Lead"
         message="You have edited the service items. Are you sure you want to change the selected lead and replace the current service list?"
       />
+
+      {proposalToDelete && (
+        <div style={overlayStyle} role="dialog" aria-modal="true">
+          <div style={modalStyle}>
+            {/* Header */}
+            <div style={headerStyle}>
+              <div style={titleStyle}>
+                <span style={{ color: "#dc3545", marginRight: "8px", fontWeight: "bold" }}>⚠</span>
+                Delete Proposal
+              </div>
+              <button 
+                style={closeBtnStyle} 
+                onClick={() => !isDeleting && setProposalToDelete(null)}
+                disabled={isDeleting}
+                aria-label="Close dialog"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={bodyStyle}>
+              <p style={{ marginBottom: "12px" }}>Are you sure you want to permanently delete this proposal?</p>
+              <div style={{ 
+                backgroundColor: "#f8f9fa", 
+                borderLeft: "4px solid #dc3545", 
+                padding: "10px 14px", 
+                borderRadius: "4px",
+                marginBottom: "12px",
+                fontWeight: 500,
+                fontSize: "14px",
+                fontStyle: "italic"
+              }}>
+                "{proposalToDelete.title}"
+              </div>
+              <small style={{ color: "#6c757d", display: "block" }}>
+                This action cannot be undone.
+              </small>
+            </div>
+
+            {/* Footer */}
+            <div style={footerStyle}>
+              <button 
+                className="btn btn-sm btn-light border me-2"
+                onClick={() => setProposalToDelete(null)}
+                disabled={isDeleting}
+                style={{ cursor: isDeleting ? "not-allowed" : "pointer" }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-sm btn-danger px-3"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                style={{ 
+                  cursor: isDeleting ? "not-allowed" : "pointer",
+                  backgroundColor: "#dc3545",
+                  color: "#fff"
+                }}
+              >
+                {isDeleting ? "Deleting..." : "Delete Proposal"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+};
+
+/* ================= STYLES ================= */
+
+const overlayStyle: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  backgroundColor: "rgba(0,0,0,0.35)",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 9999,
+};
+
+const modalStyle: React.CSSProperties = {
+  backgroundColor: "#fff",
+  width: "420px",
+  borderRadius: "14px",
+  boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
+  overflow: "hidden",
+  animation: "fadeIn 0.2s ease-in-out",
+  textAlign: "left",
+};
+
+const headerStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  padding: "18px 20px",
+  borderBottom: "1px solid #eee",
+  fontWeight: 600,
+  fontSize: "16px",
+  color: "#1e293b",
+};
+
+const titleStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+};
+
+const bodyStyle: React.CSSProperties = {
+  padding: "20px",
+  color: "#334155",
+};
+
+const footerStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: "10px",
+  padding: "16px 20px",
+  borderTop: "1px solid #eee",
+};
+
+const closeBtnStyle: React.CSSProperties = {
+  background: "transparent",
+  border: "none",
+  fontSize: "20px",
+  cursor: "pointer",
+  color: "#94a3b8",
 };
 
 export default ProposalsPage;

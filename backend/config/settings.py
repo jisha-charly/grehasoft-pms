@@ -286,3 +286,16 @@ LOGGING = {
     },
 }
 
+# ==============================
+# Site & Frontend URLs
+# ==============================
+if os.getenv("RENDER"):
+    default_site_url = os.getenv("RENDER_EXTERNAL_URL", "https://grehasoft-pms-1.onrender.com")
+    default_frontend_url = os.getenv("RENDER_EXTERNAL_URL", "https://grehasoft-pms-1.onrender.com")
+else:
+    default_site_url = "http://127.0.0.1:8000"
+    default_frontend_url = "http://localhost:5173"
+
+SITE_URL = os.environ.get("SITE_URL", default_site_url)
+FRONTEND_URL = os.environ.get("FRONTEND_URL", default_frontend_url)
+

@@ -573,6 +573,7 @@ export interface Proposal {
   leadEmail?: string;
   leadPhone?: string;
   builder_config?: any;
+  secure_pdf_link?: string;
 }
 
 export enum ReminderType {

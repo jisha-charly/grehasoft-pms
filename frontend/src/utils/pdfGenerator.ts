@@ -22,11 +22,16 @@ export const generateProposalPDF = async (proposal: Proposal) => {
 
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
+
+    alertService.showAlert({
+      variant: AlertVariant.SUCCESS,
+      message: 'Proposal downloaded successfully.',
+    });
   } catch (error) {
     console.error('Error downloading proposal PDF:', error);
     alertService.showAlert({
       variant: AlertVariant.ERROR,
-      message: 'Failed to download proposal PDF. Please try again.',
+      message: 'Failed to download proposal.',
     });
   }
 };

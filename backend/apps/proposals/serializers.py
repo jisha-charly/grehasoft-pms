@@ -8,6 +8,17 @@ class ProposalItemSerializer(serializers.ModelSerializer):
         fields = ["id", "service", "description", "cost"]
 
 
+def generate_proposal_secure_pdf_link(serializer_instance, obj):
+    from django.core.signing import TimestampSigner
+    from django.conf import settings
+    import urllib.parse
+    signer = TimestampSigner()
+    token = signer.sign(str(obj.id))
+    token_encoded = urllib.parse.quote(token)
+    site_url = getattr(settings, 'SITE_URL', 'http://127.0.0.1:8000').rstrip('/')
+    return f"{site_url}/api/v1/proposals/{obj.id}/download_pdf/?token={token_encoded}"
+
+
 class ProposalSerializer(serializers.ModelSerializer):
 
     items = ProposalItemSerializer(many=True)
@@ -15,7 +26,7 @@ class ProposalSerializer(serializers.ModelSerializer):
     leadName = serializers.CharField(source='lead.name', read_only=True)
     leadEmail = serializers.CharField(source='lead.email', read_only=True)
     leadPhone = serializers.CharField(source='lead.phone', read_only=True)
-
+    secure_pdf_link = serializers.SerializerMethodField()
 
     class Meta:
         model = Proposal
@@ -30,7 +41,7 @@ class ProposalSerializer(serializers.ModelSerializer):
             "discount",
             "amount",
             "status",
-            "client",  # add this
+            "client",
             "is_converted",
             "items",
             "created_at",
@@ -39,6 +50,7 @@ class ProposalSerializer(serializers.ModelSerializer):
             "leadPhone",
             "leadId",
             "builder_config",
+            "secure_pdf_link",
         ]
 
     def create(self, validated_data):
@@ -76,6 +88,10 @@ class ProposalSerializer(serializers.ModelSerializer):
         return instance
 
 
+    def get_secure_pdf_link(self, obj):
+        return generate_proposal_secure_pdf_link(self, obj)
+
+
 class ClientProposalSerializer(serializers.ModelSerializer):
     items = ProposalItemSerializer(many=True, read_only=True)
     proposal_number = serializers.SerializerMethodField()
@@ -83,6 +99,7 @@ class ClientProposalSerializer(serializers.ModelSerializer):
     leadName = serializers.CharField(source='lead.name', read_only=True)
     leadEmail = serializers.CharField(source='lead.email', read_only=True)
     leadPhone = serializers.CharField(source='lead.phone', read_only=True)
+    secure_pdf_link = serializers.SerializerMethodField()
 
     class Meta:
         model = Proposal
@@ -105,6 +122,7 @@ class ClientProposalSerializer(serializers.ModelSerializer):
             "leadEmail",
             "leadPhone",
             "builder_config",
+            "secure_pdf_link",
         ]
         read_only_fields = fields
 
@@ -121,4 +139,7 @@ class ClientProposalSerializer(serializers.ModelSerializer):
                 "phone": obj.client.phone,
                 "address": obj.client.address,
             }
-        return None
+        return None
+
+    def get_secure_pdf_link(self, obj):
+        return generate_proposal_secure_pdf_link(self, obj)

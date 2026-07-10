@@ -487,7 +487,7 @@ class ProposalPDFGenerator:
         # 3. Prepared For / Prepared By left-aligned sequence
         client_name = cover_conf.get('preparedForName', '').strip()
         if not client_name:
-            client_name = self.proposal.client.name if self.proposal.client else (self.proposal.leadName or "Valued Client")
+            client_name = self.proposal.client.name if self.proposal.client else ((self.proposal.lead.name if self.proposal.lead else None) or "Valued Client")
             
         client_company = cover_conf.get('preparedForCompany', '').strip()
         if not client_company:

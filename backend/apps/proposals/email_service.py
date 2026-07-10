@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
 
-def send_proposal_email(proposal, pdf_path):
+def send_proposal_email(proposal, pdf_path, secure_link=None):
     """
     Constructs and sends the proposal email with the PDF attachment.
     Raises specific socket or smtplib exceptions on network/authentication failures.
@@ -23,14 +23,14 @@ def send_proposal_email(proposal, pdf_path):
 
     logger.info(f"📨 [PROPOSAL EMAIL] Preparing proposal email for {recipient_email}")
 
+    body_text = f"Dear Client,\n\nPlease find attached the proposal for '{proposal.title}'.\n\n"
+    if secure_link:
+        body_text += f"You can also securely view or download the proposal using this link (expires in 2 days):\n{secure_link}\n\n"
+    body_text += "Best regards,\nGrehasoft Team"
+
     email = EmailMessage(
         subject=f"Proposal: {proposal.title}",
-        body=(
-            f"Dear Client,\n\n"
-            f"Please find attached the proposal for '{proposal.title}'.\n\n"
-            f"Best regards,\n"
-            f"Grehasoft Team"
-        ),
+        body=body_text,
         to=[recipient_email]
     )
 
