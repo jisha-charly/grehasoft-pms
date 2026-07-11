@@ -9,14 +9,8 @@ class ProposalItemSerializer(serializers.ModelSerializer):
 
 
 def generate_proposal_secure_pdf_link(serializer_instance, obj):
-    from django.core.signing import TimestampSigner
-    from django.conf import settings
-    import urllib.parse
-    signer = TimestampSigner()
-    token = signer.sign(str(obj.id))
-    token_encoded = urllib.parse.quote(token)
-    site_url = getattr(settings, 'SITE_URL', 'http://127.0.0.1:8000').rstrip('/')
-    return f"{site_url}/api/v1/proposals/{obj.id}/download_pdf/?token={token_encoded}"
+    from core.signing import generate_secure_pdf_link
+    return generate_secure_pdf_link(obj.id, f"/api/v1/proposals/{obj.id}/download_pdf/")
 
 
 class ProposalSerializer(serializers.ModelSerializer):

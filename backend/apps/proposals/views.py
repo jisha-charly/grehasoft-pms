@@ -237,19 +237,8 @@ class ProposalViewSet(viewsets.ModelViewSet):
         token_error = None
         
         if token:
-            from django.core.signing import TimestampSigner, SignatureExpired
-            signer = TimestampSigner()
-            try:
-                # 2 days = 172800 seconds
-                proposal_id = signer.unsign(token, max_age=172800)
-                if int(proposal_id) == proposal.id:
-                    authenticated = True
-                else:
-                    token_error = "Invalid signature token."
-            except SignatureExpired:
-                token_error = "This secure link has expired."
-            except Exception:
-                token_error = "Invalid signature token."
+            from core.signing import validate_secure_token
+            authenticated, token_error = validate_secure_token(proposal.id, token, max_age=172800)
                 
         if token and not authenticated:
             from rest_framework.exceptions import PermissionDenied

@@ -17,16 +17,18 @@ interface Service {
   price:number
 }
 
-interface Item{
-  description:string
-  quantity:number
-  rate:number
+interface Item {
+  id?: number
+  description: string
+  quantity: number
+  rate: number
 }
 interface Props {
-invoiceId?: number | null
-isEdit?: boolean
+  invoiceId?: number | null
+  isEdit?: boolean
+  onSuccess?: () => void
 }
-const CreateInvoicePage:React.FC<Props> = ({invoiceId,isEdit}) => {
+const CreateInvoicePage:React.FC<Props> = ({invoiceId,isEdit,onSuccess}) => {
 const { showAlert } = useAlert();
 
 const { id } = useParams()
@@ -369,13 +371,15 @@ const saveInvoice = async (e?: React.FormEvent)=>{
 if (e) e.preventDefault();
 if (!validateForm()) return;
 
-const formattedItems = items.map(item=>({
+const formattedItems = items.map((item: any)=>({
+id: item.id,
 description:item.description,
 quantity:item.quantity,
 rate:item.rate
 }))
 
 const payload = {
+invoice_number: invoiceNumber,
 client,
 issue_date:issueDate,
 due_date:dueDate,
@@ -387,11 +391,14 @@ advance: typeof advance==="number"?advance:0,
 notes
 }
 
+const isEditing = isEdit || !!id;
+const targetId = invoiceId || id;
+
 try{
 
-if(id){
+if(isEditing && targetId){
 
-await api.put(`/invoices/${id}/`,payload)
+await api.put(`/invoices/${targetId}/`,payload)
 
 }else{
 
@@ -401,10 +408,14 @@ await api.post("/invoices/",payload)
 
 await showAlert({
   variant: AlertVariant.SUCCESS,
-  message: "Invoice saved successfully"
+  message: isEditing ? "Invoice updated successfully." : "Invoice saved successfully"
 });
 
-navigate("/invoices")
+if (onSuccess) {
+  onSuccess();
+} else {
+  navigate("/invoices")
+}
 
 }catch(err: any){
 
@@ -769,7 +780,7 @@ Preview PDF
 type="submit"
 className="btn btn-success"
 >
-Save Invoice
+{isEdit ? "Update Invoice" : "Create Invoice"}
 </button>
 
 </div>

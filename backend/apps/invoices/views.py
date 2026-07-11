@@ -1,7 +1,7 @@
 import os
 
-
 from rest_framework import viewsets, filters, permissions
+from rest_framework.exceptions import PermissionDenied
 from django.conf import settings
 from rest_framework import viewsets
 from django.db.models import Sum
@@ -76,6 +76,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         number = generate_invoice_number()
         return Response({"invoice_number": number})
 
+    @action(detail=True, methods=["get"], url_path="secure-link")
+    def get_secure_link(self, request, pk=None):
+        invoice = self.get_object()
+        from core.signing import generate_secure_pdf_link
+        link = generate_secure_pdf_link(invoice.id, f"/api/v1/invoices/{invoice.id}/download/")
+        return Response({"secure_pdf_link": link})
+
 class InvoicePaymentViewSet(viewsets.ModelViewSet):
 
     queryset = InvoicePayment.objects.all()
@@ -132,35 +139,50 @@ invoice_analytics.cls.required_permission = 'MANAGE_SETTINGS'
 def download_invoice(request, pk):
 
     try:
-        user = request.user
-        if not user or not user.is_authenticated:
-            token_str = request.GET.get('token')
-            if token_str:
+        token_str = request.GET.get('token')
+        authenticated = False
+        token_error = None
+
+        if token_str:
+            from core.signing import validate_secure_token
+            # Try to validate as secure link signature first
+            authenticated, token_error = validate_secure_token(pk, token_str, max_age=172800)
+            
+            if not authenticated:
+                # Fallback check: is it a valid JWT token?
                 from rest_framework_simplejwt.authentication import JWTAuthentication
                 try:
                     validated_token = JWTAuthentication().get_validated_token(token_str)
                     user = JWTAuthentication().get_user(validated_token)
+                    if user and user.is_authenticated:
+                        request.user = user
+                        authenticated = True
                 except Exception:
-                    pass
+                    # Not a valid JWT token either, so raise PermissionDenied with the secure signing error
+                    from rest_framework.exceptions import PermissionDenied
+                    raise PermissionDenied(token_error or "Invalid signature token.")
 
-        if not user or not user.is_authenticated:
+        user = request.user
+        if not authenticated and (not user or not user.is_authenticated):
             return HttpResponse("Unauthorized", status=401)
             
         invoice = Invoice.objects.get(id=pk)
         
-        role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
-        if role_name == 'CLIENT':
-            client = user.get_associated_client()
-            if not client or invoice.client != client:
-                log_failed_attempt(user, f"Tried to download Invoice ID {invoice.id} (owned by another client)")
-                return HttpResponse("Forbidden", status=403)
+        if not authenticated:
+            role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+            if role_name == 'CLIENT':
+                client = user.get_associated_client()
+                if not client or invoice.client != client:
+                    log_failed_attempt(user, f"Tried to download Invoice ID {invoice.id} (owned by another client)")
+                    return HttpResponse("Forbidden", status=403)
                 
-        # Audit logging
-        from apps.activity.models import ActivityLog
-        ActivityLog.objects.create(
-            user=user,
-            action=f"Downloaded invoice {invoice.invoice_number}"
-        )
+        # Audit logging (only if authenticated via standard user context)
+        if user and user.is_authenticated:
+            from apps.activity.models import ActivityLog
+            ActivityLog.objects.create(
+                user=user,
+                action=f"Downloaded invoice {invoice.invoice_number}"
+            )
             
         pdf_path = generate_invoice_pdf(invoice)
 
@@ -170,8 +192,11 @@ def download_invoice(request, pk):
 
         return response
 
+    except PermissionDenied as e:
+        from rest_framework.response import Response
+        return Response({"detail": str(e)}, status=403)
     except Exception as e:
-        return HttpResponse(str(e))
+        return HttpResponse(str(e), status=500)
 def generate_invoice_pdf(invoice):
     tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
 

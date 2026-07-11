@@ -7,6 +7,7 @@ import { useAlert } from "../../hooks/useAlert";
 import { AlertVariant } from "../../types/alert";
 import CreateInvoicePage from "./CreateInvoicePage";
 import DeleteConfirmModal from "../../components/DeleteConfirmModal";
+import { sendInvoiceViaWhatsApp } from "../../utils/whatsapp";
 interface Invoice {
   client_name: ReactNode;
   id: number;
@@ -16,14 +17,70 @@ interface Invoice {
     client_name: string
   };
   issue_date: string;
+  due_date?: string;
   total: number;
   total_paid: number;
   balance: number;
   status: string;
+  client_phone?: string;
+  project_name?: string;
 }
 
 const InvoicesPage = () => {
   const { showAlert } = useAlert();
+
+  const handleWhatsAppSend = async (inv: Invoice) => {
+    if (!inv.client_phone) {
+      showAlert({
+        variant: AlertVariant.WARNING,
+        message: "Client mobile number is not available. Please update the client's contact information first."
+      });
+      return;
+    }
+
+    if (!inv.total || !inv.due_date || !inv.invoice_number) {
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Unable to send invoice. Please complete the invoice details first."
+      });
+      return;
+    }
+
+    try {
+      showAlert({
+        variant: AlertVariant.INFO,
+        message: "Generating secure invoice download link..."
+      });
+
+      const res = await axiosInstance.get(`/invoices/${inv.id}/secure-link/`);
+      const securePdfLink = res.data.secure_pdf_link;
+
+      if (!securePdfLink) {
+        throw new Error("No secure PDF link returned.");
+      }
+
+      sendInvoiceViaWhatsApp({
+        clientName: (typeof inv.client_name === "string" ? inv.client_name : "") || inv.client?.client_name || "Client",
+        invoiceNumber: inv.invoice_number,
+        projectName: inv.project_name,
+        totalAmount: inv.total,
+        dueDate: inv.due_date,
+        phone: inv.client_phone,
+        securePdfLink: securePdfLink
+      });
+
+      showAlert({
+        variant: AlertVariant.SUCCESS,
+        message: "Secure invoice link shared via WhatsApp."
+      });
+    } catch (err) {
+      console.error("Failed to generate secure PDF link:", err);
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Unable to generate secure PDF. Please try again."
+      });
+    }
+  };
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   
@@ -134,7 +191,13 @@ const pageNumbers: number[] = Array.from(
           </div>
 
           <div className="modal-body">
-            <CreateInvoicePage />
+            <CreateInvoicePage 
+              onSuccess={() => {
+                setShowModal(false);
+                fetchInvoices();
+                fetchAnalytics();
+              }}
+            />
           </div>
 
         </div>
@@ -163,6 +226,11 @@ onClick={() => setShowEditModal(false)}
 <CreateInvoicePage
 invoiceId={editInvoiceId}
 isEdit={true}
+onSuccess={() => {
+  setShowEditModal(false);
+  fetchInvoices();
+  fetchAnalytics();
+}}
 />
 
 </div>
@@ -322,7 +390,7 @@ title="Delete"
 </button>
 </>
 )}
-{/*
+
 <button
 className="btn btn-sm btn-light"
 onClick={()=>downloadInvoice(inv.id)}
@@ -338,7 +406,15 @@ title="Send Email"
 >
 <i className="bi bi-envelope"></i>
 </button>
-*/}
+
+<button
+  className={`btn btn-sm btn-light ${!inv.client_phone ? 'opacity-50' : ''}`}
+  style={{ cursor: !inv.client_phone ? 'not-allowed' : 'pointer' }}
+  onClick={() => handleWhatsAppSend(inv)}
+  title={inv.client_phone ? "Send via WhatsApp" : "Client mobile number is not available. Please update the client's contact information first."}
+>
+  <i className="bi bi-whatsapp text-success"></i>
+</button>
 </td>
 
 
