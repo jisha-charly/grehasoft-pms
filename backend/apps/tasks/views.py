@@ -99,15 +99,15 @@ class TaskViewSet(viewsets.ModelViewSet):
             log_failed_attempt(request.user, f"Tried to write task via {request.method}")
             self.permission_denied(request, message="Clients do not have permission to modify task data.")
         if role_name == 'TEAM_MEMBER':
-            if self.action in ['create', 'destroy']:
+            if self.action == 'create':
                 self.permission_denied(request, message="Team Members do not have permission to create or delete tasks.")
 
     def check_object_permissions(self, request, obj):
         super().check_object_permissions(request, obj)
         role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
-        if role_name == 'TEAM_MEMBER':
-            if request.method not in permissions.SAFE_METHODS:
-                # 1. Must be assigned to the task
+        if role_name not in ['SUPER_ADMIN', 'ADMIN', 'PROJECT_MANAGER']:
+            # For update/partial_update: check if assigned
+            if self.action in ['update', 'partial_update']:
                 is_assigned = obj.assignments.filter(employee=request.user).exists()
                 if not is_assigned:
                     from rest_framework.exceptions import PermissionDenied
@@ -121,6 +121,11 @@ class TaskViewSet(viewsets.ModelViewSet):
                     raise PermissionDenied(
                         f"Team Members can only update status and progress. Unauthorized fields: {', '.join(unauthorized_fields)}"
                     )
+            
+            # For destroy: always block with specific message
+            if self.action == 'destroy':
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("Only Project Managers or Administrators can delete tasks.")
 
     def perform_create(self, serializer):
         task = serializer.save(created_by=self.request.user)

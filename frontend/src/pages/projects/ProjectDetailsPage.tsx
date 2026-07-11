@@ -227,6 +227,27 @@ useEffect(() => {
     });
   }, [users, assignedUserIds]);
 
+  const canEditTask = (task: Task) => {
+    const roleStr = currentUser.role as string;
+    const tAny = task as any;
+    return (
+      roleStr === "SUPER_ADMIN" ||
+      roleStr === "ADMIN" ||
+      roleStr === "PROJECT_MANAGER" ||
+      tAny.assignee_id === currentUser.id ||
+      task.assignees?.includes(currentUser.id)
+    );
+  };
+
+  const canDeleteTask = () => {
+    const roleStr = currentUser.role as string;
+    return (
+      roleStr === "SUPER_ADMIN" ||
+      roleStr === "ADMIN" ||
+      roleStr === "PROJECT_MANAGER"
+    );
+  };
+
   if (loading) return <div className="p-5 text-center"><div className="spinner-border text-primary" role="status"></div><p className="mt-2">Loading project details...</p></div>;
   if (!project) return <div className="p-5 text-center"><h3 className="text-muted">Project not found</h3><Link to="/projects">Back to list</Link></div>;
 
@@ -541,10 +562,10 @@ try {
               </div>
               <div className="table-responsive">
                 <table className="table table-professional align-middle mb-0">
-                  <thead><tr><th>Task Name</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Due Date</th>{canManage && <th className="text-end">Action</th>}</tr></thead>
+                  <thead><tr><th>Task Name</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Due Date</th>{currentUser.role !== "CLIENT" && <th className="text-end">Action</th>}</tr></thead>
                   <tbody>
                     {projectTasks.length === 0 ? (
-                      <tr><td colSpan={canManage ? 6 : 5} className="text-center py-5 text-muted small">No tasks assigned to this project yet.</td></tr>
+                      <tr><td colSpan={currentUser.role !== "CLIENT" ? 6 : 5} className="text-center py-5 text-muted small">No tasks assigned to this project yet.</td></tr>
                     ) : (
                       projectTasks.map(t => (
                         <tr key={t.id} onClick={() => setSelectedTask(t)} style={{cursor: 'pointer'}}>
@@ -562,19 +583,24 @@ try {
                           <td><span className={`badge ${t.status === 'done' ? 'bg-success-subtle text-success' : 'bg-primary-subtle text-primary'}`}>{t.status}</span></td>
                           <td><span className={`badge ${t.priority === 'high' ? 'bg-danger' : 'bg-info'}`}>{t.priority}</span></td>
                           <td className="small text-secondary">{t.dueDate}</td>
-                          {canManage && (
-                            <td className="text-end">
-                              <div className="btn-group">
-                                <button className="btn btn-sm btn-light" onClick={(e) => { e.stopPropagation(); setEditingTask(t); setTaskErrors({}); setTaskModalOpen(true); }}>
-                                  <i className="bi bi-pencil"></i>
+                          {currentUser.role !== "CLIENT" && (
+                            <td className="text-end" onClick={(e) => e.stopPropagation()}>
+                              {canEditTask(t) ? (
+                                <div className="btn-group">
+                                  <button className="btn btn-sm btn-light" onClick={() => { setEditingTask(t); setTaskErrors({}); setTaskModalOpen(true); }} title="Edit Task">
+                                    <i className="bi bi-pencil"></i>
+                                  </button>
+                                  {canDeleteTask() && (
+                                    <button className="btn btn-sm btn-light text-danger" onClick={() => setTaskToDelete(t)} title="Delete Task">
+                                      <i className="bi bi-trash"></i>
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <button className="btn btn-sm btn-light" disabled title="You can only edit tasks assigned to you.">
+                                  <i className="bi bi-lock-fill text-secondary"></i>
                                 </button>
-                                <button className="btn btn-sm btn-light text-danger" onClick={(e) => {
-                                  e.stopPropagation();
-                                  setTaskToDelete(t);
-                                }}>
-                                  <i className="bi bi-trash"></i>
-                                </button>
-                              </div>
+                              )}
                             </td>
                           )}
                         </tr>
