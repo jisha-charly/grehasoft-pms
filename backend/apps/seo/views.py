@@ -8,6 +8,7 @@ from django.http import HttpResponse
 from django.contrib.auth import get_user_model
 
 from rest_framework import viewsets, status, permissions
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -974,17 +975,133 @@ class SEOMonthlyTargetViewSet(viewsets.ModelViewSet):
         serializer.save()
 
 
+class SEOTaskPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
 class SEOTaskViewSet(viewsets.ModelViewSet):
     queryset = SEOTask.objects.all()
     serializer_class = SEOTaskSerializer
+    pagination_class = SEOTaskPagination
 
     def get_queryset(self):
         user = self.request.user
         if is_admin(user) or is_seo_manager(user):
-            return SEOTask.objects.all().select_related("website", "assigned_executive", "created_by")
+            return SEOTask.objects.all().select_related("website", "assigned_executive", "created_by", "activity_type")
         elif is_seo_executive(user):
-            return SEOTask.objects.filter(assigned_executive=user).select_related("website", "assigned_executive", "created_by")
+            return SEOTask.objects.filter(assigned_executive=user).select_related("website", "assigned_executive", "created_by", "activity_type")
         return SEOTask.objects.none()
+
+    def filter_seo_tasks(self, queryset, exclude_status=False):
+        params = self.request.query_params
+
+        website = params.get("website")
+        if website:
+            queryset = queryset.filter(website_id=website)
+
+        executive = params.get("executive")
+        if executive:
+            queryset = queryset.filter(assigned_executive_id=executive)
+
+        priority = params.get("priority")
+        if priority:
+            queryset = queryset.filter(priority=priority)
+
+        activity_type = params.get("activity_type")
+        if activity_type:
+            queryset = queryset.filter(activity_type_id=activity_type)
+
+        search_query = params.get("search")
+        if search_query:
+            queryset = queryset.filter(
+                Q(title__icontains=search_query) |
+                Q(description__icontains=search_query) |
+                Q(website__website_name__icontains=search_query) |
+                Q(assigned_executive__name__icontains=search_query) |
+                Q(assigned_executive__username__icontains=search_query)
+            )
+
+        if not exclude_status:
+            status_param = params.get("status")
+            if status_param:
+                if status_param == "overdue":
+                    queryset = queryset.filter(due_date__lt=datetime.date.today()).exclude(status="completed")
+                else:
+                    queryset = queryset.filter(status=status_param)
+
+        return queryset
+
+    def get_ordered_queryset(self, queryset):
+        ordering = self.request.query_params.get("ordering")
+        ordering_whitelist = {
+            "newest": "-created_at",
+            "oldest": "created_at",
+            "due_date": "due_date",
+            "priority": "priority",
+            "title": "title"
+        }
+
+        db_ordering = "-created_at"
+        if ordering in ordering_whitelist:
+            db_ordering = ordering_whitelist[ordering]
+
+        if db_ordering == "priority":
+            from django.db.models import Case, When, Value, IntegerField
+            queryset = queryset.annotate(
+                priority_order=Case(
+                    When(priority="high", then=Value(1)),
+                    When(priority="medium", then=Value(2)),
+                    When(priority="low", then=Value(3)),
+                    default=Value(4),
+                    output_field=IntegerField(),
+                )
+            ).order_by("priority_order", "-created_at")
+        else:
+            queryset = queryset.order_by(db_ordering)
+
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        base_qs = self.get_queryset()
+
+        stats_qs = self.filter_seo_tasks(base_qs, exclude_status=True)
+        today = datetime.date.today()
+
+        total_count = stats_qs.count()
+        pending_count = stats_qs.filter(status="pending").count()
+        in_progress_count = stats_qs.filter(status="in_progress").count()
+        completed_count = stats_qs.filter(status="completed").count()
+        overdue_count = stats_qs.filter(due_date__lt=today).exclude(status="completed").count()
+
+        results_qs = self.filter_seo_tasks(base_qs, exclude_status=False)
+        results_qs = self.get_ordered_queryset(results_qs)
+
+        page = self.paginate_queryset(results_qs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            response = self.get_paginated_response(serializer.data)
+            response.data["stats"] = {
+                "total": total_count,
+                "pending": pending_count,
+                "in_progress": in_progress_count,
+                "completed": completed_count,
+                "overdue": overdue_count
+            }
+            return response
+
+        serializer = self.get_serializer(results_qs, many=True)
+        return Response({
+            "results": serializer.data,
+            "stats": {
+                "total": total_count,
+                "pending": pending_count,
+                "in_progress": in_progress_count,
+                "completed": completed_count,
+                "overdue": overdue_count
+            }
+        })
 
     def perform_create(self, serializer):
         user = self.request.user

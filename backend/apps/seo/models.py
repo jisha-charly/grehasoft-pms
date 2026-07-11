@@ -272,7 +272,10 @@ class SEOTask(models.Model):
     ]
     STATUS_CHOICES = [
         ("pending", "Pending"),
+        ("in_progress", "In Progress"),
         ("completed", "Completed"),
+        ("on_hold", "On Hold"),
+        ("overdue", "Overdue"),
     ]
 
     title = models.CharField(max_length=255)
@@ -290,6 +293,13 @@ class SEOTask(models.Model):
     due_date = models.DateField()
     priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default="medium")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    activity_type = models.ForeignKey(
+        SEOActivityType,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="seo_tasks"
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

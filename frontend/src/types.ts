@@ -753,7 +753,9 @@ export interface SEOTask {
   assigned_executive_name?: string;
   due_date: string;
   priority: 'low' | 'medium' | 'high';
-  status: 'pending' | 'completed';
+  status: 'pending' | 'in_progress' | 'completed' | 'on_hold' | 'overdue';
+  activity_type?: number | null;
+  activity_type_name?: string;
   created_by?: number;
   created_by_name?: string;
 }

@@ -5,7 +5,7 @@ import {
   Globe, Zap, TrendingUp, Shield, Download, Plus,
   BarChart3, Link2, Settings, MapPin, Users,
   CheckCircle2, AlertCircle, FileText, Trash2, Edit3, Eye, Upload, Filter, Calendar,
-  ArrowLeft, EyeOff, Lock, Unlock, Key
+  ArrowLeft, EyeOff, Lock, Unlock, Key, Search, Clock
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
@@ -117,8 +117,84 @@ const SEOPage: React.FC = () => {
   // Task & Reminder Creation Modals (Manager)
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [taskForm, setTaskForm] = useState({
-    title: "", description: "", website: "", assigned_executive: "", due_date: "", priority: "medium"
+    title: "", description: "", website: "", assigned_executive: "", due_date: "", priority: "medium", activity_type: ""
   });
+
+  // Tasks Filtering & Search & Sorting State
+  const [taskPage, setTaskPage] = useState(1);
+  const [taskPageSize, setTaskPageSize] = useState(10);
+  const [taskTotalCount, setTaskTotalCount] = useState(0);
+  const [taskTotalPages, setTaskTotalPages] = useState(1);
+  const [taskFilterWebsite, setTaskFilterWebsite] = useState("");
+  const [taskFilterExecutive, setTaskFilterExecutive] = useState("");
+  const [taskFilterStatus, setTaskFilterStatus] = useState("");
+  const [taskFilterPriority, setTaskFilterPriority] = useState("");
+  const [taskFilterActivityType, setTaskFilterActivityType] = useState("");
+  const [taskSort, setTaskSort] = useState("-created_at");
+  const [taskSearch, setTaskSearch] = useState("");
+  const [debouncedTaskSearch, setDebouncedTaskSearch] = useState("");
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [taskStats, setTaskStats] = useState({
+    total: 0,
+    pending: 0,
+    in_progress: 0,
+    completed: 0,
+    overdue: 0
+  });
+
+  // Debouncing search
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedTaskSearch(taskSearch);
+      setTaskPage(1);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [taskSearch]);
+
+  const fetchTasks = async () => {
+    try {
+      setTasksLoading(true);
+      const params = new URLSearchParams();
+      params.append("page", String(taskPage));
+      params.append("page_size", String(taskPageSize));
+      
+      if (taskFilterWebsite) params.append("website", taskFilterWebsite);
+      if (taskFilterExecutive) params.append("executive", taskFilterExecutive);
+      if (taskFilterStatus) params.append("status", taskFilterStatus);
+      if (taskFilterPriority) params.append("priority", taskFilterPriority);
+      if (taskFilterActivityType) params.append("activity_type", taskFilterActivityType);
+      
+      let orderingVal = "newest";
+      if (taskSort === "created_at") orderingVal = "oldest";
+      else if (taskSort === "due_date") orderingVal = "due_date";
+      else if (taskSort === "priority") orderingVal = "priority";
+      else if (taskSort === "title") orderingVal = "title";
+      params.append("ordering", orderingVal);
+
+      if (debouncedTaskSearch) params.append("search", debouncedTaskSearch);
+
+      const res = await axiosInstance.get(`/seo-tasks/?${params.toString()}`);
+      setTasks(res.data.results || []);
+      setTaskTotalCount(res.data.count || 0);
+      setTaskTotalPages(Math.ceil((res.data.count || 0) / taskPageSize) || 1);
+      if (res.data.stats) {
+        setTaskStats(res.data.stats);
+      }
+    } catch (err) {
+      console.error("Error fetching tasks:", err);
+    } finally {
+      setTasksLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTasks();
+  }, [taskPage, taskPageSize, taskFilterWebsite, taskFilterExecutive, taskFilterStatus, taskFilterPriority, taskFilterActivityType, taskSort, debouncedTaskSearch]);
+
+  const handleFilterChange = (setter: (val: string) => void, val: string) => {
+    setter(val);
+    setTaskPage(1);
+  };
 
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [reminderForm, setReminderForm] = useState({
@@ -145,7 +221,7 @@ const SEOPage: React.FC = () => {
         axiosInstance.get("/seo/activity-types/"),
         axiosInstance.get("/seo-daily-logs/"),
         axiosInstance.get("/seo-monthly-targets/"),
-        axiosInstance.get("/seo-tasks/"),
+        Promise.resolve({ data: { results: [] } as any }),
         axiosInstance.get("/seo-reminders/"),
         axiosInstance.get("/seo-credentials/")
       ]);
@@ -569,18 +645,25 @@ const SEOPage: React.FC = () => {
       const payload = {
         ...taskForm,
         website: Number(taskForm.website),
-        assigned_executive: Number(taskForm.assigned_executive)
+        assigned_executive: Number(taskForm.assigned_executive),
+        activity_type: taskForm.activity_type ? Number(taskForm.activity_type) : null
       };
       await axiosInstance.post("/seo-tasks/", payload);
       setShowTaskModal(false);
-      setTaskForm({ title: "", description: "", website: "", assigned_executive: "", due_date: "", priority: "medium" });
-      loadAllData();
+      setTaskForm({ title: "", description: "", website: "", assigned_executive: "", due_date: "", priority: "medium", activity_type: "" });
+      fetchTasks();
     } catch (err) {
       showAlert({
         variant: AlertVariant.ERROR,
         message: "Error creating task."
       });
     }
+  };
+
+  const handleToggleTaskStatus = async (task: SEOTask) => {
+    const newStatus = task.status === "pending" ? "completed" : "pending";
+    await axiosInstance.patch(`/seo-tasks/${task.id}/`, { status: newStatus });
+    fetchTasks();
   };
 
   const handleReminderSubmit = async (e: React.FormEvent) => {
@@ -603,11 +686,7 @@ const SEOPage: React.FC = () => {
     }
   };
 
-  const handleToggleTaskStatus = async (task: SEOTask) => {
-    const newStatus = task.status === "pending" ? "completed" : "pending";
-    await axiosInstance.patch(`/seo-tasks/${task.id}/`, { status: newStatus });
-    loadAllData();
-  };
+
 
   const handleToggleReminderStatus = async (rem: SEOReminder) => {
     const newStatus = rem.status === "pending" ? "completed" : "pending";
@@ -1633,7 +1712,7 @@ const SEOPage: React.FC = () => {
                     <h5 className="fw-bold text-dark mb-0">Tasks Checklist</h5>
                     {isManager && (
                       <button className="btn btn-sm btn-primary rounded-3" onClick={() => {
-                        setTaskForm({ title: "", description: "", website: String(selectedWebsite.id), assigned_executive: "", due_date: "", priority: "medium" });
+                        setTaskForm({ title: "", description: "", website: String(selectedWebsite.id), assigned_executive: "", due_date: "", priority: "medium", activity_type: "" });
                         setShowTaskModal(true);
                       }}>
                         <Plus size={14} className="me-1" /> Add Task
@@ -2217,84 +2296,328 @@ const SEOPage: React.FC = () => {
 
       {/* ================= TAB 8: TASKS & REMINDERS ================= */}
       {activeTab === "tasks" && (
-        <div className="row g-4">
-          {/* TASKS PANEL */}
-          <div className="col-lg-6">
-            <div className="card border-0 shadow-sm rounded-4 p-4 bg-white">
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h5 className="fw-bold mb-0">SEO Tasks</h5>
-                {isManager && (
-                  <button className="btn btn-sm btn-primary rounded-3" onClick={() => setShowTaskModal(true)}>
-                    <Plus size={14} className="me-2" /> Assign Task
-                  </button>
-                )}
+        <div className="d-flex flex-column gap-4">
+          
+          {/* STATS CARDS ROW */}
+          <div className="row g-3 animate__animated animate__fadeIn">
+            <div className="col-6 col-md-4 col-lg">
+              <div className="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div className="d-flex align-items-center">
+                  <div className="p-2.5 bg-primary-subtle text-primary rounded-3 me-3">
+                    <FileText size={18} />
+                  </div>
+                  <div>
+                    <small className="text-muted fw-bold text-uppercase" style={{ fontSize: "0.7rem" }}>Total Tasks</small>
+                    <h5 className="fw-bold mb-0 mt-0.5">{taskStats.total}</h5>
+                  </div>
+                </div>
               </div>
-              <div className="d-flex flex-column gap-3">
-                {tasks.length === 0 ? (
-                  <div className="text-center py-4 text-muted small">No tasks assigned.</div>
-                ) : (
-                  tasks.map(t => (
-                    <div key={t.id} className="p-3 border rounded-3 bg-light d-flex justify-content-between align-items-start">
-                      <div>
-                        <div className="d-flex align-items-center gap-2 mb-1">
-                          <input type="checkbox" checked={t.status === "completed"} onChange={() => handleToggleTaskStatus(t)} className="form-check-input mt-0" />
-                          <span className={`fw-bold text-dark ${t.status === "completed" ? "text-decoration-line-through text-muted" : ""}`}>{t.title}</span>
-                        </div>
-                        <p className="text-muted small mb-2">{t.description}</p>
-                        <div className="small text-muted">
-                          Due: <b>{t.due_date}</b> &nbsp;|&nbsp; Priority: <b>{t.priority}</b> &nbsp;|&nbsp; Website: <b>{t.website_name}</b>
-                        </div>
-                        {isManager && (
-                          <div className="small text-muted mt-1">
-                            Assigned to: <b>{t.assigned_executive_name}</b>
-                          </div>
-                        )}
-                      </div>
-                      <span className={`badge bg-${t.status === "completed" ? "success" : "warning"}`}>{t.status}</span>
-                    </div>
-                  ))
-                )}
+            </div>
+            <div className="col-6 col-md-4 col-lg">
+              <div className="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div className="d-flex align-items-center">
+                  <div className="p-2.5 bg-warning-subtle text-warning rounded-3 me-3">
+                    <Clock size={18} />
+                  </div>
+                  <div>
+                    <small className="text-muted fw-bold text-uppercase" style={{ fontSize: "0.7rem" }}>Pending</small>
+                    <h5 className="fw-bold mb-0 mt-0.5">{taskStats.pending}</h5>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="col-6 col-md-4 col-lg">
+              <div className="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div className="d-flex align-items-center">
+                  <div className="p-2.5 bg-info-subtle text-info rounded-3 me-3">
+                    <TrendingUp size={18} />
+                  </div>
+                  <div>
+                    <small className="text-muted fw-bold text-uppercase" style={{ fontSize: "0.7rem" }}>In Progress</small>
+                    <h5 className="fw-bold mb-0 mt-0.5">{taskStats.in_progress}</h5>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="col-6 col-md-4 col-lg">
+              <div className="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div className="d-flex align-items-center">
+                  <div className="p-2.5 bg-success-subtle text-success rounded-3 me-3">
+                    <CheckCircle2 size={18} />
+                  </div>
+                  <div>
+                    <small className="text-muted fw-bold text-uppercase" style={{ fontSize: "0.7rem" }}>Completed</small>
+                    <h5 className="fw-bold mb-0 mt-0.5">{taskStats.completed}</h5>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="col-6 col-md-4 col-lg">
+              <div className="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div className="d-flex align-items-center">
+                  <div className="p-2.5 bg-danger-subtle text-danger rounded-3 me-3">
+                    <AlertCircle size={18} />
+                  </div>
+                  <div>
+                    <small className="text-muted fw-bold text-uppercase" style={{ fontSize: "0.7rem" }}>Overdue</small>
+                    <h5 className="fw-bold mb-0 mt-0.5 text-danger">{taskStats.overdue}</h5>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* REMINDERS PANEL */}
-          <div className="col-lg-6">
-            <div className="card border-0 shadow-sm rounded-4 p-4 bg-white">
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h5 className="fw-bold mb-0">SEO Reminders</h5>
-                {isManager && (
-                  <button className="btn btn-sm btn-primary rounded-3" onClick={() => setShowReminderModal(true)}>
-                    <Plus size={14} className="me-2" /> Add Reminder
-                  </button>
-                )}
+          {/* TASKS PANEL (Full Width) */}
+          <div className="card border-0 shadow-sm rounded-4 p-4 bg-white">
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <div>
+                <h5 className="fw-bold mb-1">SEO Tasks</h5>
+                <p className="text-muted small mb-0">Assigned SEO actions and deliverables</p>
               </div>
+              {isManager && (
+                <button className="btn btn-sm btn-primary rounded-3 px-3" onClick={() => setShowTaskModal(true)}>
+                  <Plus size={14} className="me-2" /> Assign Task
+                </button>
+              )}
+            </div>
+
+            {/* FILTER TOOLBAR */}
+            <div className="bg-light p-3 rounded-4 mb-4">
+              <div className="row g-2 align-items-center">
+                <div className="col-sm-6 col-md-4 col-lg-2">
+                  <select
+                    className="form-select form-select-sm"
+                    value={taskFilterWebsite}
+                    onChange={e => handleFilterChange(setTaskFilterWebsite, e.target.value)}
+                  >
+                    <option value="">All Websites</option>
+                    {websites.map(s => <option key={s.id} value={s.id}>{s.website_name}</option>)}
+                  </select>
+                </div>
+                <div className="col-sm-6 col-md-4 col-lg-2">
+                  <select
+                    className="form-select form-select-sm"
+                    value={taskFilterExecutive}
+                    onChange={e => handleFilterChange(setTaskFilterExecutive, e.target.value)}
+                  >
+                    <option value="">All Executives</option>
+                    {executives.map(ex => <option key={ex.id} value={ex.id}>{ex.name || ex.username}</option>)}
+                  </select>
+                </div>
+                <div className="col-sm-6 col-md-4 col-lg-2">
+                  <select
+                    className="form-select form-select-sm"
+                    value={taskFilterStatus}
+                    onChange={e => handleFilterChange(setTaskFilterStatus, e.target.value)}
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="on_hold">On Hold</option>
+                    <option value="overdue">Overdue</option>
+                  </select>
+                </div>
+                <div className="col-sm-6 col-md-4 col-lg-2">
+                  <select
+                    className="form-select form-select-sm"
+                    value={taskFilterPriority}
+                    onChange={e => handleFilterChange(setTaskFilterPriority, e.target.value)}
+                  >
+                    <option value="">All Priorities</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+                <div className="col-sm-6 col-md-4 col-lg-2">
+                  <select
+                    className="form-select form-select-sm"
+                    value={taskFilterActivityType}
+                    onChange={e => handleFilterChange(setTaskFilterActivityType, e.target.value)}
+                  >
+                    <option value="">All Activities</option>
+                    {activityTypes.map(act => <option key={act.id} value={act.id}>{act.name}</option>)}
+                  </select>
+                </div>
+                <div className="col-sm-6 col-md-4 col-lg-2">
+                  <select
+                    className="form-select form-select-sm"
+                    value={taskSort}
+                    onChange={e => setTaskSort(e.target.value)}
+                  >
+                    <option value="-created_at">Newest First</option>
+                    <option value="created_at">Oldest First</option>
+                    <option value="due_date">Due Date</option>
+                    <option value="priority">Priority</option>
+                    <option value="title">Task Title (A-Z)</option>
+                  </select>
+                </div>
+                <div className="col-md-9 col-lg-10 mt-2">
+                  <div className="input-group input-group-sm">
+                    <span className="input-group-text bg-white text-muted border-end-0">
+                      <Search size={14} />
+                    </span>
+                    <input
+                      type="text"
+                      className="form-control border-start-0"
+                      placeholder="Search by task title, website, or executive..."
+                      value={taskSearch}
+                      onChange={e => setTaskSearch(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3 col-lg-2 mt-2">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary w-100 fw-semibold"
+                    onClick={() => {
+                      setTaskFilterWebsite("");
+                      setTaskFilterExecutive("");
+                      setTaskFilterStatus("");
+                      setTaskFilterPriority("");
+                      setTaskFilterActivityType("");
+                      setTaskSort("-created_at");
+                      setTaskSearch("");
+                      setDebouncedTaskSearch("");
+                      setTaskPage(1);
+                    }}
+                  >
+                    Reset Filters
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* TASKS LIST */}
+            {tasksLoading ? (
               <div className="d-flex flex-column gap-3">
-                {reminders.length === 0 ? (
-                  <div className="text-center py-4 text-muted small">No reminders active.</div>
-                ) : (
-                  reminders.map(r => (
-                    <div key={r.id} className="p-3 border rounded-3 bg-light d-flex justify-content-between align-items-start">
-                      <div>
-                        <div className="d-flex align-items-center gap-2 mb-1">
-                          <input type="checkbox" checked={r.status === "completed"} onChange={() => handleToggleReminderStatus(r)} className="form-check-input mt-0" />
-                          <span className={`fw-bold text-dark ${r.status === "completed" ? "text-decoration-line-through text-muted" : ""}`}>{r.title}</span>
-                        </div>
-                        <p className="text-muted small mb-2">{r.description}</p>
-                        <div className="small text-muted">
-                          Due: <b>{r.due_date}</b> &nbsp;|&nbsp; Priority: <b>{r.priority}</b> &nbsp;|&nbsp; Website: <b>{r.website_name}</b>
-                        </div>
-                        {isManager && (
-                          <div className="small text-muted mt-1">
-                            Executive: <b>{r.assigned_executive_name}</b>
-                          </div>
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="p-3 border rounded-3 bg-light placeholder-glow">
+                    <div className="placeholder col-6 mb-2 rounded" style={{ height: "18px" }}></div>
+                    <div className="placeholder col-10 mb-3 rounded" style={{ height: "12px" }}></div>
+                    <div className="placeholder col-4 rounded" style={{ height: "10px" }}></div>
+                  </div>
+                ))}
+              </div>
+            ) : tasks.length === 0 ? (
+              <div className="text-center py-5 text-muted bg-light border rounded-3">
+                <p className="mb-3">No SEO tasks match your current filters.</p>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={() => {
+                    setTaskFilterWebsite("");
+                    setTaskFilterExecutive("");
+                    setTaskFilterStatus("");
+                    setTaskFilterPriority("");
+                    setTaskFilterActivityType("");
+                    setTaskSort("-created_at");
+                    setTaskSearch("");
+                    setDebouncedTaskSearch("");
+                    setTaskPage(1);
+                  }}
+                >
+                  Reset Filters
+                </button>
+              </div>
+            ) : (
+              <div className="d-flex flex-column gap-3">
+                {tasks.map(t => (
+                  <div key={t.id} className="p-3 border rounded-3 bg-light d-flex justify-content-between align-items-start">
+                    <div>
+                      <div className="d-flex align-items-center gap-2 mb-1">
+                        <input type="checkbox" checked={t.status === "completed"} onChange={() => handleToggleTaskStatus(t)} className="form-check-input mt-0" />
+                        <span className={`fw-bold text-dark ${t.status === "completed" ? "text-decoration-line-through text-muted" : ""}`}>{t.title}</span>
+                      </div>
+                      <p className="text-muted small mb-2">{t.description}</p>
+                      <div className="small text-muted">
+                        Due: <b>{t.due_date}</b> &nbsp;|&nbsp; Priority: <span className="text-capitalize fw-bold">{t.priority}</span> &nbsp;|&nbsp; Website: <b>{t.website_name}</b>
+                        {t.activity_type_name && (
+                          <> &nbsp;|&nbsp; Activity: <b>{t.activity_type_name}</b></>
                         )}
                       </div>
-                      <span className={`badge bg-${r.status === "completed" ? "success" : "warning"}`}>{r.status}</span>
+                      {isManager && (
+                        <div className="small text-muted mt-1">
+                          Assigned to: <b>{t.assigned_executive_name}</b>
+                        </div>
+                      )}
                     </div>
-                  ))
-                )}
+                    <span className={`badge text-capitalize bg-${
+                      t.status === "completed" ? "success" : 
+                      t.status === "in_progress" ? "info" : 
+                      t.status === "on_hold" ? "secondary" : 
+                      t.status === "overdue" ? "danger" : "warning"
+                    }`}>{t.status}</span>
+                  </div>
+                ))}
               </div>
+            )}
+
+            {/* PAGINATION CONTROLS */}
+            {taskTotalPages > 1 && (
+              <div className="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                <span className="small text-muted">
+                  Page <b>{taskPage}</b> of <b>{taskTotalPages}</b> ({taskTotalCount} tasks)
+                </span>
+                <div className="d-flex gap-2">
+                  <button
+                    className="btn btn-xs btn-outline-secondary px-3 py-1.5"
+                    disabled={taskPage <= 1 || tasksLoading}
+                    onClick={() => setTaskPage(prev => Math.max(prev - 1, 1))}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    className="btn btn-xs btn-outline-secondary px-3 py-1.5"
+                    disabled={taskPage >= taskTotalPages || tasksLoading}
+                    onClick={() => setTaskPage(prev => Math.min(prev + 1, taskTotalPages))}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* REMINDERS PANEL (Full Width) */}
+          <div className="card border-0 shadow-sm rounded-4 p-4 bg-white">
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <div>
+                <h5 className="fw-bold mb-1">SEO Reminders</h5>
+                <p className="text-muted small mb-0">Active time-based reminders and alerts</p>
+              </div>
+              {isManager && (
+                <button className="btn btn-sm btn-primary rounded-3 px-3" onClick={() => setShowReminderModal(true)}>
+                  <Plus size={14} className="me-2" /> Add Reminder
+                </button>
+              )}
+            </div>
+            <div className="d-flex flex-column gap-3">
+              {reminders.length === 0 ? (
+                <div className="text-center py-4 text-muted small">No reminders active.</div>
+              ) : (
+                reminders.map(r => (
+                  <div key={r.id} className="p-3 border rounded-3 bg-light d-flex justify-content-between align-items-start">
+                    <div>
+                      <div className="d-flex align-items-center gap-2 mb-1">
+                        <input type="checkbox" checked={r.status === "completed"} onChange={() => handleToggleReminderStatus(r)} className="form-check-input mt-0" />
+                        <span className={`fw-bold text-dark ${r.status === "completed" ? "text-decoration-line-through text-muted" : ""}`}>{r.title}</span>
+                      </div>
+                      <p className="text-muted small mb-2">{r.description}</p>
+                      <div className="small text-muted">
+                        Due: <b>{r.due_date}</b> &nbsp;|&nbsp; Priority: <b>{r.priority}</b> &nbsp;|&nbsp; Website: <b>{r.website_name}</b>
+                      </div>
+                      {isManager && (
+                        <div className="small text-muted mt-1">
+                          Executive: <b>{r.assigned_executive_name}</b>
+                        </div>
+                      )}
+                    </div>
+                    <span className={`badge bg-${r.status === "completed" ? "success" : "warning"}`}>{r.status}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -2774,6 +3097,13 @@ const SEOPage: React.FC = () => {
                     <select className="form-select" value={taskForm.assigned_executive} onChange={e => setTaskForm({ ...taskForm, assigned_executive: e.target.value })} required>
                       <option value="">Select Executive</option>
                       {executives.map(ex => <option key={ex.id} value={ex.id}>{ex.name ? `${ex.name} (${ex.username})` : ex.username}</option>)}
+                    </select>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label small text-muted fw-bold">ACTIVITY TYPE (OPTIONAL)</label>
+                    <select className="form-select" value={taskForm.activity_type} onChange={e => setTaskForm({ ...taskForm, activity_type: e.target.value })}>
+                      <option value="">None / Custom</option>
+                      {activityTypes.map(act => <option key={act.id} value={act.id}>{act.name}</option>)}
                     </select>
                   </div>
                   <div className="row g-2 mb-3">

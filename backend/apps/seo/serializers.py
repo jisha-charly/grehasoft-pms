@@ -163,6 +163,7 @@ class SEOTaskSerializer(serializers.ModelSerializer):
     website_name = serializers.CharField(source="website.website_name", read_only=True)
     assigned_executive_name = serializers.CharField(source="assigned_executive.name", read_only=True)
     created_by_name = serializers.CharField(source="created_by.name", read_only=True)
+    activity_type_name = serializers.CharField(source="activity_type.name", read_only=True)
 
     class Meta:
         model = SEOTask
