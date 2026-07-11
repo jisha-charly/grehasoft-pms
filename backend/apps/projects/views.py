@@ -185,11 +185,23 @@ class MilestoneViewSet(viewsets.ModelViewSet):
         if role_name == 'CLIENT':
             client = user.get_associated_client()
             if client:
-                return Milestone.objects.filter(project__client=client)
-            return Milestone.objects.none()
-        if role_name == 'TEAM_MEMBER':
-            return Milestone.objects.filter(project__members__user=user).distinct()
-        return Milestone.objects.all()
+                queryset = Milestone.objects.filter(project__client=client)
+            else:
+                queryset = Milestone.objects.none()
+        elif role_name == 'TEAM_MEMBER':
+            queryset = Milestone.objects.filter(project__members__user=user).distinct()
+        else:
+            queryset = Milestone.objects.all()
+
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        return queryset
+
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('project'):
+            return None
+        return super().paginate_queryset(queryset)
 
     def check_permissions(self, request):
         if request.method not in permissions.SAFE_METHODS:
@@ -233,14 +245,33 @@ class ProjectMemberViewSet(viewsets.ModelViewSet):
     permission_classes = [HasPermission]
     required_permission = 'VIEW_PROJECTS'
 
+    def create(self, request, *args, **kwargs):
+        from django.db import IntegrityError
+        from rest_framework.exceptions import ValidationError
+        try:
+            return super().create(request, *args, **kwargs)
+        except IntegrityError:
+            raise ValidationError("This user is already assigned to this project.")
+
     def get_queryset(self):
         user = self.request.user
         role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
         if role_name == 'CLIENT':
-            return ProjectMember.objects.none()
-        if role_name == 'TEAM_MEMBER':
-            return ProjectMember.objects.filter(project__members__user=user).distinct()
-        return ProjectMember.objects.all()
+            queryset = ProjectMember.objects.none()
+        elif role_name == 'TEAM_MEMBER':
+            queryset = ProjectMember.objects.filter(project__members__user=user).distinct()
+        else:
+            queryset = ProjectMember.objects.all()
+
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        return queryset
+
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('project'):
+            return None
+        return super().paginate_queryset(queryset)
 
     def check_permissions(self, request):
         if request.method not in permissions.SAFE_METHODS:

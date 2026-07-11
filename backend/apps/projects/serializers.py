@@ -88,6 +88,16 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectMember
         fields = "__all__"
+        validators = []
+
+    def validate(self, attrs):
+        project = attrs.get('project')
+        user = attrs.get('user')
+        
+        if not self.instance and project and user:
+            if ProjectMember.objects.filter(project=project, user=user).exists():
+                raise serializers.ValidationError("This user is already assigned to this project.")
+        return attrs
 
 
 class ActivityLogSerializer(serializers.ModelSerializer):

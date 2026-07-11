@@ -87,6 +87,11 @@ class TaskViewSet(viewsets.ModelViewSet):
 
         return queryset.filter(project__members__user=user)
 
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('project') or self.request.query_params.get('all') == 'true':
+            return None
+        return super().paginate_queryset(queryset)
+
     def check_permissions(self, request):
         super().check_permissions(request)
         role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None

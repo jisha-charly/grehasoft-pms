@@ -80,6 +80,14 @@ class ProjectMember(models.Model):
     )
     role_in_project = models.CharField(max_length=100)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "user"],
+                name="unique_project_member"
+            )
+        ]
+
     def __str__(self):
         return f"{self.user} - {self.project}"
 

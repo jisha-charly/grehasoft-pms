@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Project, Task, User, Department, Milestone, ProjectMember, ActivityLog, TaskStatus, TaskType, ProjectStatus, TaskFile, TaskReview } from '../../types';
 import TaskDetailsModal from '../../components/TaskDetailsModal';
@@ -60,6 +60,7 @@ const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 const [memberToDelete, setMemberToDelete] = useState<number | null>(null);
 const [taskErrors, setTaskErrors] = useState<any>({});
 const [milestoneErrors, setMilestoneErrors] = useState<any>({});
+const [memberError, setMemberError] = useState<string | null>(null);
 
 const validateTask = (fd: FormData) => {
   let errors: any = {};
@@ -161,8 +162,8 @@ useEffect(() => {
       const [tasksRes, milestonesRes, membersRes] =
         await Promise.allSettled([
           axiosInstance.get(`/tasks/?project=${id}`),
-          axiosInstance.get(`/milestones/`),
-          axiosInstance.get(`/members/`),
+          axiosInstance.get(`/milestones/?project=${id}`),
+          axiosInstance.get(`/members/?project=${id}`),
         ]);
 
        if (tasksRes.status === "fulfilled") {
@@ -208,6 +209,17 @@ useEffect(() => {
     })
     .catch(err => console.error(err));
 }, [id]);
+
+  const assignedUserIds = useMemo(() => {
+    return new Set(projectMembers.map(m => Number(m.user)));
+  }, [projectMembers]);
+
+  const availableUsers = useMemo(() => {
+    return users.filter(u => {
+      const isClient = u.role_name === 'CLIENT' || u.role === 'CLIENT';
+      return !isClient && !assignedUserIds.has(Number(u.id));
+    });
+  }, [users, assignedUserIds]);
 
   if (loading) return <div className="p-5 text-center"><div className="spinner-border text-primary" role="status"></div><p className="mt-2">Loading project details...</p></div>;
   if (!project) return <div className="p-5 text-center"><h3 className="text-muted">Project not found</h3><Link to="/projects">Back to list</Link></div>;
@@ -372,14 +384,31 @@ try {
 
       const res = await axiosInstance.post("/members/", payload);
 
-      setProjectMembers(prev => [...prev, res.data]);
+      const refreshRes = await axiosInstance.get(`/members/?project=${id}`);
+      setProjectMembers(
+        getResults(refreshRes).filter(
+          (m: any) => m.project === Number(id)
+        )
+      );
     }
 
     setMemberModalOpen(false);
     setEditingMember(null);
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error saving member:", error);
+    const apiData = error.response?.data;
+    let apiError = "This user is already assigned to this project.";
+    if (apiData) {
+      if (Array.isArray(apiData) && apiData.length > 0) {
+        apiError = apiData[0];
+      } else if (typeof apiData === 'object') {
+        const firstKey = Object.keys(apiData)[0];
+        const val = apiData[firstKey];
+        apiError = Array.isArray(val) ? val[0] : String(val);
+      }
+    }
+    setMemberError(apiError);
   }
 };
 
@@ -598,7 +627,7 @@ try {
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h6 className="fw-bold mb-0">Assigned Team Members</h6>
                 {canManage && (
-                  <button className="btn btn-primary btn-sm fw-bold px-3" onClick={() => { setEditingMember(null); setMemberModalOpen(true); }}>
+                  <button className="btn btn-primary btn-sm fw-bold px-3" onClick={() => { setEditingMember(null); setMemberError(null); setMemberModalOpen(true); }}>
                     <i className="bi bi-person-plus me-2"></i>Add Member
                   </button>
                 )}
@@ -636,6 +665,7 @@ try {
               className="btn btn-link text-primary p-0 text-decoration-none"
               onClick={() => {
                 setEditingMember(m);
+                setMemberError(null);
                 setMemberModalOpen(true);
               }}
             >
@@ -792,11 +822,24 @@ try {
                   <button type="button" className="btn-close" onClick={() => setMemberModalOpen(false)}></button>
                 </div>
                 <div className="modal-body p-4 bg-white">
+                  {memberError && (
+                    <div className="alert alert-danger py-2 px-3 small mb-3">
+                      {memberError}
+                    </div>
+                  )}
                   {!editingMember && (
                     <div className="mb-3">
                       <label className="form-label smaller fw-bold">Select User</label>
-                      <select name="userId" className="form-select">
-                        {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
+                      <select name="userId" className="form-select" disabled={availableUsers.length === 0}>
+                        {availableUsers.length === 0 ? (
+                          <option value="">No available users to add.</option>
+                        ) : (
+                          availableUsers.map(u => (
+                            <option key={u.id} value={u.id}>
+                              {u.name} ({u.email})
+                            </option>
+                          ))
+                        )}
                       </select>
                     </div>
                   )}
@@ -812,7 +855,9 @@ try {
                 </div>
                 <div className="modal-footer border-0 p-4 pt-0 bg-white">
                   <button type="button" className="btn btn-light fw-bold" onClick={() => setMemberModalOpen(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary fw-bold">{editingMember ? 'Update Role' : 'Assign to Team'}</button>
+                  <button type="submit" className="btn btn-primary fw-bold" disabled={!editingMember && availableUsers.length === 0}>
+                    {editingMember ? 'Update Role' : 'Assign to Team'}
+                  </button>
                 </div>
               </form>
             </div>
