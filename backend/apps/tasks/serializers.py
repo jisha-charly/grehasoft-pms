@@ -104,6 +104,24 @@ class TaskSerializer(serializers.ModelSerializer):
         last = obj.progress_history.order_by('-updated_at').first()
         return last.progress_percentage if last else 0
 
+    def validate(self, data):
+        project = data.get('project')
+        if not project and self.instance:
+            project = self.instance.project
+
+        assignees = data.get('assignees')
+        if project and assignees:
+            from apps.projects.models import ProjectMember
+            member_user_ids = set(
+                ProjectMember.objects.filter(project=project).values_list('user_id', flat=True)
+            )
+            for assignee_id in assignees:
+                if assignee_id not in member_user_ids:
+                    raise serializers.ValidationError({
+                        "assignee": "This user is not a member of the selected project."
+                    })
+        return data
+
     def create(self, validated_data):
         assignees_data = validated_data.pop('assignees', [])
         

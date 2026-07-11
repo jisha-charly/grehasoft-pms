@@ -47,8 +47,17 @@ class ProjectViewSet(viewsets.ModelViewSet):
         super().check_permissions(request)
         role_name = getattr(request.user.role, 'name', None) if hasattr(request.user, 'role') else None
         if role_name == 'CLIENT' and request.method not in permissions.SAFE_METHODS:
-            log_failed_attempt(request.user, f"Tried to write on projects via {request.method}")
             self.permission_denied(request, message="Clients do not have permission to modify project data.")
+
+    @action(detail=True, methods=['get'], url_path='members')
+    def members(self, request, pk=None):
+        project = self.get_object()
+        from apps.users.serializers import MinimalUserSerializer
+        from .models import ProjectMember
+        members = ProjectMember.objects.filter(project=project, user__is_active=True).select_related('user')
+        users = [m.user for m in members]
+        serializer = MinimalUserSerializer(users, many=True)
+        return Response(serializer.data)
 
 class ClientViewSet(viewsets.ModelViewSet):
     queryset = Client.objects.all()

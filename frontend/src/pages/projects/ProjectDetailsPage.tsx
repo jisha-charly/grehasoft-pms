@@ -40,6 +40,7 @@ const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
   const [projectActivity, setProjectActivity] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [projectTeamUsers, setProjectTeamUsers] = useState<User[]>([]);
 
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -159,11 +160,12 @@ useEffect(() => {
       setProject(projRes.data);
 
       // ✅ 2. Fetch others separately (do NOT break page if one fails)
-      const [tasksRes, milestonesRes, membersRes] =
+      const [tasksRes, milestonesRes, membersRes, teamRes] =
         await Promise.allSettled([
           axiosInstance.get(`/tasks/?project=${id}`),
           axiosInstance.get(`/milestones/?project=${id}`),
           axiosInstance.get(`/members/?project=${id}`),
+          axiosInstance.get(`/projects/${id}/members/`),
         ]);
 
        if (tasksRes.status === "fulfilled") {
@@ -189,6 +191,10 @@ if (membersRes.status === "fulfilled")
     (m: any) => m.project === Number(id)
   )
 );
+
+if (teamRes.status === "fulfilled") {
+  setProjectTeamUsers(teamRes.value.data);
+}
 
     } catch (error) {
       console.error("Error fetching project:", error);
@@ -392,6 +398,9 @@ try {
       );
     }
 
+    const teamRes = await axiosInstance.get(`/projects/${id}/members/`);
+    setProjectTeamUsers(teamRes.data);
+
     setMemberModalOpen(false);
     setEditingMember(null);
 
@@ -420,6 +429,8 @@ try {
     setProjectMembers(prev =>
       prev.filter(m => m.id !== memberToDelete)
     );
+    const teamRes = await axiosInstance.get(`/projects/${id}/members/`);
+    setProjectTeamUsers(teamRes.data);
   } catch (error) {
     console.error("Error removing member:", error);
   }
@@ -758,16 +769,47 @@ try {
                       <div className="invalid-feedback">{taskErrors.dueDate}</div>
                     )}
                     </div>
-                    <div className="col-md-12"><label className="form-label smaller fw-bold uppercase text-secondary">Assignee *</label><select name="assignee" className={`form-select ${taskErrors.assignee ? 'is-invalid' : ''}`} defaultValue={editingTask?.assignees?.[0] || ""}><option value="">Select assignee</option>{users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
-                    {taskErrors.assignee && (
-                      <div className="invalid-feedback">{taskErrors.assignee}</div>
-                    )}
+                    <div className="col-md-12">
+                      <label className="form-label smaller fw-bold uppercase text-secondary">Assignee *</label>
+                      <select 
+                        name="assignee" 
+                        className={`form-select ${taskErrors.assignee ? 'is-invalid' : ''}`} 
+                        defaultValue={editingTask?.assignees?.[0] || ""}
+                        disabled={projectTeamUsers.length === 0}
+                      >
+                        {projectTeamUsers.length === 0 ? (
+                          <option value="">No project members available</option>
+                        ) : (
+                          <>
+                            <option value="">Select assignee</option>
+                            {projectTeamUsers.map(u => (
+                              <option key={u.id} value={u.id}>
+                                {u.name} ({u.email})
+                              </option>
+                            ))}
+                          </>
+                        )}
+                      </select>
+                      {taskErrors.assignee && (
+                        <div className="invalid-feedback">{taskErrors.assignee}</div>
+                      )}
+                      {!editingTask && projectTeamUsers.length === 0 && (
+                        <div className="alert alert-warning py-2 px-3 small mt-2">
+                          Assign at least one team member to this project before creating tasks.
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
                 <div className="modal-footer bg-white border-0 pb-4 px-4 gap-2">
                   <button type="button" className="btn btn-light fw-bold" onClick={() => setTaskModalOpen(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary fw-bold">{editingTask ? 'Update Task' : 'Create Task'}</button>
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary fw-bold"
+                    disabled={!editingTask && projectTeamUsers.length === 0}
+                  >
+                    {editingTask ? 'Update Task' : 'Create Task'}
+                  </button>
                 </div>
               </form>
             </div>
