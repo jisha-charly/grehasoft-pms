@@ -301,6 +301,8 @@ export interface Task {
 
   taskTypeId?: number;
   task_type_name?: string;
+  assignee_name?: string;
+  assignee_email?: string;
 
   createdBy?: number;
   created_at?: string;

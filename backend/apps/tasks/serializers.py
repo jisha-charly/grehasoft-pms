@@ -95,6 +95,9 @@ class TaskSerializer(serializers.ModelSerializer):
     )
     progress_percentage = serializers.IntegerField(write_only=True, required=False)
 
+    assignee_name = serializers.SerializerMethodField(read_only=True)
+    assignee_email = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = Task
         fields = '__all__'
@@ -103,6 +106,18 @@ class TaskSerializer(serializers.ModelSerializer):
     def get_latest_progress(self, obj):
         last = obj.progress_history.order_by('-updated_at').first()
         return last.progress_percentage if last else 0
+
+    def get_assignee_name(self, obj):
+        assignment = obj.assignments.first()
+        if assignment and assignment.employee:
+            return assignment.employee.name or assignment.employee.username
+        return None
+
+    def get_assignee_email(self, obj):
+        assignment = obj.assignments.first()
+        if assignment and assignment.employee:
+            return assignment.employee.email
+        return None
 
     def validate(self, data):
         project = data.get('project')

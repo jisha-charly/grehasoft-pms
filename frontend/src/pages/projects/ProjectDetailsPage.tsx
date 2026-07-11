@@ -541,14 +541,24 @@ try {
               </div>
               <div className="table-responsive">
                 <table className="table table-professional align-middle mb-0">
-                  <thead><tr><th>Task Name</th><th>Status</th><th>Priority</th><th>Due Date</th>{canManage && <th className="text-end">Action</th>}</tr></thead>
+                  <thead><tr><th>Task Name</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Due Date</th>{canManage && <th className="text-end">Action</th>}</tr></thead>
                   <tbody>
                     {projectTasks.length === 0 ? (
-                      <tr><td colSpan={canManage ? 5 : 4} className="text-center py-5 text-muted small">No tasks assigned to this project yet.</td></tr>
+                      <tr><td colSpan={canManage ? 6 : 5} className="text-center py-5 text-muted small">No tasks assigned to this project yet.</td></tr>
                     ) : (
                       projectTasks.map(t => (
                         <tr key={t.id} onClick={() => setSelectedTask(t)} style={{cursor: 'pointer'}}>
                           <td><div className="fw-bold text-dark">{t.title}</div><div className="smaller text-muted">{t.description.substring(0, 40)}...</div></td>
+                          <td>
+                            {t.assignee_name ? (
+                              <div>
+                                <div className="fw-semibold text-dark small">{t.assignee_name}</div>
+                                {t.assignee_email && <div className="text-muted smaller" style={{ fontSize: '0.75rem' }}>{t.assignee_email}</div>}
+                              </div>
+                            ) : (
+                              <span className="text-secondary small">Unassigned</span>
+                            )}
+                          </td>
                           <td><span className={`badge ${t.status === 'done' ? 'bg-success-subtle text-success' : 'bg-primary-subtle text-primary'}`}>{t.status}</span></td>
                           <td><span className={`badge ${t.priority === 'high' ? 'bg-danger' : 'bg-info'}`}>{t.priority}</span></td>
                           <td className="small text-secondary">{t.dueDate}</td>
