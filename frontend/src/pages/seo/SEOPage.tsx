@@ -20,6 +20,7 @@ import { AlertVariant } from "../../types/alert";
 import { getErrorMessage } from "../../utils/getErrorMessage";
 import ConfirmModal from "../../components/ConfirmModal";
 import DeleteConfirmModal from "../../components/DeleteConfirmModal";
+import SeoActivityTypesPage from "./SeoActivityTypesPage";
 
 const SEOPage: React.FC = () => {
   const { user } = useAuth();
@@ -141,7 +142,7 @@ const SEOPage: React.FC = () => {
         axiosInstance.get("/websites/"),
         axiosInstance.get("/clients/?all=true"),
         isManager ? axiosInstance.get("/users/?all=true&role_name=SEO_EXECUTIVE&is_active=true") : Promise.resolve({ data: [] }),
-        axiosInstance.get("/seo-activity-types/"),
+        axiosInstance.get("/seo/activity-types/"),
         axiosInstance.get("/seo-daily-logs/"),
         axiosInstance.get("/seo-monthly-targets/"),
         axiosInstance.get("/seo-tasks/"),
@@ -772,6 +773,11 @@ const SEOPage: React.FC = () => {
                 <li className="nav-item">
                   <button className={`nav-link rounded-3 fw-bold ${activeTab === "reports" ? "active btn-primary" : "text-secondary"}`} onClick={() => setActiveTab("reports")}>
                     <FileText size={16} className="me-2" /> Reports & Import
+                  </button>
+                </li>
+                <li className="nav-item">
+                  <button className={`nav-link rounded-3 fw-bold ${activeTab === "activity-types" ? "active btn-primary" : "text-secondary"}`} onClick={() => setActiveTab("activity-types")}>
+                    <Settings size={16} className="me-2" /> Activity Types
                   </button>
                 </li>
                 <li className="nav-item">
@@ -2292,6 +2298,10 @@ const SEOPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {activeTab === "activity-types" && isManager && (
+        <SeoActivityTypesPage />
       )}
 
 

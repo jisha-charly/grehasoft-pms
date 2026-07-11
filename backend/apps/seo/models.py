@@ -7,6 +7,7 @@ class SEOActivityType(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
+    display_order = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -15,7 +16,7 @@ class SEOActivityType(models.Model):
 
     class Meta:
         db_table = "seo_activity_type"
-        ordering = ["name"]
+        ordering = ["display_order", "name"]
 
 
 class Website(models.Model):

@@ -646,6 +646,7 @@ export interface SEOActivityType {
   name: string;
   description?: string;
   is_active: boolean;
+  display_order?: number;
 }
 
 export interface SEOWebsite {

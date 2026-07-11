@@ -83,7 +83,7 @@ const ClientDailyUpdatesPage: React.FC = () => {
       try {
         const [webRes, actRes, projRes] = await Promise.all([
           axiosInstance.get("/websites/?all=true"),
-          axiosInstance.get("/seo-activity-types/?all=true"),
+          axiosInstance.get("/seo/activity-types/?all=true"),
           axiosInstance.get("/projects/")
         ]);
         setWebsites(webRes.data.results || webRes.data || []);

@@ -62,7 +62,7 @@ router.register(r'activity-logs', GlobalActivityLogViewSet, basename='activity-l
 router.register("websites", WebsiteViewSet)
 router.register("seo-tasks", SEOTaskViewSet)
 router.register("seo-keywords", KeywordViewSet, basename="seo-keywords")
-router.register("seo-activity-types", SEOActivityTypeViewSet, basename="seo-activity-types")
+router.register("seo/activity-types", SEOActivityTypeViewSet, basename="seo-activity-types")
 router.register("seo-daily-logs", SEODailyWorkLogViewSet, basename="seo-daily-logs")
 router.register("seo-monthly-targets", SEOMonthlyTargetViewSet, basename="seo-monthly-targets")
 router.register("seo-reminders", SEOReminderViewSet, basename="seo-reminders")

@@ -41,10 +41,30 @@ class SEOActivityTypeViewSet(viewsets.ModelViewSet):
     queryset = SEOActivityType.objects.all()
     serializer_class = SEOActivityTypeSerializer
 
+    def get_queryset(self):
+        user = self.request.user
+        qs = SEOActivityType.objects.all()
+
+        is_privileged = is_admin(user) or is_seo_manager(user)
+        if not is_privileged:
+            qs = qs.filter(is_active=True)
+        else:
+            active_param = self.request.query_params.get("active")
+            if active_param is not None:
+                is_active_val = active_param.lower() in ["true", "1", "yes"]
+                qs = qs.filter(is_active=is_active_val)
+
+        return qs
+
     def get_permissions(self):
-        if self.request.method in permissions.SAFE_METHODS:
-            return [permissions.IsAuthenticated()]
-        return [permissions.IsAuthenticated()]  # Admin/Manager control can be verified inside methods if needed
+        return [permissions.IsAuthenticated()]
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        if request.method not in permissions.SAFE_METHODS:
+            user = request.user
+            if not (is_admin(user) or is_seo_manager(user)):
+                raise PermissionDenied("You do not have permission to manage SEO activity types.")
 
 
 class WebsiteViewSet(viewsets.ModelViewSet):

@@ -5,8 +5,12 @@ interface Props {
   onClose: () => void;
   onConfirm: () => void;
   title?: string;
-  message?: string;
+  message?: React.ReactNode;
   confirmText?: string;
+  isLoading?: boolean;
+  isDisabled?: boolean;
+  autoCloseOnConfirm?: boolean;
+  showSoftDeleteNotice?: boolean;
 }
 
 const DeleteConfirmModal: React.FC<Props> = ({
@@ -16,6 +20,10 @@ const DeleteConfirmModal: React.FC<Props> = ({
   title = "Confirm Deletion",
   message = "Are you sure you want to delete this item?",
   confirmText = "Delete",
+  isLoading = false,
+  isDisabled = false,
+  autoCloseOnConfirm = true,
+  showSoftDeleteNotice = true,
 }) => {
   if (!isOpen) return null;
 
@@ -28,7 +36,7 @@ const DeleteConfirmModal: React.FC<Props> = ({
             <span style={{ color: "#dc3545", marginRight: "8px" }}>⚠</span>
             {title}
           </div>
-          <button style={closeBtnStyle} onClick={onClose}>
+          <button style={closeBtnStyle} onClick={onClose} disabled={isLoading || isDisabled}>
             ×
           </button>
         </div>
@@ -36,24 +44,34 @@ const DeleteConfirmModal: React.FC<Props> = ({
         {/* Body */}
         <div style={bodyStyle}>
           <p style={{ marginBottom: "8px" }}>{message}</p>
-          <small style={{ color: "#6c757d" }}>
-            This action can be reversed if soft delete is enabled.
-          </small>
+          {showSoftDeleteNotice && (
+            <small style={{ color: "#6c757d" }}>
+              This action can be reversed if soft delete is enabled.
+            </small>
+          )}
         </div>
 
         {/* Footer */}
         <div style={footerStyle}>
-          <button style={cancelBtnStyle} onClick={onClose}>
+          <button style={cancelBtnStyle} onClick={onClose} disabled={isLoading || isDisabled}>
             Cancel
           </button>
           <button
-            style={deleteBtnStyle}
-            onClick={() => {
-              onConfirm();
-              onClose();
+            style={{
+              ...deleteBtnStyle,
+              opacity: (isLoading || isDisabled) ? 0.6 : 1,
+              cursor: (isLoading || isDisabled) ? "not-allowed" : "pointer"
             }}
+            onClick={() => {
+              if (isLoading || isDisabled) return;
+              onConfirm();
+              if (autoCloseOnConfirm) {
+                onClose();
+              }
+            }}
+            disabled={isLoading || isDisabled}
           >
-            {confirmText}
+            {isLoading ? "Deleting..." : confirmText}
           </button>
         </div>
       </div>
