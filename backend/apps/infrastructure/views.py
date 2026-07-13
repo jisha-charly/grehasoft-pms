@@ -1,4 +1,5 @@
 from rest_framework import filters, permissions, viewsets
+# pyrefly: ignore [missing-import]
 from apps.projects.models import Project
 from core.permissions import HasPermission
 
@@ -76,4 +77,4 @@ class WebsiteCredentialViewSet(BaseInfraViewSet):
     serializer_class = WebsiteCredentialSerializer
 
     def get_queryset(self):
-        return self.filter_queryset_by_role(self.queryset)
+        return self.filter_queryset_by_role(self.queryset)

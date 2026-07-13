@@ -39,6 +39,9 @@ const SEOPage: React.FC = () => {
   const [showDeleteTargetModal, setShowDeleteTargetModal] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
+  const [showDeleteTaskModal, setShowDeleteTaskModal] = useState(false);
+  const [deleteTaskId, setDeleteTaskId] = useState<number | null>(null);
+
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [approveTargetId, setApproveTargetId] = useState<number | null>(null);
   const isManager = user?.is_superuser || user?.role === "SUPER_ADMIN" || user?.role === "SEO_MANAGER";
@@ -116,8 +119,9 @@ const SEOPage: React.FC = () => {
 
   // Task & Reminder Creation Modals (Manager)
   const [showTaskModal, setShowTaskModal] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [taskForm, setTaskForm] = useState({
-    title: "", description: "", website: "", assigned_executive: "", due_date: "", priority: "medium", activity_type: ""
+    title: "", description: "", website: "", assigned_executive: "", due_date: "", priority: "medium", activity_type: "", status: "pending"
   });
 
   // Tasks Filtering & Search & Sorting State
@@ -347,6 +351,37 @@ const SEOPage: React.FC = () => {
     if (deleteWebsiteId !== null) {
       await axiosInstance.delete(`/websites/${deleteWebsiteId}/`);
       loadAllData();
+    }
+  };
+
+  const handleDeleteTaskClick = (id: number) => {
+    setDeleteTaskId(id);
+    setShowDeleteTaskModal(true);
+  };
+
+  const handleConfirmDeleteTask = async () => {
+    if (deleteTaskId !== null) {
+      try {
+        await axiosInstance.delete(`/seo-tasks/${deleteTaskId}/`);
+        showAlert({
+          variant: AlertVariant.SUCCESS,
+          message: "Task deleted successfully."
+        });
+        setShowDeleteTaskModal(false);
+        setDeleteTaskId(null);
+        
+        // Automatic navigation to previous page if the last task on current page is deleted
+        if (taskPage > 1 && tasks.length === 1) {
+          setTaskPage(prev => prev - 1);
+        } else {
+          fetchTasks();
+        }
+      } catch (err) {
+        showAlert({
+          variant: AlertVariant.ERROR,
+          message: "Error deleting task."
+        });
+      }
     }
   };
 
@@ -643,19 +678,37 @@ const SEOPage: React.FC = () => {
     e.preventDefault();
     try {
       const payload = {
-        ...taskForm,
+        title: taskForm.title,
+        description: taskForm.description,
         website: Number(taskForm.website),
         assigned_executive: Number(taskForm.assigned_executive),
-        activity_type: taskForm.activity_type ? Number(taskForm.activity_type) : null
+        due_date: taskForm.due_date,
+        priority: taskForm.priority,
+        activity_type: taskForm.activity_type ? Number(taskForm.activity_type) : null,
+        status: taskForm.status
       };
-      await axiosInstance.post("/seo-tasks/", payload);
+      
+      if (editingTaskId) {
+        await axiosInstance.put(`/seo-tasks/${editingTaskId}/`, payload);
+        showAlert({
+          variant: AlertVariant.SUCCESS,
+          message: "Task updated successfully."
+        });
+      } else {
+        await axiosInstance.post("/seo-tasks/", payload);
+        showAlert({
+          variant: AlertVariant.SUCCESS,
+          message: "Task created successfully."
+        });
+      }
       setShowTaskModal(false);
-      setTaskForm({ title: "", description: "", website: "", assigned_executive: "", due_date: "", priority: "medium", activity_type: "" });
+      setEditingTaskId(null);
+      setTaskForm({ title: "", description: "", website: "", assigned_executive: "", due_date: "", priority: "medium", activity_type: "", status: "pending" });
       fetchTasks();
     } catch (err) {
       showAlert({
         variant: AlertVariant.ERROR,
-        message: "Error creating task."
+        message: "Error saving task."
       });
     }
   };
@@ -1712,7 +1765,8 @@ const SEOPage: React.FC = () => {
                     <h5 className="fw-bold text-dark mb-0">Tasks Checklist</h5>
                     {isManager && (
                       <button className="btn btn-sm btn-primary rounded-3" onClick={() => {
-                        setTaskForm({ title: "", description: "", website: String(selectedWebsite.id), assigned_executive: "", due_date: "", priority: "medium", activity_type: "" });
+                        setEditingTaskId(null);
+                        setTaskForm({ title: "", description: "", website: String(selectedWebsite.id), assigned_executive: "", due_date: "", priority: "medium", activity_type: "", status: "pending" });
                         setShowTaskModal(true);
                       }}>
                         <Plus size={14} className="me-1" /> Add Task
@@ -2375,7 +2429,14 @@ const SEOPage: React.FC = () => {
                 <p className="text-muted small mb-0">Assigned SEO actions and deliverables</p>
               </div>
               {isManager && (
-                <button className="btn btn-sm btn-primary rounded-3 px-3" onClick={() => setShowTaskModal(true)}>
+                <button
+                  className="btn btn-sm btn-primary rounded-3 px-3"
+                  onClick={() => {
+                    setEditingTaskId(null);
+                    setTaskForm({ title: "", description: "", website: "", assigned_executive: "", due_date: "", priority: "medium", activity_type: "", status: "pending" });
+                    setShowTaskModal(true);
+                  }}
+                >
                   <Plus size={14} className="me-2" /> Assign Task
                 </button>
               )}
@@ -2383,8 +2444,8 @@ const SEOPage: React.FC = () => {
 
             {/* FILTER TOOLBAR */}
             <div className="bg-light p-3 rounded-4 mb-4">
-              <div className="row g-2 align-items-center">
-                <div className="col-sm-6 col-md-4 col-lg-2">
+              <div className="d-flex flex-wrap gap-2 align-items-center">
+                <div style={{ minWidth: "150px", flex: "1 1 0px" }}>
                   <select
                     className="form-select form-select-sm"
                     value={taskFilterWebsite}
@@ -2394,7 +2455,7 @@ const SEOPage: React.FC = () => {
                     {websites.map(s => <option key={s.id} value={s.id}>{s.website_name}</option>)}
                   </select>
                 </div>
-                <div className="col-sm-6 col-md-4 col-lg-2">
+                <div style={{ minWidth: "150px", flex: "1 1 0px" }}>
                   <select
                     className="form-select form-select-sm"
                     value={taskFilterExecutive}
@@ -2404,7 +2465,7 @@ const SEOPage: React.FC = () => {
                     {executives.map(ex => <option key={ex.id} value={ex.id}>{ex.name || ex.username}</option>)}
                   </select>
                 </div>
-                <div className="col-sm-6 col-md-4 col-lg-2">
+                <div style={{ minWidth: "150px", flex: "1 1 0px" }}>
                   <select
                     className="form-select form-select-sm"
                     value={taskFilterStatus}
@@ -2418,7 +2479,7 @@ const SEOPage: React.FC = () => {
                     <option value="overdue">Overdue</option>
                   </select>
                 </div>
-                <div className="col-sm-6 col-md-4 col-lg-2">
+                <div style={{ minWidth: "150px", flex: "1 1 0px" }}>
                   <select
                     className="form-select form-select-sm"
                     value={taskFilterPriority}
@@ -2430,7 +2491,7 @@ const SEOPage: React.FC = () => {
                     <option value="low">Low</option>
                   </select>
                 </div>
-                <div className="col-sm-6 col-md-4 col-lg-2">
+                <div style={{ minWidth: "150px", flex: "1 1 0px" }}>
                   <select
                     className="form-select form-select-sm"
                     value={taskFilterActivityType}
@@ -2440,7 +2501,7 @@ const SEOPage: React.FC = () => {
                     {activityTypes.map(act => <option key={act.id} value={act.id}>{act.name}</option>)}
                   </select>
                 </div>
-                <div className="col-sm-6 col-md-4 col-lg-2">
+                <div style={{ minWidth: "150px", flex: "1 1 0px" }}>
                   <select
                     className="form-select form-select-sm"
                     value={taskSort}
@@ -2453,7 +2514,7 @@ const SEOPage: React.FC = () => {
                     <option value="title">Task Title (A-Z)</option>
                   </select>
                 </div>
-                <div className="col-md-9 col-lg-10 mt-2">
+                <div style={{ minWidth: "220px", flex: "2 1 0px" }}>
                   <div className="input-group input-group-sm">
                     <span className="input-group-text bg-white text-muted border-end-0">
                       <Search size={14} />
@@ -2467,7 +2528,7 @@ const SEOPage: React.FC = () => {
                     />
                   </div>
                 </div>
-                <div className="col-md-3 col-lg-2 mt-2">
+                <div style={{ minWidth: "120px" }}>
                   <button
                     type="button"
                     className="btn btn-sm btn-outline-secondary w-100 fw-semibold"
@@ -2543,12 +2604,45 @@ const SEOPage: React.FC = () => {
                         </div>
                       )}
                     </div>
-                    <span className={`badge text-capitalize bg-${
-                      t.status === "completed" ? "success" : 
-                      t.status === "in_progress" ? "info" : 
-                      t.status === "on_hold" ? "secondary" : 
-                      t.status === "overdue" ? "danger" : "warning"
-                    }`}>{t.status}</span>
+                    <div className="d-flex align-items-center gap-2">
+                      {isManager && (
+                        <div className="d-flex gap-1 me-2 animate__animated animate__fadeIn">
+                          <button
+                            className="btn btn-xs btn-light text-secondary border p-1 rounded hover-shadow"
+                            onClick={() => {
+                              setEditingTaskId(t.id);
+                              setTaskForm({
+                                title: t.title,
+                                description: t.description,
+                                website: String(t.website),
+                                assigned_executive: String(t.assigned_executive),
+                                due_date: t.due_date,
+                                priority: t.priority,
+                                activity_type: t.activity_type ? String(t.activity_type) : "",
+                                status: t.status
+                              });
+                              setShowTaskModal(true);
+                            }}
+                            title="Edit Task"
+                          >
+                            <Edit3 size={12} />
+                          </button>
+                          <button
+                            className="btn btn-xs btn-light text-danger border p-1 rounded hover-shadow"
+                            onClick={() => handleDeleteTaskClick(t.id)}
+                            title="Delete Task"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      )}
+                      <span className={`badge text-capitalize bg-${
+                        t.status === "completed" ? "success" : 
+                        t.status === "in_progress" ? "info" : 
+                        t.status === "on_hold" ? "secondary" : 
+                        t.status === "overdue" ? "danger" : "warning"
+                      }`}>{t.status.replace('_', ' ')}</span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -3073,7 +3167,7 @@ const SEOPage: React.FC = () => {
             <div className="modal-content border-0 shadow rounded-4 overflow-hidden">
               <form onSubmit={handleTaskSubmit}>
                 <div className="modal-header bg-light border-0 px-4 py-3">
-                  <h5 className="fw-bold mb-0">Assign SEO Task</h5>
+                  <h5 className="fw-bold mb-0">{editingTaskId ? "Edit SEO Task" : "Assign SEO Task"}</h5>
                   <button type="button" className="btn-close" onClick={() => setShowTaskModal(false)}></button>
                 </div>
                 <div className="modal-body px-4 py-3">
@@ -3106,6 +3200,18 @@ const SEOPage: React.FC = () => {
                       {activityTypes.map(act => <option key={act.id} value={act.id}>{act.name}</option>)}
                     </select>
                   </div>
+                  {editingTaskId && (
+                    <div className="mb-3">
+                      <label className="form-label small text-muted fw-bold">STATUS</label>
+                      <select className="form-select" value={taskForm.status} onChange={e => setTaskForm({ ...taskForm, status: e.target.value })}>
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="on_hold">On Hold</option>
+                        <option value="overdue">Overdue</option>
+                      </select>
+                    </div>
+                  )}
                   <div className="row g-2 mb-3">
                     <div className="col-6">
                       <label className="form-label small text-muted fw-bold">DUE DATE *</label>
@@ -3123,7 +3229,7 @@ const SEOPage: React.FC = () => {
                 </div>
                 <div className="modal-footer border-0 px-4 py-3 pt-0">
                   <button type="button" className="btn btn-light" onClick={() => setShowTaskModal(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary px-4 fw-bold">Assign Task</button>
+                  <button type="submit" className="btn btn-primary px-4 fw-bold">{editingTaskId ? "Update Task" : "Assign Task"}</button>
                 </div>
               </form>
             </div>
@@ -3258,6 +3364,14 @@ const SEOPage: React.FC = () => {
         onConfirm={handleConfirmDeleteTarget}
         title="Remove Target"
         message="Are you sure you want to remove this target?"
+      />
+
+      <DeleteConfirmModal
+        isOpen={showDeleteTaskModal}
+        onClose={() => { setShowDeleteTaskModal(false); setDeleteTaskId(null); }}
+        onConfirm={handleConfirmDeleteTask}
+        title="Delete SEO Task"
+        message="Are you sure you want to delete this SEO task?"
       />
 
       <ConfirmModal
