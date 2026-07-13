@@ -96,8 +96,20 @@ const SEOPage: React.FC = () => {
 
   // Daily Work Log Multi-Row Form
   const [showWorkLogModal, setShowWorkLogModal] = useState(false);
-  const [logForm, setLogForm] = useState({
-    website: "", log_date: new Date().toISOString().split("T")[0], remarks: "", status: "submitted"
+  const [activeLaunchTask, setActiveLaunchTask] = useState<SEOTask | null>(null);
+  const [expandedTaskHistoryId, setExpandedTaskHistoryId] = useState<number | null>(null);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewTab, setReviewTab] = useState<'submissions' | 'attachments' | 'timeline'>('submissions');
+  const [reviewingTask, setReviewingTask] = useState<SEOTask | null>(null);
+  const [managerReviewRemarks, setManagerReviewRemarks] = useState("");
+  const [logForm, setLogForm] = useState<{
+    website: string;
+    log_date: string;
+    remarks: string;
+    status: string;
+    seo_task?: string | number | null;
+  }>({
+    website: "", log_date: new Date().toISOString().split("T")[0], remarks: "", status: "submitted", seo_task: null
   });
   const [logItems, setLogItems] = useState<Partial<SEODailyWorkLogItem>[]>([
     { activity_type: undefined, count: 1, keyword: "", submission_url: "", domain_authority: null, spam_score: null, time_spent_minutes: null, username: "", password: "" }
@@ -145,9 +157,149 @@ const SEOPage: React.FC = () => {
     total: 0,
     pending: 0,
     in_progress: 0,
+    ready_for_review: 0,
     completed: 0,
-    overdue: 0
+    overdue: 0,
+    avg_completion_time: 0,
+    avg_review_time: 0
   });
+
+  const handleLaunchWorkLogFromTask = (task: SEOTask) => {
+    setActiveLaunchTask(task);
+    setLogForm({
+      website: String(task.website),
+      log_date: new Date().toISOString().split("T")[0],
+      remarks: "",
+      status: "submitted",
+      seo_task: task.id
+    });
+    setLogItems([
+      {
+        activity_type: task.activity_type ? task.activity_type : undefined as any,
+        count: 1,
+        keyword: "",
+        submission_url: "",
+        domain_authority: null,
+        spam_score: null,
+        time_spent_minutes: null,
+        username: "",
+        password: ""
+      }
+    ]);
+    setVisibleSubmitPasswords({});
+    setExistingLogItems([]);
+    setDuplicateLogWarning(null);
+    setIsEditingDraft(false);
+    setShowWorkLogModal(true);
+  };
+
+  const handleMarkReadyForReview = async (taskId: number) => {
+    try {
+      await axiosInstance.post(`/seo-tasks/${taskId}/ready-for-review/`);
+      loadAllData();
+      fetchTasks();
+      showAlert({
+        variant: AlertVariant.SUCCESS,
+        message: "Task marked as ready for review."
+      });
+    } catch (err) {
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Failed to mark task ready for review."
+      });
+    }
+  };
+
+  const handleTaskReview = async (action: 'approve' | 'reject') => {
+    if (!reviewingTask) return;
+    
+    if (action === 'reject' && !managerReviewRemarks.trim()) {
+      showAlert({
+        variant: AlertVariant.WARNING,
+        message: "Rejection requires remarks."
+      });
+      return;
+    }
+
+    try {
+      await axiosInstance.post(`/seo-tasks/${reviewingTask.id}/review/`, {
+        action,
+        remarks: managerReviewRemarks
+      });
+      setShowReviewModal(false);
+      setReviewingTask(null);
+      setManagerReviewRemarks("");
+      loadAllData();
+      fetchTasks();
+      showAlert({
+        variant: AlertVariant.SUCCESS,
+        message: `Task successfully ${action === 'approve' ? 'approved' : 'rejected'}.`
+      });
+    } catch (err) {
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: `Failed to ${action} task.`
+      });
+    }
+  };
+
+  const handleApproveIndividualLog = async (logId: number) => {
+    try {
+      await axiosInstance.post(`/seo-daily-logs/${logId}/approve/`);
+      showAlert({
+        variant: AlertVariant.SUCCESS,
+        message: "Individual log approved."
+      });
+      loadAllData();
+      const updatedTasksRes = await axiosInstance.get(`/seo-tasks/`);
+      const allTasks: SEOTask[] = updatedTasksRes.data.results || [];
+      const current = allTasks.find(t => t.id === reviewingTask?.id);
+      if (current) {
+        setReviewingTask(current);
+      }
+      fetchTasks();
+    } catch (err) {
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Failed to approve log."
+      });
+    }
+  };
+
+  const handleRejectIndividualLog = async (logId: number) => {
+    const remarks = prompt("Enter remarks for rejecting this log:");
+    if (remarks === null) return;
+    if (!remarks.trim()) {
+      showAlert({
+        variant: AlertVariant.WARNING,
+        message: "Rejection remarks are required."
+      });
+      return;
+    }
+
+    try {
+      await axiosInstance.post(`/seo-daily-logs/${logId}/reject/`, {
+        remarks_by_manager: remarks
+      });
+      showAlert({
+        variant: AlertVariant.SUCCESS,
+        message: "Individual log rejected."
+      });
+      loadAllData();
+      const updatedTasksRes = await axiosInstance.get(`/seo-tasks/`);
+      const allTasks: SEOTask[] = updatedTasksRes.data.results || [];
+      const current = allTasks.find(t => t.id === reviewingTask?.id);
+      if (current) {
+        setReviewingTask(current);
+      }
+      fetchTasks();
+    } catch (err) {
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Failed to reject log."
+      });
+    }
+  };
 
   // URL sync active tab & action triggers
   useEffect(() => {
@@ -252,15 +404,43 @@ const SEOPage: React.FC = () => {
     try {
       setLoading(true);
       const [webRes, clientRes, userRes, actTypeRes, logRes, targetRes, taskRes, reminderRes, credRes] = await Promise.all([
-        axiosInstance.get("/websites/"),
-        axiosInstance.get("/clients/?all=true"),
-        isManager ? axiosInstance.get("/users/?all=true&role_name=SEO_EXECUTIVE&is_active=true") : Promise.resolve({ data: [] }),
-        axiosInstance.get("/seo/activity-types/"),
-        axiosInstance.get("/seo-daily-logs/"),
-        axiosInstance.get("/seo-monthly-targets/"),
+        axiosInstance.get("/websites/").catch(err => {
+          console.error("Failed to load websites", err);
+          throw err; // Critical, throw to trigger fallback
+        }),
+        (isManager ? axiosInstance.get("/clients/?all=true") : Promise.resolve({ data: [] as any })).catch(err => {
+          console.error("Failed to load clients", err);
+          return { data: [] };
+        }),
+        (isManager ? axiosInstance.get("/users/?all=true&role_name=SEO_EXECUTIVE&is_active=true") : Promise.resolve({ data: [] })).catch(err => {
+          console.error("Failed to load users", err);
+          return { data: [] };
+        }),
+        axiosInstance.get("/seo/activity-types/").catch(err => {
+          console.error("Failed to load activity types", err);
+          showAlert({
+            variant: AlertVariant.ERROR,
+            message: "Failed to load Activity Types from API."
+          });
+          return { data: { results: [] } };
+        }),
+        axiosInstance.get("/seo-daily-logs/").catch(err => {
+          console.error("Failed to load daily logs", err);
+          return { data: [] };
+        }),
+        axiosInstance.get("/seo-monthly-targets/").catch(err => {
+          console.error("Failed to load monthly targets", err);
+          return { data: [] };
+        }),
         Promise.resolve({ data: { results: [] } as any }),
-        axiosInstance.get("/seo-reminders/"),
-        axiosInstance.get("/seo-credentials/")
+        axiosInstance.get("/seo-reminders/").catch(err => {
+          console.error("Failed to load reminders", err);
+          return { data: [] };
+        }),
+        axiosInstance.get("/seo-credentials/").catch(err => {
+          console.error("Failed to load credentials", err);
+          return { data: [] };
+        })
       ]);
 
       setWebsites(webRes.data.results || webRes.data || []);
@@ -278,15 +458,27 @@ const SEOPage: React.FC = () => {
       setCredentials(credRes.data.results || credRes.data || []);
 
       // Fetch dashboard summaries
-      const dashRes = await axiosInstance.get("/seo-daily-logs/dashboard/");
-      setDashboardData(dashRes.data);
+      try {
+        const dashRes = await axiosInstance.get("/seo-daily-logs/dashboard/");
+        setDashboardData(dashRes.data);
+      } catch (dashErr) {
+        console.error("Failed to load dashboard data", dashErr);
+      }
 
       if (isManager) {
-        const perfRes = await axiosInstance.get("/seo-daily-logs/team-performance/");
-        setPerformanceData(perfRes.data);
+        try {
+          const perfRes = await axiosInstance.get("/seo-daily-logs/team-performance/");
+          setPerformanceData(perfRes.data);
+        } catch (perfErr) {
+          console.error("Failed to load team performance", perfErr);
+        }
       }
     } catch (err) {
-      console.error("Error loading SEO data", err);
+      console.error("Critical error loading SEO data", err);
+      showAlert({
+        variant: AlertVariant.ERROR,
+        message: "Failed to load initial SEO data."
+      });
     } finally {
       setLoading(false);
     }
@@ -542,6 +734,15 @@ const SEOPage: React.FC = () => {
       });
       return;
     }
+    const hasInvalidActivityType = logItems.some(item => !item.activity_type);
+    if (hasInvalidActivityType) {
+      showAlert({
+        variant: AlertVariant.WARNING,
+        message: "Please select a valid Activity Type for all rows."
+      });
+      return;
+    }
+
     const cleanItems = logItems.filter(item => item.activity_type && item.count);
     if (cleanItems.length === 0) {
       showAlert({
@@ -557,6 +758,7 @@ const SEOPage: React.FC = () => {
         log_date: logForm.log_date,
         remarks: logForm.remarks,
         status: statusVal,
+        seo_task: logForm.seo_task ? Number(logForm.seo_task) : null,
         items: cleanItems.map(it => ({
           activity_type: Number(it.activity_type),
           count: Number(it.count),
@@ -596,7 +798,7 @@ const SEOPage: React.FC = () => {
       }
 
       setShowWorkLogModal(false);
-      setLogForm({ website: "", log_date: new Date().toISOString().split("T")[0], remarks: "", status: "submitted" });
+      setLogForm({ website: "", log_date: new Date().toISOString().split("T")[0], remarks: "", status: "submitted", seo_task: null });
       setLogItems([{ activity_type: undefined, count: 1, keyword: "", submission_url: "", domain_authority: null, spam_score: null, time_spent_minutes: null, username: "", password: "" }]);
       setProofFile(null);
       setLogEditingId(null);
@@ -604,6 +806,7 @@ const SEOPage: React.FC = () => {
       setDuplicateLogWarning(null);
       setIsEditingDraft(false);
       setVisibleSubmitPasswords({});
+      setActiveLaunchTask(null);
       loadAllData();
       showAlert({
         variant: AlertVariant.SUCCESS,
@@ -872,25 +1075,7 @@ const SEOPage: React.FC = () => {
           <p className="text-muted small mb-0 mt-1">Replace sheets with interactive target planning and activity trackers.</p>
         </div>
         <div className="mt-3 mt-md-0 d-flex gap-2">
-          {!isManager && (
-            <button className="btn btn-primary shadow-sm rounded-3 px-3 py-2 d-flex align-items-center" onClick={() => {
-              setLogEditingId(null);
-              setLogForm({
-                website: "",
-                log_date: new Date().toISOString().split("T")[0],
-                remarks: "",
-                status: "submitted"
-              });
-              setLogItems([{ activity_type: undefined, count: 1, keyword: "", submission_url: "", domain_authority: null, spam_score: null, time_spent_minutes: null, username: "", password: "" }]);
-              setVisibleSubmitPasswords({});
-              setExistingLogItems([]);
-              setDuplicateLogWarning(null);
-              setIsEditingDraft(false);
-              setShowWorkLogModal(true);
-            }}>
-              <Plus size={16} className="me-2" /> Submit Daily Work
-            </button>
-          )}
+
           {isManager && (
             <>
               <button className="btn btn-outline-primary shadow-sm rounded-3 px-3 py-2" onClick={() => setShowWebsiteModal(true)}>
@@ -2440,6 +2625,19 @@ const SEOPage: React.FC = () => {
             <div className="col-6 col-md-4 col-lg">
               <div className="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
                 <div className="d-flex align-items-center">
+                  <div className="p-2.5 bg-warning rounded-3 me-3 text-white" style={{ backgroundColor: "#f59e0b" }}>
+                    <Eye size={18} />
+                  </div>
+                  <div>
+                    <small className="text-muted fw-bold text-uppercase" style={{ fontSize: "0.7rem" }}>Ready For Review</small>
+                    <h5 className="fw-bold mb-0 mt-0.5">{taskStats.ready_for_review}</h5>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="col-6 col-md-4 col-lg">
+              <div className="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div className="d-flex align-items-center">
                   <div className="p-2.5 bg-success-subtle text-success rounded-3 me-3">
                     <CheckCircle2 size={18} />
                   </div>
@@ -2463,6 +2661,36 @@ const SEOPage: React.FC = () => {
                 </div>
               </div>
             </div>
+            {isManager && (
+              <>
+                <div className="col-6 col-md-4 col-lg">
+                  <div className="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                    <div className="d-flex align-items-center">
+                      <div className="p-2.5 bg-primary-subtle text-primary rounded-3 me-3">
+                        <Clock size={18} />
+                      </div>
+                      <div>
+                        <small className="text-muted fw-bold text-uppercase" style={{ fontSize: "0.7rem" }}>Avg Comp Time</small>
+                        <h5 className="fw-bold mb-0 mt-0.5">{taskStats.avg_completion_time}h</h5>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-6 col-md-4 col-lg">
+                  <div className="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                    <div className="d-flex align-items-center">
+                      <div className="p-2.5 bg-secondary-subtle text-secondary rounded-3 me-3">
+                        <Clock size={18} />
+                      </div>
+                      <div>
+                        <small className="text-muted fw-bold text-uppercase" style={{ fontSize: "0.7rem" }}>Avg Review Time</small>
+                        <h5 className="fw-bold mb-0 mt-0.5">{taskStats.avg_review_time}h</h5>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* TASKS PANEL (Full Width) */}
@@ -2630,25 +2858,144 @@ const SEOPage: React.FC = () => {
               <div className="d-flex flex-column gap-3">
                 {tasks.map(t => (
                   <div key={t.id} className="p-3 border rounded-3 bg-light d-flex justify-content-between align-items-start">
-                    <div>
+                    <div className="w-100 me-3">
                       <div className="d-flex align-items-center gap-2 mb-1">
-                        <input type="checkbox" checked={t.status === "completed"} onChange={() => handleToggleTaskStatus(t)} className="form-check-input mt-0" />
+                        <input
+                          type="checkbox"
+                          checked={t.status === "completed"}
+                          onChange={() => handleToggleTaskStatus(t)}
+                          className="form-check-input mt-0"
+                          disabled={!isManager}
+                        />
                         <span className={`fw-bold text-dark ${t.status === "completed" ? "text-decoration-line-through text-muted" : ""}`}>{t.title}</span>
                       </div>
                       <p className="text-muted small mb-2">{t.description}</p>
+                      
                       <div className="small text-muted">
-                        Due: <b>{t.due_date}</b> &nbsp;|&nbsp; Priority: <span className="text-capitalize fw-bold">{t.priority}</span> &nbsp;|&nbsp; Website: <b>{t.website_name}</b>
+                        Assigned to: <b>{t.assigned_executive_name}</b> &nbsp;|&nbsp; Due: <b>{t.due_date}</b> &nbsp;|&nbsp; Website: <b>{t.website_name}</b>
                         {t.activity_type_name && (
                           <> &nbsp;|&nbsp; Activity: <b>{t.activity_type_name}</b></>
                         )}
                       </div>
-                      {isManager && (
-                        <div className="small text-muted mt-1">
-                          Assigned to: <b>{t.assigned_executive_name}</b>
+
+                      <div className="small text-muted mt-1">
+                        Progress: <span className="fw-bold text-dark">{t.current_progress}%</span> &nbsp;|&nbsp; Submissions: <span className="fw-bold text-dark">{t.submitted_logs_count}</span>
+                        {t.latest_submission_date && (
+                          <>&nbsp;|&nbsp; Latest: <b>{t.latest_submission_date}</b></>
+                        )}
+                      </div>
+
+                      <div className="small text-muted mt-1">
+                        Review Status: <span className={`badge text-capitalize bg-${
+                          t.review_status === "approved" ? "success" :
+                          t.review_status === "rejected" ? "danger" :
+                          t.review_status === "pending" ? "warning text-dark" : "light text-dark border"
+                        }`} style={{ fontSize: "0.7rem" }}>
+                          {t.review_status === "pending" ? "Pending Review" : t.review_status || "N/A"}
+                        </span>
+                      </div>
+
+                      {t.manager_remarks && (
+                        <div className="alert alert-info py-1.5 px-3 mt-2 rounded-3 small mb-0 border-0 shadow-xs" style={{ background: "rgba(59, 130, 246, 0.08)", color: "#1d4ed8", maxWidth: "600px" }}>
+                          <span className="fw-bold">Manager Remarks: </span>"{t.manager_remarks}"
+                        </div>
+                      )}
+
+                      {t.work_history && t.work_history.length > 0 && (
+                        <div className="mt-2 animate__animated animate__fadeIn">
+                          <button
+                            className="btn btn-xs btn-link text-decoration-none p-0 text-secondary fw-semibold small d-flex align-items-center gap-1"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setExpandedTaskHistoryId(expandedTaskHistoryId === t.id ? null : t.id);
+                            }}
+                          >
+                            <Clock size={12} />
+                            {expandedTaskHistoryId === t.id ? "Hide Work History" : "View Work History"} ({t.work_history.length})
+                          </button>
+                          
+                          {expandedTaskHistoryId === t.id && (
+                            <div className="mt-2 bg-white border rounded-3 p-3 d-flex flex-column gap-3 shadow-xs" style={{ maxWidth: "650px" }}>
+                              {t.work_history.map((log: any, logIdx: number) => (
+                                <div key={log.id || logIdx} className="small pb-3 border-bottom last-border-0 last-pb-0">
+                                  <div className="d-flex justify-content-between align-items-start gap-2 mb-1.5">
+                                    <div>
+                                      <span className="fw-bold text-dark">{log.log_date}</span> &nbsp;|&nbsp; 
+                                      <span className="text-secondary">{log.executive_name}</span> &nbsp;|&nbsp; 
+                                      <span className="fw-semibold text-primary">{log.total_count} activities</span>
+                                    </div>
+                                    <div className="d-flex align-items-center gap-2">
+                                      {log.proof_file && (
+                                        <a href={log.proof_file} target="_blank" rel="noopener noreferrer" className="badge bg-light text-primary border text-decoration-none d-inline-flex align-items-center gap-1 py-1">
+                                          <FileText size={10} /> Proof File
+                                        </a>
+                                      )}
+                                      <span className={`badge text-capitalize bg-${
+                                        log.status === "approved" ? "success" :
+                                        log.status === "rejected" ? "danger" :
+                                        log.status === "submitted" ? "info" : "secondary"
+                                      }`} style={{ fontSize: "0.65rem" }}>{log.status}</span>
+                                    </div>
+                                  </div>
+                                  
+                                  {log.items && log.items.length > 0 && (
+                                    <div className="bg-light p-2 rounded-2 mt-1 mb-1 border shadow-xs">
+                                      {log.items.map((it: any, itemIdx: number) => (
+                                        <div key={it.id || itemIdx} className="smaller text-secondary d-flex justify-content-between align-items-center py-1 border-bottom last-border-0">
+                                          <span>
+                                            <b>{it.activity_type_name}</b> &nbsp;|&nbsp; Keyword: <b>{it.keyword || "—"}</b>
+                                            {it.time_spent_minutes !== null && <> &nbsp;|&nbsp; Time Spent: <b>{it.time_spent_minutes}m</b></>}
+                                          </span>
+                                          <span className="badge bg-secondary-subtle text-dark-emphasis fw-bold">Count: {it.count}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  
+                                  {log.remarks && <div className="text-muted italic smaller" style={{ fontSize: "0.75rem" }}><span className="fw-medium">Remarks:</span> "{log.remarks}"</div>}
+                                  {log.remarks_by_manager && <div className="text-danger italic smaller mt-0.5" style={{ fontSize: "0.75rem" }}><span className="fw-medium">Manager Notes:</span> "{log.remarks_by_manager}"</div>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                    <div className="d-flex align-items-center gap-2">
+                    <div className="d-flex align-items-center gap-2 flex-shrink-0">
+                      {!isManager && t.status === "pending" && (
+                        <button
+                          className="btn btn-xs btn-success d-flex align-items-center gap-1 py-1 px-2 rounded text-white fw-bold"
+                          onClick={() => handleLaunchWorkLogFromTask(t)}
+                        >
+                          <Plus size={12} /> Submit Today's Work
+                        </button>
+                      )}
+                      {!isManager && t.status === "in_progress" && (
+                        <div className="d-flex gap-1">
+                          <button
+                            className="btn btn-xs btn-primary d-flex align-items-center gap-1 py-1 px-2 rounded text-white fw-bold"
+                            onClick={() => handleLaunchWorkLogFromTask(t)}
+                          >
+                            <Plus size={12} /> Continue Work
+                          </button>
+                          <button
+                            className="btn btn-xs btn-outline-info d-flex align-items-center gap-1 py-1 px-2 rounded fw-bold"
+                            onClick={() => handleMarkReadyForReview(t.id)}
+                          >
+                            <CheckCircle2 size={12} /> Mark Ready for Review
+                          </button>
+                        </div>
+                      )}
+                      {isManager && (
+                        <button
+                          className={`btn btn-xs fw-bold d-flex align-items-center gap-1 py-1 px-2 rounded ${
+                            t.status === "ready_for_review" ? "btn-warning text-dark" : "btn-outline-secondary text-secondary"
+                          }`}
+                          onClick={() => { setReviewingTask(t); setShowReviewModal(true); setReviewTab('submissions'); }}
+                        >
+                          <Eye size={12} /> {t.status === "ready_for_review" ? "Review Task" : "Task Details"}
+                        </button>
+                      )}
                       {isManager && (
                         <div className="d-flex gap-1 me-2 animate__animated animate__fadeIn">
                           <button
@@ -2683,6 +3030,7 @@ const SEOPage: React.FC = () => {
                       <span className={`badge text-capitalize bg-${
                         t.status === "completed" ? "success" : 
                         t.status === "in_progress" ? "info" : 
+                        t.status === "ready_for_review" ? "warning text-dark" : 
                         t.status === "on_hold" ? "secondary" : 
                         t.status === "overdue" ? "danger" : "warning"
                       }`}>{t.status.replace('_', ' ')}</span>
@@ -2911,13 +3259,49 @@ const SEOPage: React.FC = () => {
             <div className="modal-content border-0 shadow rounded-4 overflow-hidden">
               <div className="modal-header bg-light border-0 px-4 py-3">
                 <h5 className="fw-bold mb-0">{logEditingId ? "Edit Daily Work Log" : "Submit Daily Work Log"}</h5>
-                <button type="button" className="btn-close" onClick={() => setShowWorkLogModal(false)}></button>
+                <button type="button" className="btn-close" onClick={() => { setShowWorkLogModal(false); setActiveLaunchTask(null); }}></button>
               </div>
               <div className="modal-body px-4 py-3">
+                {activeLaunchTask && (
+                  <div className="card border-0 bg-light shadow-sm mb-4 rounded-3 p-3 border-start border-4 border-primary">
+                    <div className="row g-2 align-items-center">
+                      <div className="col-12 mb-1">
+                        <span className="small text-muted fw-bold d-block text-uppercase" style={{ fontSize: "0.7rem" }}>Linked SEO Task</span>
+                        <h6 className="fw-bold text-dark mb-0">{activeLaunchTask.title}</h6>
+                      </div>
+                      <div className="col-md-3">
+                        <span className="small text-muted fw-bold d-block text-uppercase" style={{ fontSize: "0.7rem" }}>Website</span>
+                        <span className="text-secondary small fw-medium">{activeLaunchTask.website_name}</span>
+                      </div>
+                      <div className="col-md-3">
+                        <span className="small text-muted fw-bold d-block text-uppercase" style={{ fontSize: "0.7rem" }}>Priority</span>
+                        <span className={`badge text-capitalize bg-${
+                          activeLaunchTask.priority === "high" ? "danger" :
+                          activeLaunchTask.priority === "medium" ? "warning text-dark" : "info text-dark"
+                        }`} style={{ fontSize: "0.7rem" }}>{activeLaunchTask.priority}</span>
+                      </div>
+                      <div className="col-md-3">
+                        <span className="small text-muted fw-bold d-block text-uppercase" style={{ fontSize: "0.7rem" }}>Due Date</span>
+                        <span className="text-secondary small fw-medium">{activeLaunchTask.due_date}</span>
+                      </div>
+                      <div className="col-md-3">
+                        <span className="small text-muted fw-bold d-block text-uppercase" style={{ fontSize: "0.7rem" }}>Current Status</span>
+                        <span className="text-secondary small fw-medium text-capitalize">{activeLaunchTask.status}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="row g-3 mb-4">
                   <div className="col-md-6">
                     <label className="form-label small text-muted fw-bold">WEBSITE *</label>
-                    <select className="form-select" value={logForm.website} onChange={e => setLogForm({ ...logForm, website: e.target.value })} required>
+                    <select
+                      className="form-select"
+                      value={logForm.website}
+                      onChange={e => setLogForm({ ...logForm, website: e.target.value })}
+                      required
+                      disabled={!!activeLaunchTask}
+                    >
                       <option value="">Select Website</option>
                       {websites.map(s => <option key={s.id} value={s.id}>{s.website_name}</option>)}
                     </select>
@@ -3031,9 +3415,23 @@ const SEOPage: React.FC = () => {
                     <div className="row g-3">
                       <div className="col-md-6">
                         <label className="form-label small text-muted fw-bold">ACTIVITY TYPE *</label>
-                        <select className="form-select" value={item.activity_type || ""} onChange={e => handleLogItemChange(idx, "activity_type", e.target.value)} required>
-                          <option value="">Select Activity</option>
-                          {activityTypes.map(act => <option key={act.id} value={act.id}>{act.name}</option>)}
+                        <select
+                          className="form-select"
+                          value={item.activity_type || ""}
+                          onChange={e => handleLogItemChange(idx, "activity_type", e.target.value)}
+                          required
+                          disabled={loading || activityTypes.length === 0}
+                        >
+                          {loading ? (
+                            <option value="">Loading activities...</option>
+                          ) : activityTypes.length === 0 ? (
+                            <option value="">No Activity Types Available</option>
+                          ) : (
+                            <>
+                              <option value="">Select Activity</option>
+                              {activityTypes.map(act => <option key={act.id} value={act.id}>{act.name}</option>)}
+                            </>
+                          )}
                         </select>
                       </div>
                       <div className="col-md-6">
@@ -3117,7 +3515,7 @@ const SEOPage: React.FC = () => {
                 </div>
               </div>
               <div className="modal-footer border-0 px-4 py-3 pt-0 d-flex justify-content-between">
-                <button type="button" className="btn btn-light" onClick={() => setShowWorkLogModal(false)}>Cancel</button>
+                <button type="button" className="btn btn-light" onClick={() => { setShowWorkLogModal(false); setActiveLaunchTask(null); }}>Cancel</button>
                 <div className="d-flex gap-2">
                   <button type="button" className="btn btn-outline-secondary px-4 fw-bold" onClick={() => handleWorkLogSubmit("draft")}>Save as Draft</button>
                   <button type="button" className="btn btn-primary px-4 fw-bold" onClick={() => handleWorkLogSubmit("submitted")}>Submit Work</button>
@@ -3147,6 +3545,260 @@ const SEOPage: React.FC = () => {
               <div className="modal-footer border-0 px-4 py-3 pt-0">
                 <button type="button" className="btn btn-light" onClick={() => setShowRejectModal(false)}>Cancel</button>
                 <button type="button" className="btn btn-danger px-4 fw-bold" onClick={handleRejectLog}>Confirm Rejection</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MANAGER TASK REVIEW MODAL */}
+      {showReviewModal && reviewingTask && (
+        <div className="modal show d-block" tabIndex={-1} style={{ background: "rgba(17,24,39,0.8)", overflowY: "auto" }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content border-0 shadow rounded-4 overflow-hidden">
+              <div className="modal-header bg-light border-0 px-4 py-3">
+                <h5 className="fw-bold mb-0">Review SEO Task Submissions</h5>
+                <button type="button" className="btn-close" onClick={() => { setShowReviewModal(false); setReviewingTask(null); }}></button>
+              </div>
+              <div className="modal-body px-4 py-3">
+                <div className="card border-0 bg-light-subtle shadow-sm mb-4 rounded-3 p-3 border-start border-4 border-warning">
+                  <div className="row g-2 align-items-center">
+                    <div className="col-12 mb-1">
+                      <span className="small text-muted fw-bold d-block text-uppercase" style={{ fontSize: "0.7rem" }}>Task Title</span>
+                      <h6 className="fw-bold text-dark mb-0">{reviewingTask.title}</h6>
+                    </div>
+                    <div className="col-md-4">
+                      <span className="small text-muted fw-bold d-block text-uppercase" style={{ fontSize: "0.7rem" }}>Assigned Executive</span>
+                      <span className="text-secondary small fw-medium">{reviewingTask.assigned_executive_name}</span>
+                    </div>
+                    <div className="col-md-4">
+                      <span className="small text-muted fw-bold d-block text-uppercase" style={{ fontSize: "0.7rem" }}>Due Date</span>
+                      <span className="text-secondary small fw-medium">{reviewingTask.due_date}</span>
+                    </div>
+                    <div className="col-md-4">
+                      <span className="small text-muted fw-bold d-block text-uppercase" style={{ fontSize: "0.7rem" }}>Website</span>
+                      <span className="text-secondary small fw-medium">{reviewingTask.website_name}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {reviewingTask.status === "completed" && reviewingTask.completion_summary && (
+                  <div className="card border-0 bg-success-subtle shadow-sm mb-4 rounded-3 p-3 border-start border-4 border-success animate__animated animate__fadeIn">
+                    <div className="d-flex align-items-center gap-2 mb-2">
+                      <CheckCircle2 size={16} className="text-success" />
+                      <h6 className="fw-bold text-success-emphasis mb-0">Task Completion Summary</h6>
+                    </div>
+                    <div className="row g-3">
+                      <div className="col-6 col-md-3">
+                        <span className="small text-muted fw-bold d-block text-uppercase" style={{ fontSize: "0.65rem" }}>Total Logs</span>
+                        <span className="text-success-emphasis fw-bold small">{reviewingTask.completion_summary.total_logs} logs</span>
+                      </div>
+                      <div className="col-6 col-md-3">
+                        <span className="small text-muted fw-bold d-block text-uppercase" style={{ fontSize: "0.65rem" }}>Total Activities</span>
+                        <span className="text-success-emphasis fw-bold small">{reviewingTask.completion_summary.total_activities} activities</span>
+                      </div>
+                      <div className="col-6 col-md-3">
+                        <span className="small text-muted fw-bold d-block text-uppercase" style={{ fontSize: "0.65rem" }}>Submission URLs</span>
+                        <span className="text-success-emphasis fw-bold small">{reviewingTask.completion_summary.total_urls} links</span>
+                      </div>
+                      <div className="col-6 col-md-3">
+                        <span className="small text-muted fw-bold d-block text-uppercase" style={{ fontSize: "0.65rem" }}>Total Time Spent</span>
+                        <span className="text-success-emphasis fw-bold small">{reviewingTask.completion_summary.total_time} mins</span>
+                      </div>
+                      <div className="col-6 col-md-4">
+                        <span className="small text-muted fw-bold d-block text-uppercase" style={{ fontSize: "0.65rem" }}>Completion Date</span>
+                        <span className="text-success-emphasis fw-bold small">{reviewingTask.completion_summary.completion_date || "—"}</span>
+                      </div>
+                      <div className="col-6 col-md-4">
+                        <span className="small text-muted fw-bold d-block text-uppercase" style={{ fontSize: "0.65rem" }}>Completed By</span>
+                        <span className="text-success-emphasis fw-bold small">{reviewingTask.completion_summary.completed_by || "—"}</span>
+                      </div>
+                      <div className="col-6 col-md-4">
+                        <span className="small text-muted fw-bold d-block text-uppercase" style={{ fontSize: "0.65rem" }}>Review Duration</span>
+                        <span className="text-success-emphasis fw-bold small">{reviewingTask.completion_summary.review_duration || "—"}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <ul className="nav nav-tabs mb-3">
+                  <li className="nav-item">
+                    <button
+                      className={`nav-link fw-bold small ${reviewTab === 'submissions' ? 'active' : ''}`}
+                      onClick={() => setReviewTab('submissions')}
+                    >
+                      Submissions ({reviewingTask.work_history?.length || 0})
+                    </button>
+                  </li>
+                  <li className="nav-item">
+                    <button
+                      className={`nav-link fw-bold small ${reviewTab === 'attachments' ? 'active' : ''}`}
+                      onClick={() => setReviewTab('attachments')}
+                    >
+                      Attachments ({reviewingTask.work_history?.filter(log => log.proof_file).length || 0})
+                    </button>
+                  </li>
+                  <li className="nav-item">
+                    <button
+                      className={`nav-link fw-bold small ${reviewTab === 'timeline' ? 'active' : ''}`}
+                      onClick={() => setReviewTab('timeline')}
+                    >
+                      Timeline / Audit Log ({reviewingTask.timeline?.length || 0})
+                    </button>
+                  </li>
+                </ul>
+
+                {reviewTab === 'submissions' && (
+                  <div className="d-flex flex-column gap-3 mb-4 animate__animated animate__fadeIn" style={{ maxHeight: "350px", overflowY: "auto" }}>
+                    {!reviewingTask.work_history || reviewingTask.work_history.length === 0 ? (
+                      <div className="text-muted small py-3 text-center bg-light border rounded-3">No work logs submitted for this task yet.</div>
+                    ) : (
+                      reviewingTask.work_history.map((log: any, logIdx: number) => (
+                        <div key={log.id || logIdx} className="p-3 border rounded-3 bg-white shadow-xs">
+                          <div className="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                              <span className="fw-bold text-dark">{log.log_date}</span> &nbsp;|&nbsp; 
+                              <span className="text-muted small">{log.executive_name}</span>
+                            </div>
+                            <div className="d-flex align-items-center gap-2">
+                              {log.proof_file && (
+                                <a href={log.proof_file} target="_blank" rel="noopener noreferrer" className="badge bg-light text-primary border text-decoration-none py-1">
+                                  <FileText size={10} className="me-1" /> View Proof
+                                </a>
+                              )}
+                              <span className={`badge text-capitalize bg-${
+                                log.status === "approved" ? "success" :
+                                log.status === "rejected" ? "danger" :
+                                log.status === "submitted" ? "info" : "secondary"
+                              }`} style={{ fontSize: "0.65rem" }}>{log.status}</span>
+                            </div>
+                          </div>
+
+                          {log.items && log.items.length > 0 && (
+                            <div className="bg-light p-2 rounded-2 mt-1 mb-2 border shadow-xs">
+                              {log.items.map((it: any, itemIdx: number) => (
+                                <div key={it.id || itemIdx} className="smaller text-secondary d-flex justify-content-between align-items-center py-1 border-bottom last-border-0">
+                                  <span>
+                                    <b>{it.activity_type_name}</b> &nbsp;|&nbsp; Keyword: <b>{it.keyword || "—"}</b>
+                                    {it.time_spent_minutes !== null && <> &nbsp;|&nbsp; Time Spent: <b>{it.time_spent_minutes}m</b></>}
+                                  </span>
+                                  <span className="badge bg-secondary-subtle text-dark-emphasis fw-bold">Count: {it.count}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {log.remarks && <div className="text-muted italic smaller mb-2">Remarks: "{log.remarks}"</div>}
+
+                          {log.status === "submitted" && (
+                            <div className="d-flex justify-content-end gap-2 border-top pt-2">
+                              <button
+                                type="button"
+                                className="btn btn-xs btn-outline-danger py-1 px-2 fw-semibold rounded"
+                                onClick={() => handleRejectIndividualLog(log.id)}
+                              >
+                                Reject Log
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-xs btn-success text-white py-1 px-2 fw-semibold rounded"
+                                onClick={() => handleApproveIndividualLog(log.id)}
+                              >
+                                Approve Log
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {reviewTab === 'attachments' && (
+                  <div className="d-flex flex-column gap-2 mb-4 animate__animated animate__fadeIn" style={{ maxHeight: "350px", overflowY: "auto" }}>
+                    {(() => {
+                      const logsWithFiles = reviewingTask.work_history?.filter(log => log.proof_file) || [];
+                      if (logsWithFiles.length === 0) {
+                        return <div className="text-muted small py-3 text-center bg-light border rounded-3">No attachments uploaded for this task yet.</div>;
+                      }
+                      return logsWithFiles.map((log: any) => (
+                        <div key={log.id} className="p-3 border rounded-3 bg-white shadow-xs d-flex justify-content-between align-items-center">
+                          <div>
+                            <span className="fw-bold text-dark">{log.log_date}</span> &nbsp;|&nbsp; 
+                            <span className="text-muted small">Submitted by {log.executive_name}</span>
+                            <div className="text-primary fw-medium small mt-1 font-monospace" style={{ fontSize: "0.75rem" }}>
+                              {log.proof_file.split("/").pop()}
+                            </div>
+                          </div>
+                          <a
+                            href={log.proof_file}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+                          >
+                            <FileText size={12} /> Download / View File
+                          </a>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
+
+                {reviewTab === 'timeline' && (
+                  <div className="d-flex flex-column gap-2 mb-4 animate__animated animate__fadeIn" style={{ maxHeight: "350px", overflowY: "auto" }}>
+                    {!reviewingTask.timeline || reviewingTask.timeline.length === 0 ? (
+                      <div className="text-muted small py-3 text-center bg-light border rounded-3">No activity logged on this task.</div>
+                    ) : (
+                      reviewingTask.timeline.map((evt: any) => (
+                        <div key={evt.id} className="p-3 border rounded-3 bg-white shadow-xs border-start border-3 border-secondary">
+                          <div className="d-flex justify-content-between align-items-start gap-2 mb-1">
+                            <div>
+                              <span className="badge bg-secondary-subtle text-secondary-emphasis fw-bold mb-1">{evt.action}</span>
+                              <div className="text-muted smaller" style={{ fontSize: "0.7rem" }}>
+                                {new Date(evt.event_time).toLocaleString()} &nbsp;|&nbsp; User: <b>{evt.user_name}</b>
+                              </div>
+                            </div>
+                          </div>
+                          {evt.remarks && (
+                            <div className="text-dark small mt-1 p-2 bg-light rounded italic" style={{ fontSize: "0.75rem" }}>
+                              "{evt.remarks}"
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                <div className="mb-3">
+                  <label className="form-label small text-muted fw-bold">MANAGER REVIEW REMARKS / REJECTION NOTES</label>
+                  <textarea
+                    className="form-control"
+                    rows={3}
+                    placeholder="Enter approval feedback or rejection reasons detailing changes required..."
+                    value={managerReviewRemarks}
+                    onChange={e => setManagerReviewRemarks(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="modal-footer border-0 px-4 py-3 pt-0 d-flex justify-content-between">
+                <button type="button" className="btn btn-light" onClick={() => { setShowReviewModal(false); setReviewingTask(null); }}>Close</button>
+                <div className="d-flex gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-outline-danger px-4 fw-bold"
+                    onClick={() => handleTaskReview("reject")}
+                  >
+                    Reject & Return to In Progress
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary px-4 fw-bold"
+                    onClick={() => handleTaskReview("approve")}
+                  >
+                    Approve & Complete Task
+                  </button>
+                </div>
               </div>
             </div>
           </div>

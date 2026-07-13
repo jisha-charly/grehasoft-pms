@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from .models import (
-    SEOActivityType, Website, Keyword, SEODailyWorkLog, SEODailyWorkLogItem, SEOMonthlyTarget, SEOTask, SEOReminder, SEOCredential, SEODailyWorkProof
+    SEOActivityType, Website, Keyword, SEODailyWorkLog, SEODailyWorkLogItem, SEOMonthlyTarget, SEOTask, SEOReminder, SEOCredential, SEODailyWorkProof, SEOTaskTimeline
 )
 from .serializers import (
     SEOActivityTypeSerializer, WebsiteSerializer, KeywordSerializer,
@@ -207,6 +207,10 @@ class SEODailyWorkLogViewSet(viewsets.ModelViewSet):
             qs = qs.filter(log_date__gte=start_date)
         if end_date:
             qs = qs.filter(log_date__lte=end_date)
+        
+        seo_task_id = self.request.query_params.get("seo_task")
+        if seo_task_id:
+            qs = qs.filter(seo_task_id=seo_task_id)
 
         return qs.distinct()
 
@@ -398,6 +402,34 @@ class SEODailyWorkLogViewSet(viewsets.ModelViewSet):
         log.approved_by = user
         log.approved_date = timezone.now()
         log.save()
+
+        if log.seo_task:
+            task = log.seo_task
+            SEOTaskTimeline.objects.create(
+                task=task,
+                user=user,
+                user_name=user.name or user.username,
+                action="Manager Approved Work Log",
+                remarks=f"Log date: {log.log_date}. Approved by manager."
+            )
+
+            # Automatically complete task if all daily logs are approved
+            if task.status != "completed":
+                other_submitted = task.daily_logs.filter(status="submitted").exclude(id=log.id).exists()
+                other_rejected = task.daily_logs.filter(status="rejected").exclude(id=log.id).exists()
+                
+                if not other_submitted and not other_rejected:
+                    task.status = "completed"
+                    task.review_status = "approved"
+                    task.save()
+                    
+                    SEOTaskTimeline.objects.create(
+                        task=task,
+                        user=user,
+                        user_name=user.name or user.username,
+                        action="Manager Marked Task as Completed",
+                        remarks=f"Automatically completed after approving the final work log for log date {log.log_date}."
+                    )
         return Response({"status": "approved"})
 
     @action(detail=True, methods=["post"])
@@ -416,6 +448,29 @@ class SEODailyWorkLogViewSet(viewsets.ModelViewSet):
         log.rejected_by = user
         log.rejected_date = timezone.now()
         log.save()
+
+        if log.seo_task:
+            task = log.seo_task
+            # If the log is rejected, return task to in_progress and mark review as rejected
+            task.status = "in_progress"
+            task.review_status = "rejected"
+            task.manager_remarks = remarks
+            task.save()
+
+            SEOTaskTimeline.objects.create(
+                task=task,
+                user=user,
+                user_name=user.name or user.username,
+                action="Manager Rejected Work Log",
+                remarks=f"Log date: {log.log_date}. Rejection remarks: {remarks}."
+            )
+            SEOTaskTimeline.objects.create(
+                task=task,
+                user=user,
+                user_name=user.name or user.username,
+                action="Manager Returned Task to In Progress",
+                remarks=f"Returned to in_progress after rejecting work log of {log.log_date}. Remarks: {remarks}"
+            )
         return Response({"status": "rejected"})
 
     @action(detail=False, methods=["get"])
@@ -565,7 +620,7 @@ class SEODailyWorkLogViewSet(viewsets.ModelViewSet):
                 "targets": targets_list
             })
 
-    @action(detail=False, methods=["get"])
+    @action(detail=False, methods=["get"], url_path="team-performance")
     def team_performance(self, request):
         user = request.user
         if not (is_admin(user) or is_seo_manager(user)):
@@ -989,9 +1044,9 @@ class SEOTaskViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if is_admin(user) or is_seo_manager(user):
-            return SEOTask.objects.all().select_related("website", "assigned_executive", "created_by", "activity_type")
+            return SEOTask.objects.all().select_related("website", "assigned_executive", "created_by", "activity_type").prefetch_related("daily_logs__executive", "daily_logs__approved_by", "daily_logs__rejected_by", "daily_logs__items__activity_type", "timeline")
         elif is_seo_executive(user):
-            return SEOTask.objects.filter(assigned_executive=user).select_related("website", "assigned_executive", "created_by", "activity_type")
+            return SEOTask.objects.filter(assigned_executive=user).select_related("website", "assigned_executive", "created_by", "activity_type").prefetch_related("daily_logs__executive", "daily_logs__approved_by", "daily_logs__rejected_by", "daily_logs__items__activity_type", "timeline")
         return SEOTask.objects.none()
 
     def filter_seo_tasks(self, queryset, exclude_status=False):
@@ -1072,8 +1127,29 @@ class SEOTaskViewSet(viewsets.ModelViewSet):
         total_count = stats_qs.count()
         pending_count = stats_qs.filter(status="pending").count()
         in_progress_count = stats_qs.filter(status="in_progress").count()
+        ready_for_review_count = stats_qs.filter(status="ready_for_review").count()
         completed_count = stats_qs.filter(status="completed").count()
         overdue_count = stats_qs.filter(due_date__lt=today).exclude(status="completed").count()
+
+        # Compute average times
+        completed_tasks = stats_qs.filter(status="completed").prefetch_related("timeline")
+        completion_durations = []
+        review_durations = []
+        for t in completed_tasks:
+            assigned_evt = t.timeline.filter(action="Task Assigned").first()
+            comp_evt = t.timeline.filter(action="Manager Marked Task as Completed").first()
+            if assigned_evt and comp_evt:
+                completion_durations.append((comp_evt.event_time - assigned_evt.event_time).total_seconds())
+            
+            ready_evt = t.timeline.filter(action="Marked Ready for Review").first()
+            if ready_evt and comp_evt:
+                review_durations.append((comp_evt.event_time - ready_evt.event_time).total_seconds())
+                
+        avg_completion = sum(completion_durations) / len(completion_durations) if completion_durations else 0
+        avg_review = sum(review_durations) / len(review_durations) if review_durations else 0
+        
+        avg_completion_hours = round(avg_completion / 3600, 1)
+        avg_review_hours = round(avg_review / 3600, 1)
 
         results_qs = self.filter_seo_tasks(base_qs, exclude_status=False)
         results_qs = self.get_ordered_queryset(results_qs)
@@ -1086,8 +1162,11 @@ class SEOTaskViewSet(viewsets.ModelViewSet):
                 "total": total_count,
                 "pending": pending_count,
                 "in_progress": in_progress_count,
+                "ready_for_review": ready_for_review_count,
                 "completed": completed_count,
-                "overdue": overdue_count
+                "overdue": overdue_count,
+                "avg_completion_time": avg_completion_hours,
+                "avg_review_time": avg_review_hours
             }
             return response
 
@@ -1098,8 +1177,11 @@ class SEOTaskViewSet(viewsets.ModelViewSet):
                 "total": total_count,
                 "pending": pending_count,
                 "in_progress": in_progress_count,
+                "ready_for_review": ready_for_review_count,
                 "completed": completed_count,
-                "overdue": overdue_count
+                "overdue": overdue_count,
+                "avg_completion_time": avg_completion_hours,
+                "avg_review_time": avg_review_hours
             }
         })
 
@@ -1107,7 +1189,104 @@ class SEOTaskViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not (is_admin(user) or is_seo_manager(user)):
             raise PermissionDenied("Only SEO Managers and Admins can assign SEO tasks.")
-        serializer.save(created_by=user)
+        task = serializer.save(created_by=user)
+        SEOTaskTimeline.objects.create(
+            task=task,
+            user=user,
+            user_name=user.name or user.username,
+            action="Task Assigned",
+            remarks=f"Assigned to {task.assigned_executive.name or task.assigned_executive.username}"
+        )
+
+    def perform_update(self, serializer):
+        old_task = self.get_object()
+        old_exec = old_task.assigned_executive
+        task = serializer.save()
+        if old_exec != task.assigned_executive:
+            SEOTaskTimeline.objects.create(
+                task=task,
+                user=self.request.user,
+                user_name=self.request.user.name or self.request.user.username,
+                action="Task Reassigned",
+                remarks=f"Reassigned from {old_exec.name or old_exec.username} to {task.assigned_executive.name or task.assigned_executive.username}"
+            )
+
+    @action(detail=True, methods=["post"], url_path="review")
+    def review(self, request, pk=None):
+        user = request.user
+        if not (is_admin(user) or is_seo_manager(user)):
+            raise PermissionDenied("Only SEO Managers and Admins can review tasks.")
+        
+        task = self.get_object()
+        action_type = request.data.get("action")
+        remarks = request.data.get("remarks", "")
+        
+        if action_type == "approve":
+            task.status = "completed"
+            task.review_status = "approved"
+            task.manager_remarks = remarks
+            task.save()
+            
+            task.daily_logs.filter(status="submitted").update(
+                status="approved",
+                approved_by=user,
+                approved_date=timezone.now()
+            )
+
+            SEOTaskTimeline.objects.create(
+                task=task,
+                user=user,
+                user_name=user.name or user.username,
+                action="Manager Marked Task as Completed",
+                remarks=remarks or "Approved and completed by manager."
+            )
+            return Response({"status": "completed", "review_status": "approved"})
+        
+        elif action_type == "reject":
+            task.status = "in_progress"
+            task.review_status = "rejected"
+            task.manager_remarks = remarks
+            task.save()
+            
+            task.daily_logs.filter(status="submitted").update(
+                status="rejected",
+                rejected_by=user,
+                rejected_date=timezone.now(),
+                remarks_by_manager=remarks
+            )
+
+            SEOTaskTimeline.objects.create(
+                task=task,
+                user=user,
+                user_name=user.name or user.username,
+                action="Manager Returned Task to In Progress",
+                remarks=remarks or "Returned to in_progress by manager."
+            )
+            return Response({"status": "in_progress", "review_status": "rejected"})
+        
+        else:
+            return Response({"error": "Invalid action. Must be 'approve' or 'reject'."}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["post"], url_path="ready-for-review")
+    def ready_for_review(self, request, pk=None):
+        user = request.user
+        task = self.get_object()
+        
+        if task.assigned_executive != user and not (is_admin(user) or is_seo_manager(user)):
+            raise PermissionDenied("You are not authorized to mark this task as ready for review.")
+        
+        task.status = "ready_for_review"
+        task.review_status = "pending"
+        task.save()
+
+        SEOTaskTimeline.objects.create(
+            task=task,
+            user=user,
+            user_name=user.name or user.username,
+            action="Marked Ready for Review",
+            remarks="Task submitted by executive for manager review."
+        )
+        return Response({"status": "ready_for_review", "review_status": "pending"})
 
 
 class SEOReminderViewSet(viewsets.ModelViewSet):

@@ -144,6 +144,13 @@ class SEODailyWorkLog(models.Model):
     total_count = models.IntegerField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
     remarks_by_manager = models.TextField(blank=True, null=True)
+    seo_task = models.ForeignKey(
+        'SEOTask',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="daily_logs"
+    )
 
     # Audit Trail
     created_by = models.ForeignKey(
@@ -273,6 +280,7 @@ class SEOTask(models.Model):
     STATUS_CHOICES = [
         ("pending", "Pending"),
         ("in_progress", "In Progress"),
+        ("ready_for_review", "Ready for Review"),
         ("completed", "Completed"),
         ("on_hold", "On Hold"),
         ("overdue", "Overdue"),
@@ -280,6 +288,17 @@ class SEOTask(models.Model):
 
     title = models.CharField(max_length=255)
     description = models.TextField()
+    review_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending Review'),
+            ('approved', 'Approved'),
+            ('rejected', 'Rejected')
+        ],
+        blank=True,
+        null=True
+    )
+    manager_remarks = models.TextField(blank=True, null=True)
     website = models.ForeignKey(
         Website,
         on_delete=models.CASCADE,
@@ -377,3 +396,25 @@ class SEOCredential(models.Model):
     class Meta:
         db_table = "seo_credential"
         ordering = ["website", "platform"]
+
+
+class SEOTaskTimeline(models.Model):
+    task = models.ForeignKey(
+        'SEOTask',
+        on_delete=models.CASCADE,
+        related_name="timeline"
+    )
+    event_time = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    user_name = models.CharField(max_length=255, blank=True, null=True)
+    action = models.CharField(max_length=100)
+    remarks = models.TextField(blank=True, null=True)
+
+    class Meta:
+        db_table = "seo_task_timeline"
+        ordering = ["event_time"]

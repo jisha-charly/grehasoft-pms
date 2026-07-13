@@ -753,11 +753,27 @@ export interface SEOTask {
   assigned_executive_name?: string;
   due_date: string;
   priority: 'low' | 'medium' | 'high';
-  status: 'pending' | 'in_progress' | 'completed' | 'on_hold' | 'overdue';
+  status: 'pending' | 'in_progress' | 'ready_for_review' | 'completed' | 'on_hold' | 'overdue';
   activity_type?: number | null;
   activity_type_name?: string;
   created_by?: number;
   created_by_name?: string;
+  submitted_logs_count?: number;
+  latest_submission_date?: string | null;
+  current_progress?: number;
+  work_history?: any[];
+  review_status?: 'pending' | 'approved' | 'rejected' | null;
+  manager_remarks?: string | null;
+  timeline?: any[];
+  completion_summary?: {
+    total_logs: number;
+    total_activities: number;
+    total_urls: number;
+    total_time: number;
+    completion_date: string | null;
+    completed_by: string | null;
+    review_duration: string;
+  } | null;
 }
 
 export interface SEOReminder {

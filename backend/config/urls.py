@@ -1,5 +1,6 @@
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
+from django.views.static import serve
 from rest_framework import routers
 from apps.projects.views import ProjectViewSet, ClientViewSet,MilestoneViewSet,ProjectMemberViewSet,ActivityLogViewSet
 from apps.users.views import UserViewSet, RoleViewSet, DepartmentViewSet
@@ -101,5 +102,9 @@ urlpatterns = [
    
 ] 
 # Removed seo-dashboard endpoint 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Serve media files regardless of DEBUG status
+urlpatterns += [
+    re_path(r'^media/(?P<path>.*)$', serve, {
+        'document_root': settings.MEDIA_ROOT,
+    }),
+]
