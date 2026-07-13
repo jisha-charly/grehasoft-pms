@@ -403,7 +403,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ roles, departments }) => {
                           onChange={(e) => handleChange('role', e.target.value)}
                         >
                           <option value="">Assign a role...</option>
-                         {roles.map(role => (
+                         {roles.filter(role => role.name !== 'CLIENT').map(role => (
   <option key={role.id} value={role.id}>
     {role.name.replace(/_/g, ' ')}
   </option>

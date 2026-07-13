@@ -61,7 +61,7 @@ class User(AbstractUser, SoftDeleteModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='associated_users'
+        related_name='portal_users'
     )
     profile_photo = models.ImageField(upload_to='profile_photos/', null=True, blank=True)
 

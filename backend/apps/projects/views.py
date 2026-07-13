@@ -1,4 +1,4 @@
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Project, Client,Milestone,ProjectMember,ActivityLog
@@ -180,7 +180,117 @@ class ClientViewSet(viewsets.ModelViewSet):
         return Response(results)
 
     def perform_create(self, serializer):
-     serializer.save()
+        serializer.save()
+
+    @action(detail=True, methods=['post'], url_path='create-portal-account')
+    def create_portal_account(self, request, pk=None):
+        client = self.get_object()
+        username = request.data.get('username')
+        password = request.data.get('password')
+        name = request.data.get('name') or client.name
+        email = request.data.get('email') or client.email
+        
+        if not username or not password:
+            return Response({"error": "Username and password are required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        from apps.users.models import User, Role
+        
+        # Check if username is already taken
+        if User.objects.filter(username=username).exists():
+            return Response({"error": "This username is already taken."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Check if email is already taken
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "A user with this email address already exists."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            client_role = Role.objects.get(name='CLIENT')
+        except Role.DoesNotExist:
+            return Response({"error": "CLIENT role does not exist in the system."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        user = User.objects.create(
+            username=username,
+            name=name,
+            email=email,
+            role=client_role,
+            client=client,
+            status='active'
+        )
+        user.set_password(password)
+        user.save()
+        
+        return Response({"status": "success", "user_id": user.id, "username": user.username})
+
+    @action(detail=True, methods=['post'], url_path='reset-portal-user-password')
+    def reset_portal_user_password(self, request, pk=None):
+        client = self.get_object()
+        user_id = request.data.get('user_id')
+        new_password = request.data.get('password')
+        if not user_id or not new_password:
+            return Response({"error": "User ID and new password are required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            portal_user = client.portal_users.get(id=user_id)
+        except Exception:
+            return Response({"error": "Portal user not found for this client."}, status=status.HTTP_404_NOT_FOUND)
+            
+        portal_user.set_password(new_password)
+        portal_user.save()
+        return Response({"status": "success", "message": "Password reset successfully."})
+
+    @action(detail=True, methods=['post'], url_path='toggle-portal-user-status')
+    def toggle_portal_user_status(self, request, pk=None):
+        client = self.get_object()
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response({"error": "User ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            portal_user = client.portal_users.get(id=user_id)
+        except Exception:
+            return Response({"error": "Portal user not found for this client."}, status=status.HTTP_404_NOT_FOUND)
+            
+        # Toggle is_active
+        portal_user.is_active = not portal_user.is_active
+        portal_user.save()
+        return Response({"status": "success", "is_active": portal_user.is_active})
+
+    @action(detail=True, methods=['post'], url_path='edit-portal-user-username')
+    def edit_portal_user_username(self, request, pk=None):
+        client = self.get_object()
+        user_id = request.data.get('user_id')
+        new_username = request.data.get('username')
+        if not user_id or not new_username:
+            return Response({"error": "User ID and new username are required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            portal_user = client.portal_users.get(id=user_id)
+        except Exception:
+            return Response({"error": "Portal user not found for this client."}, status=status.HTTP_404_NOT_FOUND)
+            
+        # Check uniqueness of new username
+        from apps.users.models import User
+        if User.objects.filter(username=new_username).exclude(id=user_id).exists():
+            return Response({"error": "This username is already taken."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        portal_user.username = new_username
+        portal_user.save()
+        return Response({"status": "success", "username": portal_user.username})
+
+    @action(detail=True, methods=['post'], url_path='delete-portal-user')
+    def delete_portal_user(self, request, pk=None):
+        client = self.get_object()
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response({"error": "User ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            portal_user = client.portal_users.get(id=user_id)
+        except Exception:
+            return Response({"error": "Portal user not found for this client."}, status=status.HTTP_404_NOT_FOUND)
+            
+        portal_user.delete()
+        return Response({"status": "success", "message": "Portal user deleted successfully."})
 
 class MilestoneViewSet(viewsets.ModelViewSet):
     queryset = Milestone.objects.all()

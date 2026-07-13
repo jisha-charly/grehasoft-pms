@@ -15,6 +15,7 @@ class ClientSerializer(serializers.ModelSerializer):
         allow_null=True,
         required=False
     )
+    portal_users = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Client
@@ -26,9 +27,14 @@ class ClientSerializer(serializers.ModelSerializer):
             'company_name',
             'gst_number',
             'address',
+            'portal_users',
             'created_at',
             'updated_at'
         ]
+
+    def get_portal_users(self, obj):
+        from apps.users.serializers import MinimalUserSerializer
+        return MinimalUserSerializer(obj.portal_users.all(), many=True).data
 
     def validate_email(self, value):
         qs = Client.objects.filter(email=value)

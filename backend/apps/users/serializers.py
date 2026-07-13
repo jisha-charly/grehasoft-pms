@@ -18,6 +18,8 @@ class UserSerializer(serializers.ModelSerializer):
     role_name = serializers.CharField(source='role.name', read_only=True)
     department_name = serializers.CharField(source='department.name', read_only=True)
     role_permissions = serializers.JSONField(source='role.permissions', read_only=True)
+    client_name = serializers.CharField(source='client.name', read_only=True)
+    company_name = serializers.CharField(source='client.company_name', read_only=True)
     
     class Meta:
         model = User
@@ -25,14 +27,17 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'name', 'username', 'email', 'role', 'role_name', 'role_permissions',
             'department', 'department_name', 'status', 'is_active', 
             'date_joined', 'last_login','position', 'joining_date', 'salary_monthly','address',
-            'is_superuser', 'client', 'profile_photo'
+            'is_superuser', 'client', 'client_name', 'company_name', 'profile_photo'
         ]
         read_only_fields = ['last_login', 'date_joined']
 
 class UserCreateUpdateSerializer(serializers.ModelSerializer):
+    client_name = serializers.CharField(source='client.name', read_only=True)
+    company_name = serializers.CharField(source='client.company_name', read_only=True)
+
     class Meta:
         model = User
-        fields = ['id', 'name', 'username', 'email', 'password', 'role', 'department', 'status','position', 'joining_date', 'salary_monthly','address', 'client', 'profile_photo']
+        fields = ['id', 'name', 'username', 'email', 'password', 'role', 'department', 'status','position', 'joining_date', 'salary_monthly','address', 'client', 'client_name', 'company_name', 'profile_photo']
         extra_kwargs = {
             'password': {'write_only': True},
             'department': {'required': False, 'allow_null': True}
@@ -74,7 +79,15 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
                 attrs['position'] = None
                 attrs['joining_date'] = None
                 attrs['salary_monthly'] = None
+
+                # Enforce that client is provided for CLIENT users
+                client = attrs.get('client', self.instance.client if self.instance else None)
+                if not client:
+                    raise serializers.ValidationError({"client": "Client is required when role is CLIENT."})
             else:
+                # Non-client users must not have a client relationship
+                attrs['client'] = None
+
                 # Employee roles must specify a department
                 target_dept = attrs.get('department', self.instance.department if self.instance else None)
                 if target_dept is None:

@@ -208,6 +208,8 @@ export interface User {
   address?: string;
   is_superuser?: boolean;
   client?: number | null;
+  client_name?: string;
+  company_name?: string;
   profile_photo?: string | null;
 }
 
@@ -221,6 +223,7 @@ export interface Client {
   gst_number?: string;
   address?: string;
   created_at?: string;
+  portal_users?: Array<{ id: number; name?: string; username: string; email: string; is_active: boolean }>;
 }
 
 export interface Employee {
