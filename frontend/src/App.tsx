@@ -3,6 +3,7 @@ import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom"
 import { useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import Layout from "./components/layout/Layout";
+import { portalRegistry, resolvePortalType } from "./components/layout/portalRegistry";
 import { AuthProvider } from "./context/AuthContext";
 import LoginPage from "./pages/auth/LoginPage";
 import Dashboard from "./pages/dashboard/Dashboard";
@@ -64,6 +65,14 @@ import DomainsPage from "./pages/infrastructure/DomainsPage";
 
 import WorkTrackingDashboard from "./components/WorkTrackingDashboard";
 import WorkReportsPage from "./pages/admin/reports/WorkReportsPage";
+
+const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+  const role = user?.role_name || user?.role || "";
+  const portalType = resolvePortalType(role);
+  const SelectedLayout = portalRegistry[portalType].layout;
+  return <SelectedLayout>{children}</SelectedLayout>;
+};
 
 const App: React.FC = () => {
   const { isAuthenticated, loading, user, hasPermission } = useAuth();
@@ -256,13 +265,16 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
 
+          <Route path="/dashboard" element={<Navigate to="/" replace />} />
+          <Route path="/client" element={<Navigate to="/client/dashboard" replace />} />
+
           <Route
             path="/"
             element={
               <ProtectedRoute requiredPermission={Permission.VIEW_DASHBOARD}>
-                <Layout >
+                <AppLayout>
                   <Dashboard projects={projects} tasks={tasks} />
-                </Layout>
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -270,13 +282,13 @@ const App: React.FC = () => {
             path="/projects"
             element={
               <ProtectedRoute requiredPermission={Permission.VIEW_PROJECTS}>
-                <Layout >
+                <AppLayout>
                   <ProjectsPage
                     users={users}
                     departments={departments}
                     clients={clients}
                   />
-                </Layout>
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -285,7 +297,7 @@ const App: React.FC = () => {
             path="/projects/:id"
             element={
               <ProtectedRoute requiredPermission={Permission.VIEW_PROJECTS}>
-                <Layout>
+                <AppLayout>
                   <ProjectDetailsPage
                     projects={projects}
                     tasks={tasks}
@@ -301,23 +313,23 @@ const App: React.FC = () => {
                     taskTypes={taskTypes}
                     currentUser={user!}
                   />
-                </Layout>
+                </AppLayout>
               </ProtectedRoute>
             }
           />
-          <Route path="/projects/:id/kanban" element={<ProtectedRoute requiredPermission={Permission.MANAGE_TASKS}><Layout ><ProjectKanbanPage projects={projects} tasks={tasks} setTasks={setTasks} milestones={milestones} users={users} crud={taskCrud} taskTypes={taskTypes} currentUser={user!} /></Layout></ProtectedRoute>} />
-          <Route path="/tasks" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><Layout ><TasksPage milestones={milestones} projects={projects} taskTypes={taskTypes} users={users} currentUser={user!} /></Layout></ProtectedRoute>} />
-          <Route path="/clients" element={<ProtectedRoute requiredPermission={Permission.VIEW_CLIENTS}><Layout ><ClientsPage /></Layout></ProtectedRoute>} />
-          <Route path="/crm" element={<ProtectedRoute requiredPermission={Permission.VIEW_LEADS}><Layout ><LeadsPage users={users} clients={clients} departments={departments} setProjects={setProjects} /></Layout></ProtectedRoute>} />
-          <Route path="/seo" element={<ProtectedRoute requiredPermission={Permission.VIEW_SEO_DASHBOARD}><Layout><SEOPage /></Layout></ProtectedRoute>} />
-          <Route path="/admin/users" element={<ProtectedRoute requiredPermission={Permission.MANAGE_USERS}><Layout><UsersPage roles={roles} departments={departments} /></Layout></ProtectedRoute>} />
+          <Route path="/projects/:id/kanban" element={<ProtectedRoute requiredPermission={Permission.MANAGE_TASKS}><AppLayout><ProjectKanbanPage projects={projects} tasks={tasks} setTasks={setTasks} milestones={milestones} users={users} crud={taskCrud} taskTypes={taskTypes} currentUser={user!} /></AppLayout></ProtectedRoute>} />
+          <Route path="/tasks" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><AppLayout><TasksPage milestones={milestones} projects={projects} taskTypes={taskTypes} users={users} currentUser={user!} /></AppLayout></ProtectedRoute>} />
+          <Route path="/clients" element={<ProtectedRoute requiredPermission={Permission.VIEW_CLIENTS}><AppLayout><ClientsPage /></AppLayout></ProtectedRoute>} />
+          <Route path="/crm" element={<ProtectedRoute requiredPermission={Permission.VIEW_LEADS}><AppLayout><LeadsPage users={users} clients={clients} departments={departments} setProjects={setProjects} /></AppLayout></ProtectedRoute>} />
+          <Route path="/seo" element={<ProtectedRoute requiredPermission={Permission.VIEW_SEO_DASHBOARD}><AppLayout><SEOPage /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/users" element={<ProtectedRoute requiredPermission={Permission.MANAGE_USERS}><AppLayout><UsersPage roles={roles} departments={departments} /></AppLayout></ProtectedRoute>} />
           <Route
             path="/infrastructure"
             element={
               <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
-                <Layout>
+                <AppLayout>
                   <InfrastructurePage />
-                </Layout>
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -325,9 +337,9 @@ const App: React.FC = () => {
             path="/admin/roles"
             element={
               <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
-                <Layout >
+                <AppLayout>
                   <RolesPage />
-                </Layout>
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -336,9 +348,9 @@ const App: React.FC = () => {
             path="/admin/departments"
             element={
               <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
-                <Layout >
+                <AppLayout>
                   <DepartmentsPage />
-                </Layout>
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -347,9 +359,9 @@ const App: React.FC = () => {
             path="/admin/task-types"
             element={
               <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
-                <Layout>
+                <AppLayout>
                   <TaskTypesPage />
-                </Layout>
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -358,14 +370,14 @@ const App: React.FC = () => {
           <Route
             path="/profile"
             element={
-              <ProtectedRoute requiredPermission={Permission.VIEW_DASHBOARD}>
-                <Layout>
+              <ProtectedRoute>
+                <AppLayout>
                   <ProfilePage
                     activityLogs={activityLogs}
                     onUpdatePassword={handleUpdatePassword}
                     onUpdateProfile={handleUpdateProfile}
                   />
-                </Layout>
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -374,16 +386,16 @@ const App: React.FC = () => {
           <Route path="/invoices/create" element={<CreateInvoicePage />} />
           <Route path="/invoices/edit/:id" element={<CreateInvoicePage />} />
           <Route path="/invoices/:id" element={<InvoiceDetailsPage />} />
-          <Route path="/reminders" element={<ProtectedRoute requiredPermission={Permission.VIEW_REMINDERS}><Layout><RemindersPage /></Layout></ProtectedRoute>} />
-          <Route path="/proposals" element={<ProtectedRoute requiredPermission={Permission.VIEW_PROPOSALS}><Layout><ProposalsPage leads={leads} setProjects={setProjects} setLeads={setLeads} /></Layout></ProtectedRoute>} />
-          <Route path="/hr-documents" element={<ProtectedRoute requiredPermission={Permission.GENERATE_HR_DOCS}><Layout><HRDocumentsPage /></Layout></ProtectedRoute>} />
+          <Route path="/reminders" element={<ProtectedRoute requiredPermission={Permission.VIEW_REMINDERS}><AppLayout><RemindersPage /></AppLayout></ProtectedRoute>} />
+          <Route path="/proposals" element={<ProtectedRoute requiredPermission={Permission.VIEW_PROPOSALS}><AppLayout><ProposalsPage leads={leads} setProjects={setProjects} setLeads={setLeads} /></AppLayout></ProtectedRoute>} />
+          <Route path="/hr-documents" element={<ProtectedRoute requiredPermission={Permission.GENERATE_HR_DOCS}><AppLayout><HRDocumentsPage /></AppLayout></ProtectedRoute>} />
           <Route
             path="/admin/servers"
             element={
               <ProtectedRoute requiredPermission={Permission.MANAGE_INFRASTRUCTURE}>
-                <Layout>
+                <AppLayout>
                   <ServersPage />
-                </Layout>
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -392,9 +404,9 @@ const App: React.FC = () => {
             path="/infrastructure/domains"
             element={
               <ProtectedRoute requiredPermission={Permission.MANAGE_INFRASTRUCTURE}>
-                <Layout>
+                <AppLayout>
                   <DomainsPage />
-                </Layout>
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -403,9 +415,9 @@ const App: React.FC = () => {
             path="/infrastructure/credentials"
             element={
               <ProtectedRoute requiredPermission={Permission.MANAGE_INFRASTRUCTURE}>
-                <Layout>
+                <AppLayout>
                   <CredentialsPage />
-                </Layout>
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -414,9 +426,9 @@ const App: React.FC = () => {
             path="/admin/tracking"
             element={
               <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
-                <Layout>
+                <AppLayout>
                   <WorkTrackingDashboard />
-                </Layout>
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -425,24 +437,24 @@ const App: React.FC = () => {
             path="/admin/reports"
             element={
               <ProtectedRoute requiredPermission={Permission.MANAGE_SETTINGS}>
-                <Layout>
+                <AppLayout>
                   <WorkReportsPage />
-                </Layout>
+                </AppLayout>
               </ProtectedRoute>
             }
           />
 
           {/* Client Dashboard Routes */}
-          <Route path="/client/dashboard" element={<ProtectedRoute><Layout><ClientDashboardPage /></Layout></ProtectedRoute>} />
-          <Route path="/client/projects" element={<ProtectedRoute><Layout><ClientProjectsPage /></Layout></ProtectedRoute>} />
-          <Route path="/client/projects/:id" element={<ProtectedRoute><Layout><ClientProjectDetailsPage /></Layout></ProtectedRoute>} />
-          <Route path="/client/updates" element={<ProtectedRoute><Layout><ClientDailyUpdatesPage /></Layout></ProtectedRoute>} />
-          <Route path="/client/seo" element={<ProtectedRoute><Layout><ClientSEOReportsPage /></Layout></ProtectedRoute>} />
-          <Route path="/client/documents" element={<ProtectedRoute><Layout><ClientDocumentsPage /></Layout></ProtectedRoute>} />
-          <Route path="/client/invoices" element={<ProtectedRoute><Layout><ClientInvoicesPage /></Layout></ProtectedRoute>} />
-          <Route path="/client/notifications" element={<ProtectedRoute><Layout><ClientNotificationsPage /></Layout></ProtectedRoute>} />
-          <Route path="/client/profile" element={<ProtectedRoute><Layout><ClientProfilePage /></Layout></ProtectedRoute>} />
-          <Route path="/client/proposals/:id" element={<ProtectedRoute><Layout><ClientProposalDetailsPage /></Layout></ProtectedRoute>} />
+          <Route path="/client/dashboard" element={<ProtectedRoute><AppLayout><ClientDashboardPage /></AppLayout></ProtectedRoute>} />
+          <Route path="/client/projects" element={<ProtectedRoute><AppLayout><ClientProjectsPage /></AppLayout></ProtectedRoute>} />
+          <Route path="/client/projects/:id" element={<ProtectedRoute><AppLayout><ClientProjectDetailsPage /></AppLayout></ProtectedRoute>} />
+          <Route path="/client/updates" element={<ProtectedRoute><AppLayout><ClientDailyUpdatesPage /></AppLayout></ProtectedRoute>} />
+          <Route path="/client/seo" element={<ProtectedRoute><AppLayout><ClientSEOReportsPage /></AppLayout></ProtectedRoute>} />
+          <Route path="/client/documents" element={<ProtectedRoute><AppLayout><ClientDocumentsPage /></AppLayout></ProtectedRoute>} />
+          <Route path="/client/invoices" element={<ProtectedRoute><AppLayout><ClientInvoicesPage /></AppLayout></ProtectedRoute>} />
+          <Route path="/client/notifications" element={<ProtectedRoute><AppLayout><ClientNotificationsPage /></AppLayout></ProtectedRoute>} />
+          <Route path="/client/profile" element={<ProtectedRoute><AppLayout><ClientProfilePage /></AppLayout></ProtectedRoute>} />
+          <Route path="/client/proposals/:id" element={<ProtectedRoute><AppLayout><ClientProposalDetailsPage /></AppLayout></ProtectedRoute>} />
 
           <Route
             path="*"

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import axiosInstance from "../../api/axiosInstance";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -25,6 +26,8 @@ import SeoActivityTypesPage from "./SeoActivityTypesPage";
 const SEOPage: React.FC = () => {
   const { user } = useAuth();
   const { showAlert } = useAlert();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Deletion and Approval Modal States
   const [showDeleteWebsiteModal, setShowDeleteWebsiteModal] = useState(false);
@@ -145,6 +148,36 @@ const SEOPage: React.FC = () => {
     completed: 0,
     overdue: 0
   });
+
+  // URL sync active tab & action triggers
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    if (tab) {
+      setActiveTab(tab);
+    }
+
+    const action = params.get("action");
+    if (action === "submit-work") {
+      setLogForm({
+        website: "",
+        log_date: new Date().toISOString().split("T")[0],
+        remarks: "",
+        status: "submitted"
+      });
+      setLogItems([{ activity_type: undefined as any, count: 1, keyword: "", submission_url: "", domain_authority: null, spam_score: null, time_spent_minutes: null, username: "", password: "" }]);
+      setVisibleSubmitPasswords({});
+      setExistingLogItems([]);
+      setDuplicateLogWarning(null);
+      setIsEditingDraft(false);
+      setShowWorkLogModal(true);
+
+      // Clean parameter so it doesn't trigger modal again on refresh
+      const newParams = new URLSearchParams(location.search);
+      newParams.delete("action");
+      navigate({ search: newParams.toString() }, { replace: true });
+    }
+  }, [location.search, navigate]);
 
   // Debouncing search
   useEffect(() => {
@@ -933,6 +966,11 @@ const SEOPage: React.FC = () => {
                 <li className="nav-item">
                   <button className={`nav-link rounded-3 fw-bold ${activeTab === "activities" ? "active btn-primary" : "text-secondary"}`} onClick={() => setActiveTab("activities")}>
                     <Link2 size={16} className="me-2" /> My Activities
+                  </button>
+                </li>
+                <li className="nav-item">
+                  <button className={`nav-link rounded-3 fw-bold ${activeTab === "targets" ? "active btn-primary" : "text-secondary"}`} onClick={() => setActiveTab("targets")}>
+                    <TrendingUp size={16} className="me-2" /> My Monthly Targets
                   </button>
                 </li>
                 <li className="nav-item">
@@ -2039,31 +2077,37 @@ const SEOPage: React.FC = () => {
         </div>
       )}
 
-      {/* ================= TAB 5: MONTHLY TARGETS (MANAGER) ================= */}
-      {activeTab === "targets" && isManager && (
+      {/* ================= TAB 5: MONTHLY TARGETS (MANAGER / EXECUTIVE) ================= */}
+      {activeTab === "targets" && (
         <div>
           {/* Tracker Toggle Buttons */}
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <h4 className="fw-bold mb-0 text-dark">Monthly Activity Targets</h4>
-            <div className="btn-group shadow-sm" role="group">
-              <button
-                type="button"
-                className={`btn btn-sm px-3 py-2 fw-semibold ${!targetViewAchievement ? "btn-primary" : "btn-outline-primary bg-white"}`}
-                onClick={() => setTargetViewAchievement(false)}
-              >
-                Manage Targets
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm px-3 py-2 fw-semibold ${targetViewAchievement ? "btn-primary" : "btn-outline-primary bg-white"}`}
-                onClick={() => setTargetViewAchievement(true)}
-              >
-                Achievement Tracker
-              </button>
+          {isManager ? (
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <h4 className="fw-bold mb-0 text-dark">Monthly Activity Targets</h4>
+              <div className="btn-group shadow-sm" role="group">
+                <button
+                  type="button"
+                  className={`btn btn-sm px-3 py-2 fw-semibold ${!targetViewAchievement ? "btn-primary" : "btn-outline-primary bg-white"}`}
+                  onClick={() => setTargetViewAchievement(false)}
+                >
+                  Manage Targets
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm px-3 py-2 fw-semibold ${targetViewAchievement ? "btn-primary" : "btn-outline-primary bg-white"}`}
+                  onClick={() => setTargetViewAchievement(true)}
+                >
+                  Achievement Tracker
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="mb-4">
+              <h4 className="fw-bold mb-0 text-dark">My Monthly Targets</h4>
+            </div>
+          )}
 
-          {targetViewAchievement ? (
+          {(!isManager || targetViewAchievement) ? (
             // TARGET TRACKING TABLE
             <div className="card border-0 shadow-sm rounded-4 p-4 bg-white">
               <h5 className="fw-bold mb-3">Targets vs Achievement Progress</h5>
@@ -2071,7 +2115,7 @@ const SEOPage: React.FC = () => {
                 <table className="table align-middle border table-hover">
                   <thead className="table-light">
                     <tr>
-                      <th>Executive</th>
+                      {isManager && <th>Executive</th>}
                       <th>Website</th>
                       <th>Month</th>
                       <th>Activity Type</th>
@@ -2084,7 +2128,7 @@ const SEOPage: React.FC = () => {
                   <tbody>
                     {targets.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="text-center py-4 text-muted">No monthly targets configured.</td>
+                        <td colSpan={isManager ? 8 : 7} className="text-center py-4 text-muted">No monthly targets configured.</td>
                       </tr>
                     ) : (
                       targets.map(tg => {
@@ -2093,7 +2137,7 @@ const SEOPage: React.FC = () => {
                         const pct = tg.target_count > 0 ? Math.round((completed / tg.target_count) * 100) : 0;
                         return (
                           <tr key={tg.id}>
-                            <td className="fw-semibold">{tg.executive_name}</td>
+                            {isManager && <td className="fw-semibold">{tg.executive_name}</td>}
                             <td>{tg.website_name || <span className="text-muted">Overall (All)</span>}</td>
                             <td>{tg.month}</td>
                             <td>{tg.activity_type_name}</td>

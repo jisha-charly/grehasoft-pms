@@ -22,12 +22,19 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const getDefaultRoute = (user: User | null): string => {
   if (!user) return "/login";
-  if (user.role_name === "CLIENT") return "/client/dashboard";
-  if (user.is_superuser) return "/";
+  const role = user.role_name || "";
+
+  if (role === "SUPER_ADMIN" || role === "ADMIN") return "/dashboard";
+  if (role === "PROJECT_MANAGER") return "/projects";
+  if (role === "TEAM_MEMBER") return "/tasks";
+  if (role === "SEO_MANAGER" || role === "SEO_EXECUTIVE") return "/seo";
+  if (role === "CLIENT") return "/client";
+
+  if (user.is_superuser) return "/dashboard";
 
   const perms = (user.role_permissions || []).map((p) => String(p).toUpperCase());
 
-  if (perms.includes("VIEW_DASHBOARD")) return "/";
+  if (perms.includes("VIEW_DASHBOARD")) return "/dashboard";
   if (perms.includes("VIEW_PROJECTS")) return "/projects";
   if (perms.includes("VIEW_TASKS")) return "/tasks";
   if (perms.includes("VIEW_LEADS")) return "/crm";
