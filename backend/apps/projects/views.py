@@ -1,7 +1,7 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Project, Client,Milestone,ProjectMember,ActivityLog
+from .models import Project, Client,Milestone,ProjectMember,ActivityLog, PortalUserAudit
 from rest_framework.permissions import IsAuthenticated
 from .serializers import ProjectSerializer, ClientSerializer
 from core.permissions import HasPermission
@@ -182,6 +182,81 @@ class ClientViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save()
 
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        old_status = getattr(instance, 'status', 'active')
+        
+        client = serializer.save()
+        new_status = getattr(client, 'status', 'active')
+        
+        if old_status == 'active' and new_status == 'inactive':
+            # Deactivate all active portal users
+            active_users = client.portal_users.filter(is_active=True)
+            for u in active_users:
+                u.is_active = False
+                u.save()
+                PortalUserAudit.objects.create(
+                    portal_user=u,
+                    client=client,
+                    action="Account Deactivated",
+                    performed_by=self.request.user,
+                    remarks="System deactivated due to Client deactivation"
+                )
+        elif old_status == 'inactive' and new_status == 'active':
+            # Reactivate users that were deactivated due to Client deactivation
+            inactive_users = client.portal_users.filter(is_active=False)
+            for u in inactive_users:
+                last_audit = PortalUserAudit.objects.filter(portal_user=u, action="Account Deactivated").order_by('-timestamp').first()
+                if last_audit and last_audit.remarks == "System deactivated due to Client deactivation":
+                    u.is_active = True
+                    u.save()
+                    PortalUserAudit.objects.create(
+                        portal_user=u,
+                        client=client,
+                        action="Account Activated",
+                        performed_by=self.request.user,
+                        remarks="System activated due to Client reactivation"
+                    )
+
+    def destroy(self, request, *args, **kwargs):
+        client = self.get_object()
+        active_users = client.portal_users.filter(is_active=True)
+        if active_users.exists():
+            user = request.user
+            is_super = user.is_superuser or (user.role and user.role.name == 'SUPER_ADMIN')
+            force = request.query_params.get('force') == 'true'
+            if not (is_super and force):
+                return Response({
+                    "error": "This client has active portal users. Please deactivate or remove all portal accounts before deleting the client."
+                }, status=status.HTTP_400_BAD_REQUEST)
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=False, methods=['get'], url_path='dashboard-stats')
+    def dashboard_stats(self, request):
+        from apps.users.models import User
+        total_clients = Client.objects.count()
+        portal_accounts = Client.objects.filter(portal_users__isnull=False).distinct().count()
+        
+        portal_users_qs = User.objects.filter(role__name='CLIENT')
+        active_portal_users = portal_users_qs.filter(is_active=True).count()
+        inactive_portal_users = portal_users_qs.filter(is_active=False).count()
+        never_logged_in = portal_users_qs.filter(last_login__isnull=True).count()
+        
+        # Invitation Pending (users that have "Invitation Sent" in audit log but never logged in)
+        invitation_pending = portal_users_qs.filter(
+            last_login__isnull=True,
+            portal_audits__action="Invitation Sent"
+        ).distinct().count()
+        
+        return Response({
+            "total_clients": total_clients,
+            "portal_accounts": portal_accounts,
+            "active_portal_users": active_portal_users,
+            "inactive_portal_users": inactive_portal_users,
+            "invitation_pending": invitation_pending,
+            "never_logged_in": never_logged_in
+        })
+
     @action(detail=True, methods=['post'], url_path='create-portal-account')
     def create_portal_account(self, request, pk=None):
         client = self.get_object()
@@ -219,7 +294,123 @@ class ClientViewSet(viewsets.ModelViewSet):
         user.set_password(password)
         user.save()
         
+        PortalUserAudit.objects.create(
+            portal_user=user,
+            client=client,
+            action="Portal Account Created",
+            performed_by=request.user,
+            remarks=f"Portal account provisioned for username: {username}"
+        )
+        
         return Response({"status": "success", "user_id": user.id, "username": user.username})
+
+    @action(detail=True, methods=['post'], url_path=r'portal-users/(?P<user_id>\d+)/send-invitation')
+    def send_invitation(self, request, pk=None, user_id=None):
+        client = self.get_object()
+        try:
+            portal_user = client.portal_users.get(id=user_id)
+        except Exception:
+            return Response({"error": "Portal user not found for this client."}, status=status.HTTP_404_NOT_FOUND)
+        
+        company_name = client.company_name
+        username = portal_user.username
+        login_url = request.build_absolute_uri('/login')
+        
+        subject = f"Invitation to Client Portal - {company_name}"
+        message = f"""Hello {portal_user.name or 'Client'},
+
+You have been invited to the Client Portal for {company_name}.
+
+Your login credentials are:
+Username: {username}
+Temporary Password: (As provided by your administrator)
+
+Please login using the link below:
+{login_url}
+
+Important: Please change your password after logging in for the first time.
+
+Regards,
+System Administrator"""
+        
+        from django.core.mail import send_mail
+        from django.conf import settings
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL or 'noreply@grehasoft.com',
+            [portal_user.email],
+            fail_silently=False,
+        )
+        
+        PortalUserAudit.objects.create(
+            portal_user=portal_user,
+            client=client,
+            action="Invitation Sent",
+            performed_by=request.user,
+            remarks=f"Invitation email sent to {portal_user.email}."
+        )
+        
+        return Response({"status": "success", "message": "Invitation email sent successfully."})
+
+    @action(detail=True, methods=['post'], url_path=r'portal-users/(?P<user_id>\d+)/reset-password')
+    def reset_password(self, request, pk=None, user_id=None):
+        client = self.get_object()
+        try:
+            portal_user = client.portal_users.get(id=user_id)
+        except Exception:
+            return Response({"error": "Portal user not found for this client."}, status=status.HTTP_404_NOT_FOUND)
+        
+        new_password = request.data.get('password')
+        remarks = ""
+        
+        if not new_password:
+            import secrets
+            import string
+            alphabet = string.ascii_letters + string.digits
+            new_password = ''.join(secrets.choice(alphabet) for i in range(12))
+            remarks = "Temporary password generated and emailed to user."
+        else:
+            remarks = "Password reset by administrator."
+            
+        portal_user.set_password(new_password)
+        portal_user.save()
+        
+        from django.core.mail import send_mail
+        from django.conf import settings
+        subject = "Client Portal Password Reset"
+        message = f"""Hello {portal_user.name or 'Client'},
+
+Your password for the Client Portal has been reset by the administrator.
+
+Your credentials are:
+Username: {portal_user.username}
+Password: {new_password}
+
+Please login using the link below:
+{request.build_absolute_uri('/login')}
+
+Important: Please change your password immediately after logging in.
+
+Regards,
+System Administrator"""
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL or 'noreply@grehasoft.com',
+            [portal_user.email],
+            fail_silently=False,
+        )
+        
+        PortalUserAudit.objects.create(
+            portal_user=portal_user,
+            client=client,
+            action="Password Reset",
+            performed_by=request.user,
+            remarks=remarks
+        )
+        
+        return Response({"status": "success", "message": "Password reset successfully."})
 
     @action(detail=True, methods=['post'], url_path='reset-portal-user-password')
     def reset_portal_user_password(self, request, pk=None):
@@ -236,6 +427,15 @@ class ClientViewSet(viewsets.ModelViewSet):
             
         portal_user.set_password(new_password)
         portal_user.save()
+        
+        PortalUserAudit.objects.create(
+            portal_user=portal_user,
+            client=client,
+            action="Password Reset",
+            performed_by=request.user,
+            remarks="Password reset by administrator."
+        )
+        
         return Response({"status": "success", "message": "Password reset successfully."})
 
     @action(detail=True, methods=['post'], url_path='toggle-portal-user-status')
@@ -250,9 +450,18 @@ class ClientViewSet(viewsets.ModelViewSet):
         except Exception:
             return Response({"error": "Portal user not found for this client."}, status=status.HTTP_404_NOT_FOUND)
             
-        # Toggle is_active
         portal_user.is_active = not portal_user.is_active
         portal_user.save()
+        
+        action_str = "Account Activated" if portal_user.is_active else "Account Deactivated"
+        PortalUserAudit.objects.create(
+            portal_user=portal_user,
+            client=client,
+            action=action_str,
+            performed_by=request.user,
+            remarks=f"Account status toggled. Active={portal_user.is_active}"
+        )
+        
         return Response({"status": "success", "is_active": portal_user.is_active})
 
     @action(detail=True, methods=['post'], url_path='edit-portal-user-username')
@@ -268,13 +477,22 @@ class ClientViewSet(viewsets.ModelViewSet):
         except Exception:
             return Response({"error": "Portal user not found for this client."}, status=status.HTTP_404_NOT_FOUND)
             
-        # Check uniqueness of new username
         from apps.users.models import User
         if User.objects.filter(username=new_username).exclude(id=user_id).exists():
             return Response({"error": "This username is already taken."}, status=status.HTTP_400_BAD_REQUEST)
             
+        old_username = portal_user.username
         portal_user.username = new_username
         portal_user.save()
+        
+        PortalUserAudit.objects.create(
+            portal_user=portal_user,
+            client=client,
+            action="Username Changed",
+            performed_by=request.user,
+            remarks=f"Username changed from {old_username} to {new_username}."
+        )
+        
         return Response({"status": "success", "username": portal_user.username})
 
     @action(detail=True, methods=['post'], url_path='delete-portal-user')
@@ -289,8 +507,32 @@ class ClientViewSet(viewsets.ModelViewSet):
         except Exception:
             return Response({"error": "Portal user not found for this client."}, status=status.HTTP_404_NOT_FOUND)
             
+        PortalUserAudit.objects.create(
+            portal_user=portal_user,
+            client=client,
+            action="Account Deleted",
+            performed_by=request.user,
+            remarks=f"Deleted portal account for username {portal_user.username}"
+        )
         portal_user.delete()
         return Response({"status": "success", "message": "Portal user deleted successfully."})
+
+    @action(detail=True, methods=['get'], url_path='portal-user-audit')
+    def portal_user_audit(self, request, pk=None):
+        client = self.get_object()
+        audits = PortalUserAudit.objects.filter(client=client).order_by('-timestamp')
+        data = []
+        for a in audits:
+            data.append({
+                "id": a.id,
+                "portal_user_name": a.portal_user.name if a.portal_user else "Deleted User",
+                "portal_user_username": a.portal_user.username if a.portal_user else "",
+                "action": a.action,
+                "performed_by_name": a.performed_by.name or a.performed_by.username if a.performed_by else "System",
+                "timestamp": a.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                "remarks": a.remarks
+            })
+        return Response(data)
 
 class MilestoneViewSet(viewsets.ModelViewSet):
     queryset = Milestone.objects.all()

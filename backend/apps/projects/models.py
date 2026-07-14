@@ -9,12 +9,45 @@ class Client(SoftDeleteModel):
     company_name = models.CharField(max_length=200)
     gst_no = models.CharField(max_length=50, null=True, blank=True)
     address = models.TextField()
+    status = models.CharField(
+        max_length=10,
+        choices=[('active', 'Active'), ('inactive', 'Inactive')],
+        default='active'
+    )
 
     class Meta:
         ordering = ['-id']
 
     def __str__(self):
         return self.company_name
+
+class PortalUserAudit(models.Model):
+    portal_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="portal_audits"
+    )
+    client = models.ForeignKey(
+        'Client',
+        on_delete=models.CASCADE,
+        related_name="portal_audits"
+    )
+    action = models.CharField(max_length=50)
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="performed_audits"
+    )
+    timestamp = models.DateTimeField(auto_now_add=True)
+    remarks = models.TextField(blank=True, null=True)
+
+    class Meta:
+        db_table = "portal_user_audit"
+        ordering = ["-timestamp"]
 
 class Project(SoftDeleteModel):
     STATUS_CHOICES = [

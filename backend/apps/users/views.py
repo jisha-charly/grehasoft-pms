@@ -294,3 +294,22 @@ def change_password(request):
      ActivityLog.objects.create(user=user, action="Changed password")
 
      return Response({"message": "Password updated successfully"})
+
+
+from rest_framework_simplejwt.views import TokenObtainPairView
+from django.utils import timezone
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except Exception:
+            return super().post(request, *args, **kwargs)
+
+        user = serializer.user
+        if user:
+            user.last_login = timezone.now()
+            user.save(update_fields=['last_login'])
+
+        return Response(serializer.validated_data, status=status.HTTP_200_OK)

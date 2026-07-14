@@ -222,8 +222,9 @@ export interface Client {
   phone?: string;
   gst_number?: string;
   address?: string;
+  status?: 'active' | 'inactive';
   created_at?: string;
-  portal_users?: Array<{ id: number; name?: string; username: string; email: string; is_active: boolean }>;
+  portal_users?: Array<{ id: number; name?: string; username: string; email: string; is_active: boolean; last_login?: string | null }>;
 }
 
 export interface Employee {

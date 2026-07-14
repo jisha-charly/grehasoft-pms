@@ -175,4 +175,4 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class MinimalUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'name', 'username', 'email', 'role']
+        fields = ['id', 'name', 'username', 'email', 'role', 'is_active', 'last_login']

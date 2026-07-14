@@ -27,6 +27,7 @@ class ClientSerializer(serializers.ModelSerializer):
             'company_name',
             'gst_number',
             'address',
+            'status',
             'portal_users',
             'created_at',
             'updated_at'

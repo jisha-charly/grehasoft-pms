@@ -1,9 +1,37 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Client } from '../../types';
 import { useForm } from '../../hooks/useForm';
 import { useCrud } from '../../hooks/useCrud';
 import FormField from '../../components/FormField';
 import axiosInstance from '../../api/axiosInstance';
+import ConfirmModal from '../../components/ConfirmModal';
+import DeleteConfirmModal from '../../components/DeleteConfirmModal';
+import alertService from '../../services/alertService';
+import { AlertVariant } from '../../types/alert';
+
+const formatLastLogin = (dateStr?: string | null) => {
+  if (!dateStr) return "Never Logged In";
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "Never Logged In";
+    
+    const day = date.getDate().toString().padStart(2, '0');
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    
+    let hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const strTime = `${hours.toString().padStart(2, '0')}:${minutes} ${ampm}`;
+    
+    return `${day} ${month} ${year}, ${strTime}`;
+  } catch (e) {
+    return "Never Logged In";
+  }
+};
 
 const ClientsPage: React.FC = () => {
   const {
@@ -48,6 +76,53 @@ const ClientsPage: React.FC = () => {
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editUsernameVal, setEditUsernameVal] = useState('');
 
+  // Reset Password Custom Modal State
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [resetUserId, setResetUserId] = useState<number | null>(null);
+  const [resetUserName, setResetUserName] = useState('');
+  const [resetUserUsername, setResetUserUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resetPasswordError, setResetPasswordError] = useState<string | null>(null);
+  const [resetPasswordSubmitting, setResetPasswordSubmitting] = useState(false);
+
+  // Delete Portal User Confirmation State
+  const [showDeleteUserConfirm, setShowDeleteUserConfirm] = useState(false);
+  const [deletePortalUserObj, setDeletePortalUserObj] = useState<{ id: number; name: string; username: string } | null>(null);
+
+  // Status Toggle Confirmation State
+  const [showStatusConfirm, setShowStatusConfirm] = useState(false);
+  const [statusConfirmUserObj, setStatusConfirmUserObj] = useState<{ id: number; name: string; username: string; is_active: boolean } | null>(null);
+
+  // Audit Log State
+  const [showAuditLog, setShowAuditLog] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogLoading, setAuditLogLoading] = useState(false);
+
+  // Dashboard metrics state
+  const [stats, setStats] = useState<{
+    total_clients: number;
+    portal_accounts: number;
+    active_portal_users: number;
+    inactive_portal_users: number;
+    invitation_pending: number;
+    never_logged_in: number;
+  } | null>(null);
+
+  const fetchStats = async () => {
+    try {
+      const res = await axiosInstance.get('/clients/dashboard-stats/');
+      setStats(res.data);
+    } catch (err) {
+      console.error("Failed to fetch dashboard stats", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, [clients]);
+
   const handleOpenCreatePortalAccount = (client: Client) => {
     setSelectedClient(client);
     setPortalUsername('');
@@ -57,10 +132,12 @@ const ClientsPage: React.FC = () => {
     setShowCreatePortalModal(true);
   };
 
-  const handleOpenManagePortalUsers = (client: Client) => {
+  const handleOpenManagePortalUsers = async (client: Client) => {
     setSelectedClient(client);
     setManageError(null);
     setShowAddUserForm(false);
+    setShowAuditLog(false);
+    setAuditLogs([]);
     setNewUserName('');
     setNewUserEmail('');
     setNewUserUsername('');
@@ -69,6 +146,16 @@ const ClientsPage: React.FC = () => {
     setAddUserError(null);
     setEditingUserId(null);
     setShowManagePortalModal(true);
+
+    try {
+      const updated = await refetch();
+      const currentClient = updated.results.find(c => c.id === client.id);
+      if (currentClient) {
+        setSelectedClient(currentClient);
+      }
+    } catch (err) {
+      console.error("Failed to refetch client data", err);
+    }
   };
 
   const handleCreatePortalAccountSubmit = async (e: React.FormEvent) => {
@@ -135,29 +222,68 @@ const ClientsPage: React.FC = () => {
     }
   };
 
-  const handleResetPassword = async (userId: number) => {
-    const newPass = prompt("Enter new password for this user:");
-    if (newPass === null) return;
-    if (!newPass.trim()) {
-      alert("Password cannot be empty.");
+  const handleResetPassword = (userId: number, name: string, username: string) => {
+    setResetUserId(userId);
+    setResetUserName(name);
+    setResetUserUsername(username);
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowResetPassword(false);
+    setResetPasswordError(null);
+    setShowResetPasswordModal(true);
+  };
+
+  const handleConfirmResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 8) {
+      setResetPasswordError("Password must be at least 8 characters.");
       return;
     }
-    setManageActionLoading(userId);
-    setManageError(null);
+    if (newPassword !== confirmPassword) {
+      setResetPasswordError("Passwords do not match.");
+      return;
+    }
+    setResetPasswordSubmitting(true);
+    setResetPasswordError(null);
     try {
       await axiosInstance.post(`/clients/${selectedClient?.id}/reset-portal-user-password/`, {
-        user_id: userId,
-        password: newPass
+        user_id: resetUserId,
+        password: newPassword
       });
-      alert("Password reset successfully.");
+      setShowResetPasswordModal(false);
+      
+      const updated = await refetch();
+      const currentClient = updated.results.find(c => c.id === selectedClient?.id);
+      if (currentClient) {
+        setSelectedClient(currentClient);
+      }
+      
+      alertService.showAlert({
+        variant: AlertVariant.SUCCESS,
+        title: "Success",
+        message: "Password reset successfully."
+      });
     } catch (err: any) {
-      setManageError(err.response?.data?.error || "Failed to reset password.");
+      const errorMsg = err.response?.data?.error || "Failed to reset password.";
+      setResetPasswordError(errorMsg);
+      alertService.showAlert({
+        variant: AlertVariant.ERROR,
+        title: "Error",
+        message: errorMsg
+      });
     } finally {
-      setManageActionLoading(null);
+      setResetPasswordSubmitting(false);
     }
   };
 
-  const handleToggleStatus = async (userId: number) => {
+  const handleToggleStatusClick = (user: any) => {
+    setStatusConfirmUserObj(user);
+    setShowStatusConfirm(true);
+  };
+
+  const handleConfirmToggleStatus = async () => {
+    if (!statusConfirmUserObj) return;
+    const userId = statusConfirmUserObj.id;
     setManageActionLoading(userId);
     setManageError(null);
     try {
@@ -169,16 +295,32 @@ const ClientsPage: React.FC = () => {
       if (currentClient) {
         setSelectedClient(currentClient);
       }
+      alertService.showAlert({
+        variant: AlertVariant.SUCCESS,
+        title: "Success",
+        message: "Portal user status updated successfully."
+      });
     } catch (err: any) {
-      setManageError(err.response?.data?.error || "Failed to toggle status.");
+      const errorMsg = err.response?.data?.error || "Failed to toggle status.";
+      setManageError(errorMsg);
+      alertService.showAlert({
+        variant: AlertVariant.ERROR,
+        title: "Error",
+        message: errorMsg
+      });
     } finally {
       setManageActionLoading(null);
+      setShowStatusConfirm(false);
     }
   };
 
   const handleSaveUsername = async (userId: number) => {
     if (!editUsernameVal.trim()) {
-      alert("Username cannot be empty.");
+      alertService.showAlert({
+        variant: AlertVariant.WARNING,
+        title: "Validation Error",
+        message: "Username cannot be empty."
+      });
       return;
     }
     setManageActionLoading(userId);
@@ -194,15 +336,32 @@ const ClientsPage: React.FC = () => {
       if (currentClient) {
         setSelectedClient(currentClient);
       }
+      alertService.showAlert({
+        variant: AlertVariant.SUCCESS,
+        title: "Success",
+        message: "Username updated successfully."
+      });
     } catch (err: any) {
-      setManageError(err.response?.data?.error || "Failed to update username.");
+      const errorMsg = err.response?.data?.error || "Failed to update username.";
+      setManageError(errorMsg);
+      alertService.showAlert({
+        variant: AlertVariant.ERROR,
+        title: "Error",
+        message: errorMsg
+      });
     } finally {
       setManageActionLoading(null);
     }
   };
 
-  const handleDeletePortalUser = async (userId: number) => {
-    if (!confirm("Are you sure you want to delete this portal user? This will permanently remove their login access.")) return;
+  const handleDeletePortalUserClick = (user: any) => {
+    setDeletePortalUserObj(user);
+    setShowDeleteUserConfirm(true);
+  };
+
+  const handleConfirmDeletePortalUser = async () => {
+    if (!deletePortalUserObj) return;
+    const userId = deletePortalUserObj.id;
     setManageActionLoading(userId);
     setManageError(null);
     try {
@@ -214,10 +373,66 @@ const ClientsPage: React.FC = () => {
       if (currentClient) {
         setSelectedClient(currentClient);
       }
+      alertService.showAlert({
+        variant: AlertVariant.SUCCESS,
+        title: "Success",
+        message: "Portal user deleted successfully."
+      });
     } catch (err: any) {
-      setManageError(err.response?.data?.error || "Failed to delete user.");
+      const errorMsg = err.response?.data?.error || "Failed to delete user.";
+      setManageError(errorMsg);
+      alertService.showAlert({
+        variant: AlertVariant.ERROR,
+        title: "Error",
+        message: errorMsg
+      });
     } finally {
       setManageActionLoading(null);
+      setShowDeleteUserConfirm(false);
+    }
+  };
+
+  const handleSendInvitationEmail = async (userId: number) => {
+    setManageActionLoading(userId);
+    setManageError(null);
+    try {
+      await axiosInstance.post(`/clients/${selectedClient?.id}/portal-users/${userId}/send-invitation/`);
+      alertService.showAlert({
+        variant: AlertVariant.SUCCESS,
+        title: "Success",
+        message: "Invitation email sent successfully."
+      });
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || "Failed to send invitation.";
+      setManageError(errorMsg);
+      alertService.showAlert({
+        variant: AlertVariant.ERROR,
+        title: "Error",
+        message: errorMsg
+      });
+    } finally {
+      setManageActionLoading(null);
+    }
+  };
+
+  const handleToggleAuditLog = async () => {
+    if (showAuditLog) {
+      setShowAuditLog(false);
+      return;
+    }
+    setAuditLogLoading(true);
+    try {
+      const res = await axiosInstance.get(`/clients/${selectedClient?.id}/portal-user-audit/`);
+      setAuditLogs(res.data);
+      setShowAuditLog(true);
+    } catch (err) {
+      alertService.showAlert({
+        variant: AlertVariant.ERROR,
+        title: "Error",
+        message: "Failed to load portal audit log."
+      });
+    } finally {
+      setAuditLogLoading(false);
     }
   };
 
@@ -257,7 +472,8 @@ const ClientsPage: React.FC = () => {
       phone: '',
       company_name: '',
       gst_number: '',
-      address: ''
+      address: '',
+      status: 'active' as 'active' | 'inactive'
     },
     validationSchema,
     onSubmit: async (formData) => {
@@ -268,7 +484,8 @@ const ClientsPage: React.FC = () => {
         email: formData.email,
         phone: formData.phone,
         gst_number: formData.gst_number,
-        address: formData.address
+        address: formData.address,
+        status: formData.status
       };
 
       if (editingClient) {
@@ -313,7 +530,8 @@ const ClientsPage: React.FC = () => {
       phone: client.phone || '',
       company_name: client.company_name || '',
       gst_number: client.gst_number || '',
-      address: client.address || ''
+      address: client.address || '',
+      status: client.status || 'active'
     });
 
     setModalOpen(true);
@@ -357,6 +575,46 @@ const confirmDelete = async () => {
           <i className="bi bi-person-plus-fill me-2"></i>
           Register New Client
         </button>
+      </div>
+
+      {/* SUMMARY STATS CARDS */}
+      <div className="row g-3 mb-4">
+        <div className="col-md-2 col-sm-4 col-6">
+          <div className="card shadow-sm border-0 bg-white p-3 text-center rounded-3">
+            <span className="text-secondary small fw-bold text-uppercase d-block mb-1" style={{ fontSize: '0.65rem' }}>Total Clients</span>
+            <h4 className="fw-bold text-dark mb-0">{stats ? stats.total_clients : '...'}</h4>
+          </div>
+        </div>
+        <div className="col-md-2 col-sm-4 col-6">
+          <div className="card shadow-sm border-0 bg-white p-3 text-center rounded-3">
+            <span className="text-secondary small fw-bold text-uppercase d-block mb-1" style={{ fontSize: '0.65rem' }}>Portal Accounts</span>
+            <h4 className="fw-bold text-primary mb-0">{stats ? stats.portal_accounts : '...'}</h4>
+          </div>
+        </div>
+        <div className="col-md-2 col-sm-4 col-6">
+          <div className="card shadow-sm border-0 bg-white p-3 text-center rounded-3">
+            <span className="text-secondary small fw-bold text-uppercase d-block mb-1" style={{ fontSize: '0.65rem' }}>Active Users</span>
+            <h4 className="fw-bold text-success mb-0">{stats ? stats.active_portal_users : '...'}</h4>
+          </div>
+        </div>
+        <div className="col-md-2 col-sm-4 col-6">
+          <div className="card shadow-sm border-0 bg-white p-3 text-center rounded-3">
+            <span className="text-secondary small fw-bold text-uppercase d-block mb-1" style={{ fontSize: '0.65rem' }}>Inactive Users</span>
+            <h4 className="fw-bold text-danger mb-0">{stats ? stats.inactive_portal_users : '...'}</h4>
+          </div>
+        </div>
+        <div className="col-md-2 col-sm-4 col-6">
+          <div className="card shadow-sm border-0 bg-white p-3 text-center rounded-3">
+            <span className="text-secondary small fw-bold text-uppercase d-block mb-1" style={{ fontSize: '0.65rem' }}>Pending Invites</span>
+            <h4 className="fw-bold text-warning mb-0">{stats ? stats.invitation_pending : '...'}</h4>
+          </div>
+        </div>
+        <div className="col-md-2 col-sm-4 col-6">
+          <div className="card shadow-sm border-0 bg-white p-3 text-center rounded-3">
+            <span className="text-secondary small fw-bold text-uppercase d-block mb-1" style={{ fontSize: '0.65rem' }}>Never Logged In</span>
+            <h4 className="fw-bold text-info mb-0">{stats ? stats.never_logged_in : '...'}</h4>
+          </div>
+        </div>
       </div>
 
       {/* SEARCH CARD */}
@@ -473,8 +731,10 @@ const confirmDelete = async () => {
                           <button
                             className="btn btn-sm btn-light"
                             onClick={() => handleDelete(client.id)}
+                            disabled={client.portal_users?.some(u => u.is_active)}
+                            title={client.portal_users?.some(u => u.is_active) ? "Cannot delete client with active portal users. Please deactivate or delete them first." : "Delete Client"}
                           >
-                            <i className="bi bi-trash3 text-danger"></i>
+                            <i className={`bi bi-trash3 ${client.portal_users?.some(u => u.is_active) ? 'text-muted' : 'text-danger'}`}></i>
                           </button>
                         </div>
                       </div>
@@ -627,6 +887,27 @@ const confirmDelete = async () => {
                       }
                     />
                   </FormField>
+
+                  <FormField label="Client Status">
+                    <select
+                      name="status"
+                      className="form-select"
+                      value={values.status}
+                      onChange={(e) =>
+                        handleChange(e.target.name as keyof typeof values, e.target.value)
+                      }
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </FormField>
+
+                  {editingClient && values.status === 'inactive' && editingClient.portal_users?.some(u => u.is_active) && (
+                    <div className="alert alert-warning py-2 px-3 small rounded-3 mt-3 text-start">
+                      <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                      This client has active portal users. Deactivating this client will immediately disable portal access for all linked users.
+                    </div>
+                  )}
 
                 </div>
 
@@ -837,15 +1118,26 @@ const confirmDelete = async () => {
                   <span className="text-secondary small fw-bold">
                     Active Portal Accounts: {selectedClient.portal_users?.length ?? 0}
                   </span>
-                  <button
-                    className={`btn btn-sm ${showAddUserForm ? 'btn-secondary' : 'btn-primary'} fw-bold rounded-3`}
-                    onClick={() => {
-                      setShowAddUserForm(!showAddUserForm);
-                      setAddUserError(null);
-                    }}
-                  >
-                    {showAddUserForm ? 'Cancel Add User' : 'Add Additional User'}
-                  </button>
+                  <div className="d-flex gap-2">
+                    <button
+                      className="btn btn-sm btn-outline-secondary fw-bold rounded-3"
+                      type="button"
+                      onClick={handleToggleAuditLog}
+                      disabled={auditLogLoading}
+                    >
+                      <i className="bi bi-clock-history me-1"></i>
+                      {auditLogLoading ? 'Loading...' : (showAuditLog ? 'Hide Audit Log' : 'View Audit Log')}
+                    </button>
+                    <button
+                      className={`btn btn-sm ${showAddUserForm ? 'btn-secondary' : 'btn-primary'} fw-bold rounded-3`}
+                      onClick={() => {
+                        setShowAddUserForm(!showAddUserForm);
+                        setAddUserError(null);
+                      }}
+                    >
+                      {showAddUserForm ? 'Cancel Add User' : 'Add Additional User'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* ADD ADDITIONAL USER FORM */}
@@ -942,13 +1234,14 @@ const confirmDelete = async () => {
                         <th className="ps-3 py-2">Name & Email</th>
                         <th className="py-2">Username</th>
                         <th className="py-2">Status</th>
+                        <th className="py-2">Last Login</th>
                         <th className="text-end pe-3 py-2">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {!selectedClient.portal_users || selectedClient.portal_users.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="text-center py-4 text-muted small">
+                          <td colSpan={5} className="text-center py-4 text-muted small">
                             No portal users associated with this client.
                           </td>
                         </tr>
@@ -993,6 +1286,9 @@ const confirmDelete = async () => {
                                 {user.is_active ? 'Active' : 'Inactive'}
                               </span>
                             </td>
+                            <td className="small text-secondary text-nowrap">
+                              {formatLastLogin(user.last_login)}
+                            </td>
                             <td className="text-end pe-3">
                               <div className="d-inline-flex gap-1">
                                 {editingUserId !== user.id && (
@@ -1010,10 +1306,19 @@ const confirmDelete = async () => {
                                   </button>
                                 )}
                                 <button
+                                  className="btn btn-xs btn-outline-info py-1 px-2 rounded small"
+                                  style={{ fontSize: '0.7rem' }}
+                                  title="Send Invitation Email"
+                                  onClick={() => handleSendInvitationEmail(user.id)}
+                                  disabled={manageActionLoading !== null}
+                                >
+                                  <i className="bi bi-envelope-fill text-info"></i>
+                                </button>
+                                <button
                                   className="btn btn-xs btn-outline-warning py-1 px-2 rounded small text-dark"
                                   style={{ fontSize: '0.7rem' }}
                                   title="Reset Password"
-                                  onClick={() => handleResetPassword(user.id)}
+                                  onClick={() => handleResetPassword(user.id, user.name || '', user.username)}
                                   disabled={manageActionLoading !== null}
                                 >
                                   <i className="bi bi-key-fill"></i>
@@ -1022,7 +1327,7 @@ const confirmDelete = async () => {
                                   className={`btn btn-xs ${user.is_active ? 'btn-outline-danger' : 'btn-outline-success'} py-1 px-2 rounded small`}
                                   style={{ fontSize: '0.7rem' }}
                                   title={user.is_active ? 'Deactivate Account' : 'Activate Account'}
-                                  onClick={() => handleToggleStatus(user.id)}
+                                  onClick={() => handleToggleStatusClick(user)}
                                   disabled={manageActionLoading !== null}
                                 >
                                   <i className={`bi ${user.is_active ? 'bi-lock-fill' : 'bi-unlock-fill'}`}></i>
@@ -1031,7 +1336,7 @@ const confirmDelete = async () => {
                                   className="btn btn-xs btn-outline-danger py-1 px-2 rounded small"
                                   style={{ fontSize: '0.7rem' }}
                                   title="Delete User"
-                                  onClick={() => handleDeletePortalUser(user.id)}
+                                  onClick={() => handleDeletePortalUserClick(user)}
                                   disabled={manageActionLoading !== null}
                                 >
                                   <i className="bi bi-trash"></i>
@@ -1044,6 +1349,45 @@ const confirmDelete = async () => {
                     </tbody>
                   </table>
                 </div>
+
+                {showAuditLog && (
+                  <div className="mt-4 p-3 bg-light rounded-3 border text-start animate__animated animate__fadeIn">
+                    <h6 className="fw-bold mb-3 border-bottom pb-2">
+                      <i className="bi bi-clock-history me-2 text-primary"></i>
+                      Client Portal Audit History
+                    </h6>
+                    {auditLogs.length === 0 ? (
+                      <p className="text-secondary small mb-0 text-center py-3">No audit log entries found for this client.</p>
+                    ) : (
+                      <div className="timeline-container" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                        <table className="table table-sm table-hover align-middle mb-0 small">
+                          <thead>
+                            <tr>
+                              <th>Date</th>
+                              <th>Administrator</th>
+                              <th>Action</th>
+                              <th>Remarks</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {auditLogs.map(log => (
+                              <tr key={log.id}>
+                                <td className="text-nowrap text-secondary">{log.timestamp}</td>
+                                <td><strong>{log.performed_by_name}</strong></td>
+                                <td>
+                                  <span className="badge bg-primary-subtle text-primary border">
+                                    {log.action}
+                                  </span>
+                                </td>
+                                <td className="text-secondary">{log.remarks}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="modal-footer border-0 pt-0">
@@ -1055,6 +1399,135 @@ const confirmDelete = async () => {
                   Close
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STATUS TOGGLE CONFIRM MODAL */}
+      <ConfirmModal
+        isOpen={showStatusConfirm}
+        onClose={() => setShowStatusConfirm(false)}
+        onConfirm={handleConfirmToggleStatus}
+        title={statusConfirmUserObj?.is_active ? "Deactivate Portal User" : "Activate Portal User"}
+        message={statusConfirmUserObj?.is_active
+          ? "Are you sure you want to deactivate this portal account? The user will no longer be able to log in until the account is reactivated."
+          : "Are you sure you want to reactivate this portal account?"}
+        confirmText="Confirm"
+        variant={statusConfirmUserObj?.is_active ? "warning" : "success"}
+      />
+
+      {/* DELETE PORTAL USER CONFIRMATION MODAL */}
+      <DeleteConfirmModal
+        isOpen={showDeleteUserConfirm}
+        onClose={() => setShowDeleteUserConfirm(false)}
+        onConfirm={handleConfirmDeletePortalUser}
+        title="Delete Portal User"
+        message={selectedClient && deletePortalUserObj ? (
+          <div>
+            <p className="mb-3">Are you sure you want to permanently delete this portal account? This action cannot be undone.</p>
+            <div className="bg-light p-3 rounded border small text-start">
+              <div className="mb-2"><strong>Client Company:</strong> {selectedClient.company_name}</div>
+              <div className="mb-2"><strong>Portal User Name:</strong> {deletePortalUserObj.name}</div>
+              <div><strong>Username:</strong> <code className="text-primary">@{deletePortalUserObj.username}</code></div>
+            </div>
+          </div>
+        ) : "Are you sure you want to delete this user?"}
+        confirmText="Delete User"
+        showSoftDeleteNotice={false}
+      />
+
+      {/* RESET PASSWORD MODAL */}
+      {showResetPasswordModal && selectedClient && resetUserId && (
+        <div className="modal show d-block bg-dark bg-opacity-50" style={{ zIndex: 10050 }} tabIndex={-1}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 rounded-4 shadow-lg">
+              <form onSubmit={handleConfirmResetPasswordSubmit}>
+                <div className="modal-header border-0 pb-0">
+                  <h5 className="modal-title fw-bold">
+                    <i className="bi bi-key-fill text-warning me-2"></i>
+                    Reset Portal User Password
+                  </h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setShowResetPasswordModal(false)}
+                  ></button>
+                </div>
+
+                <div className="modal-body py-3 text-start">
+                  {resetPasswordError && (
+                    <div className="alert alert-danger py-2 px-3 small rounded-3 mb-3">
+                      {resetPasswordError}
+                    </div>
+                  )}
+
+                  <div className="mb-3 bg-light p-3 rounded-3 border">
+                    <div className="row g-2">
+                      <div className="col-12 border-bottom pb-2 mb-2">
+                        <label className="text-secondary small fw-bold d-block text-uppercase mb-1" style={{ fontSize: '0.7rem' }}>Client Company</label>
+                        <span className="text-dark fw-bold">{selectedClient.company_name}</span>
+                      </div>
+                      <div className="col-md-6">
+                        <label className="text-secondary small fw-bold d-block text-uppercase mb-1" style={{ fontSize: '0.7rem' }}>Portal User Name</label>
+                        <span className="text-secondary small">{resetUserName}</span>
+                      </div>
+                      <div className="col-md-6">
+                        <label className="text-secondary small fw-bold d-block text-uppercase mb-1" style={{ fontSize: '0.7rem' }}>Username</label>
+                        <code className="text-primary small">@{resetUserUsername}</code>
+                      </div>
+                    </div>
+                  </div>
+
+                  <FormField label="New Password *" required>
+                    <div className="input-group">
+                      <input
+                        type={showResetPassword ? "text" : "password"}
+                        className="form-control"
+                        placeholder="New password (min 8 characters)"
+                        required
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                      />
+                      <button
+                        className="btn btn-outline-secondary"
+                        type="button"
+                        onClick={() => setShowResetPassword(!showResetPassword)}
+                      >
+                        <i className={`bi ${showResetPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                      </button>
+                    </div>
+                  </FormField>
+
+                  <FormField label="Confirm Password *" required>
+                    <input
+                      type={showResetPassword ? "text" : "password"}
+                      className="form-control"
+                      placeholder="Confirm new password"
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                  </FormField>
+                </div>
+
+                <div className="modal-footer border-0 pt-0">
+                  <button
+                    type="button"
+                    className="btn btn-light rounded-3 fw-semibold"
+                    onClick={() => setShowResetPasswordModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary rounded-3 fw-bold"
+                    disabled={resetPasswordSubmitting}
+                  >
+                    {resetPasswordSubmitting ? 'Updating...' : 'Update Password'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

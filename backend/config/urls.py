@@ -21,7 +21,7 @@ from rest_framework_simplejwt.views import (
 )
 from django.conf.urls.static import static
 from django.conf import settings
-from apps.users.views import ProfileView,change_password
+from apps.users.views import ProfileView,change_password, CustomTokenObtainPairView
 from apps.activity.views import ActivityLogViewSet as GlobalActivityLogViewSet
 from apps.projects.views import ActivityLogViewSet as ProjectActivityLogViewSet
 from apps.invoices.views import InvoicePaymentViewSet, InvoiceViewSet
@@ -80,7 +80,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
      # JWT Authentication
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path("api/v1/invoices/analytics/", views.invoice_analytics),
     path("api/v1/users/profile/", ProfileView.as_view()),
