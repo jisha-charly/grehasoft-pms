@@ -343,6 +343,23 @@ const ProposalsPage: React.FC<ProposalsPageProps> = ({ leads, setProjects, setLe
     }
   }, [editingProposal, isModalOpen, leads]);
 
+  const refreshLeadsList = async () => {
+    if (!setLeads) return;
+    try {
+      const res = await axiosInstance.get('/leads/');
+      const data = res.data.results || res.data || [];
+      setLeads(data);
+    } catch (err) {
+      console.error("Failed to refresh leads list:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (isModalOpen) {
+      refreshLeadsList();
+    }
+  }, [isModalOpen]);
+
   useEffect(() => {
     if (!selectedLeadId) {
       if (!editingProposal) {

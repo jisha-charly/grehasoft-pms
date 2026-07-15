@@ -203,6 +203,7 @@ interface LeadsPageProps {
   clients: Client[];
   departments: Department[];
   setProjects?: (projects: any[]) => void;
+  setLeads?: (leads: any[]) => void;
 }
 
 const LeadsPage: React.FC<LeadsPageProps> = ({
@@ -210,6 +211,7 @@ const LeadsPage: React.FC<LeadsPageProps> = ({
   clients = [],
   departments = [],
   setProjects,
+  setLeads,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -233,6 +235,17 @@ const LeadsPage: React.FC<LeadsPageProps> = ({
   useEffect(() => {
     setPage(1);
   }, [searchTerm, statusFilter]);
+
+  const syncGlobalLeads = async () => {
+    if (!setLeads) return;
+    try {
+      const res = await axiosInstance.get('/leads/');
+      const data = res.data.results || res.data || [];
+      setLeads(data);
+    } catch (err) {
+      console.error("Failed to sync global leads:", err);
+    }
+  };
 
   const [isModalOpen, setModalOpen] = useState(false);
   const [isConvertModalOpen, setConvertModalOpen] = useState(false);
@@ -340,18 +353,25 @@ const handleConfirmAssignmentDelete = async () => {
 
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
   const validationSchema = {
-    name: {
+    company_name: {
       required: true,
-      message: 'Full name is required.'
+      message: 'Company name is required.'
     },
     email: {
-      required: true,
-      pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+      validate: (value: string) => {
+        if (!value || value.trim() === '') return true;
+        const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return pattern.test(value) || 'Enter a valid corporate email address.';
+      },
       message: 'Enter a valid corporate email address.'
     },
-    service_required: {
-      validate: (value: string[]) => value && value.length > 0,
-      message: 'At least one service must be selected.'
+    phone: {
+      validate: (value: string) => {
+        if (!value || value.trim() === '') return true;
+        const pattern = /^\+?[0-9\s\-()]{7,20}$/;
+        return pattern.test(value) || 'Enter a valid phone number.';
+      },
+      message: 'Enter a valid phone number.'
     }
   };
 
@@ -400,6 +420,7 @@ const handleConfirmAssignmentDelete = async () => {
       }
       setModalOpen(false);
       setEditingLead(null);
+      syncGlobalLeads();
     }
   });
 
@@ -436,6 +457,7 @@ const handleConfirmDelete = async () => {
 
   try {
     await deleteLead(leadToDelete.id);
+    syncGlobalLeads();
   } catch (error) {
     console.error("Delete failed:", error);
   }
@@ -934,16 +956,16 @@ const filteredCategories = SERVICE_CATEGORIES.map(category => {
                       </h6>
                     </div>
                     <div className="col-12">
-                      <FormField label="Full Name *" name="name" value={values.name} onChange={handleChange} error={errors.name} placeholder="e.g. Alex Thompson" />
+                      <FormField label="Contact Person" name="name" value={values.name} onChange={handleChange} error={errors.name} placeholder="e.g. Alex Thompson" />
                     </div>
                     <div className="col-md-6">
-                      <FormField label="Email *" name="email" type="email" value={values.email} onChange={handleChange} error={errors.email} placeholder="alex@example.com" />
+                      <FormField label="Email" name="email" type="email" value={values.email} onChange={handleChange} error={errors.email} placeholder="alex@example.com" />
                     </div>
                     <div className="col-md-6">
-                      <FormField label="Phone" name="phone" value={values.phone} onChange={handleChange} placeholder="+91 00000 00000" />
+                      <FormField label="Phone" name="phone" value={values.phone} onChange={handleChange} error={errors.phone} placeholder="+91 00000 00000" />
                     </div>
                     <div className="col-12">
-                      <FormField label="Company Name" name="company_name" value={values.company_name} onChange={handleChange} placeholder="e.g. ABC Corporation" />
+                      <FormField label="Company Name *" name="company_name" value={values.company_name} onChange={handleChange} error={errors.company_name} placeholder="e.g. ABC Corporation" />
                     </div>
 
                     {/* LEAD SOURCE SECTION */}

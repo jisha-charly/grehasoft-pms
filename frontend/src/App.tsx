@@ -320,7 +320,7 @@ const App: React.FC = () => {
           <Route path="/projects/:id/kanban" element={<ProtectedRoute requiredPermission={Permission.MANAGE_TASKS}><AppLayout><ProjectKanbanPage projects={projects} tasks={tasks} setTasks={setTasks} milestones={milestones} users={users} crud={taskCrud} taskTypes={taskTypes} currentUser={user!} /></AppLayout></ProtectedRoute>} />
           <Route path="/tasks" element={<ProtectedRoute requiredPermission={Permission.VIEW_TASKS}><AppLayout><TasksPage milestones={milestones} projects={projects} taskTypes={taskTypes} users={users} currentUser={user!} /></AppLayout></ProtectedRoute>} />
           <Route path="/clients" element={<ProtectedRoute requiredPermission={Permission.VIEW_CLIENTS}><AppLayout><ClientsPage /></AppLayout></ProtectedRoute>} />
-          <Route path="/crm" element={<ProtectedRoute requiredPermission={Permission.VIEW_LEADS}><AppLayout><LeadsPage users={users} clients={clients} departments={departments} setProjects={setProjects} /></AppLayout></ProtectedRoute>} />
+          <Route path="/crm" element={<ProtectedRoute requiredPermission={Permission.VIEW_LEADS}><AppLayout><LeadsPage users={users} clients={clients} departments={departments} setProjects={setProjects} setLeads={setLeads} /></AppLayout></ProtectedRoute>} />
           <Route path="/seo" element={<ProtectedRoute requiredPermission={Permission.VIEW_SEO_DASHBOARD}><AppLayout><SEOPage /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute requiredPermission={Permission.MANAGE_USERS}><AppLayout><UsersPage roles={roles} departments={departments} /></AppLayout></ProtectedRoute>} />
           <Route

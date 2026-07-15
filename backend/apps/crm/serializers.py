@@ -19,6 +19,11 @@ class LeadAssignmentSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class LeadSerializer(serializers.ModelSerializer):
+    company_name = serializers.CharField(required=True, allow_blank=False)
+    name = serializers.CharField(required=False, allow_blank=True, default="")
+    email = serializers.EmailField(required=False, allow_blank=True, default="")
+    phone = serializers.CharField(required=False, allow_blank=True, default="")
+    source = serializers.CharField(required=False, allow_blank=True, default="Website")
     followups = LeadFollowupSerializer(many=True, read_only=True)
     assignments = LeadAssignmentSerializer(many=True, read_only=True)
 
