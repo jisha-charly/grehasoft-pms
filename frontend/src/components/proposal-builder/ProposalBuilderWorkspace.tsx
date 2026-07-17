@@ -219,24 +219,36 @@ const Sidebar: React.FC = React.memo(() => {
       <div className="p-3 border-top mt-auto bg-white flex-grow-1 overflow-auto">
         <h6 className="fw-bold text-uppercase text-secondary small mb-2">Sections Ordering</h6>
         <ul className="list-group list-group-flush border rounded mb-3">
-          {activeSections.map((sectionId, idx) => (
-            <li key={sectionId} className="list-group-item d-flex justify-content-between align-items-center py-1.5 px-2 bg-white">
-              <div className="form-check form-switch mb-0">
-                <input type="checkbox" className="form-check-input" id={`sec-${sectionId}`} checked={true} onChange={() => disableSection(sectionId)} />
-                <label className="form-check-label fw-bold text-dark" htmlFor={`sec-${sectionId}`} style={{ fontSize: '10px' }}>
-                  {sectionId.replace('_', ' ').toUpperCase()}
-                </label>
-              </div>
-              <div className="d-flex gap-1">
-                <button type="button" className="btn btn-link p-0 text-secondary" onClick={() => reorderSections(idx, 'up')} disabled={idx === 0}>
-                  <i className="bi bi-arrow-up-short fs-6"></i>
-                </button>
-                <button type="button" className="btn btn-link p-0 text-secondary" onClick={() => reorderSections(idx, 'down')} disabled={idx === activeSections.length - 1}>
-                  <i className="bi bi-arrow-down-short fs-6"></i>
-                </button>
-              </div>
-            </li>
-          ))}
+          {activeSections.map((sectionId, idx) => {
+            const isFixed = ['additional_charges', 'maintenance_cost', 'terms_conditions'].includes(sectionId);
+            return (
+              <li key={sectionId} className="list-group-item d-flex justify-content-between align-items-center py-1.5 px-2 bg-white">
+                <div className="form-check form-switch mb-0">
+                  <input 
+                    type="checkbox" 
+                    className="form-check-input" 
+                    id={`sec-${sectionId}`} 
+                    checked={true} 
+                    disabled={isFixed}
+                    onChange={() => !isFixed && disableSection(sectionId)} 
+                  />
+                  <label className="form-check-label fw-bold text-dark" htmlFor={`sec-${sectionId}`} style={{ fontSize: '10px' }}>
+                    {sectionId.replace('_', ' ').toUpperCase()}
+                  </label>
+                </div>
+                {!isFixed && (
+                  <div className="d-flex gap-1">
+                    <button type="button" className="btn btn-link p-0 text-secondary" onClick={() => reorderSections(idx, 'up')} disabled={idx === 0}>
+                      <i className="bi bi-arrow-up-short fs-6"></i>
+                    </button>
+                    <button type="button" className="btn btn-link p-0 text-secondary" onClick={() => reorderSections(idx, 'down')} disabled={idx === activeSections.length - 1}>
+                      <i className="bi bi-arrow-down-short fs-6"></i>
+                    </button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
         <h6 className="fw-bold text-uppercase text-secondary small mb-2">Add Sections</h6>
         <div className="d-flex flex-wrap gap-1">
@@ -274,10 +286,7 @@ const ContentLibrary: React.FC = React.memo(() => {
           <div key={lib.name} className="d-flex justify-content-between align-items-center border p-1 rounded bg-light">
             <span className="small font-monospace" style={{ fontSize: '11px' }}>{lib.name}</span>
             <div className="btn-group btn-group-sm">
-              <button type="button" className="btn btn-xs btn-outline-primary py-0 px-2 text-dark" onClick={() => insertLibraryContent(lib.text, 'cover_letter')}>Letter</button>
-              <button type="button" className="btn btn-xs btn-outline-primary py-0 px-2 text-dark" onClick={() => insertLibraryContent(lib.text, 'company_profile')}>Profile</button>
-              <button type="button" className="btn btn-xs btn-outline-primary py-0 px-2 text-dark" onClick={() => insertLibraryContent(lib.text, 'why_choose_us')}>Why Us</button>
-              <button type="button" className="btn btn-xs btn-outline-primary py-0 px-2 text-dark" onClick={() => insertLibraryContent(lib.text, 'terms_conditions')}>Terms</button>
+              <button type="button" className="btn btn-xs btn-outline-primary py-0 px-2 text-dark" onClick={() => insertLibraryContent(lib.text, 'website_structure')}>Insert</button>
             </div>
           </div>
         ))}

@@ -8,5 +8,6 @@ export const EDITOR_REGISTRY: Record<string, React.LazyExoticComponent<React.Com
   features: React.lazy(() => import('./FeaturesEditor')),
   deliverables: React.lazy(() => import('./DeliverablesEditor')),
   payment_terms: React.lazy(() => import('./PaymentTermsEditor')),
-  thank_you: React.lazy(() => import('./ThankYouEditor'))
+  thank_you: React.lazy(() => import('./ThankYouEditor')),
+  fixed: React.lazy(() => import('./FixedSectionEditor'))
 };

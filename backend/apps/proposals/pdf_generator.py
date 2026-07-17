@@ -561,12 +561,35 @@ class ProposalPDFGenerator:
         if not letter_content:
             # Fallback
             letter_content = (
-                "<p>Dear Sir,</p>"
-                "<p>Thank you for considering GrehaSoft for your software development needs. As discussed, we are pleased to submit a proposal for your consideration.</p>"
-                "<p>At GrehaSoft, we prioritize client satisfaction, delivering modern, secure, and SEO friendly solutions designed for scalability.</p>"
-                "<p>Best regards,</p>"
-                "<p><b>Grehasoft Smart IT Solutions</b></p>"
+                "<p>Dear Sir/Madam,</p>"
+                "<p>Thank you for considering Grehasoft for your website development needs. As discussed, we have reviewed your requirements and are pleased to submit this proposal for your consideration.</p>"
+                "<p>At Grehasoft, we understand the challenges of finding the right technology partner for branding, website development, digital marketing, and software solutions. Our top priority is client satisfaction, and we are committed to delivering high-quality, scalable, and future-ready solutions using the latest technologies and industry best practices.</p>"
+                "<p>Throughout the project, our experienced team will work closely with you to ensure that every requirement is understood and implemented with precision. We are also committed to providing dedicated support during our working hours, ensuring that your queries and concerns are addressed promptly and professionally.</p>"
+                "<p>Thank you for considering Grehasoft as your technology partner. We look forward to the opportunity to collaborate with you and build a successful long-term business relationship.</p>"
+                "<p>Best Regards,</p>"
+                "<p>Raji T. Skariah<br/>"
+                "Grehasoft<br/>"
+                "+91 89215 40 183 | +91 98950 72 145<br/>"
+                "info@grehasoft.com | grehasoft@gmail.com</p>"
             )
+            
+        # Interpolate placeholders: {client_name}, {company_name}, {project_name}, {proposal_title}
+        client_name = ""
+        company_name = ""
+        if self.proposal.client:
+            client_name = self.proposal.client.name or ""
+            company_name = self.proposal.client.company_name or ""
+        elif self.proposal.lead:
+            client_name = self.proposal.lead.name or ""
+            company_name = self.proposal.lead.company_name or ""
+            
+        project_name = self.proposal.title or "Project"
+        proposal_title = self.proposal.title or "Proposal"
+        
+        letter_content = letter_content.replace("{client_name}", client_name or "Client")
+        letter_content = letter_content.replace("{company_name}", company_name or "Client Company")
+        letter_content = letter_content.replace("{project_name}", project_name)
+        letter_content = letter_content.replace("{proposal_title}", proposal_title)
             
         story.extend(parse_html_to_flowables(letter_content, self.body_style))
         return story
@@ -611,40 +634,16 @@ class ProposalPDFGenerator:
         story.extend(parse_html_to_flowables(scope_content, self.body_style))
         return story
 
-    def draw_features(self):
+    def draw_website_structure(self):
         story = []
-        story.append(Paragraph("Key Features & Security", self.heading1_style))
+        story.append(Paragraph("Proposed Website Structure & Pages", self.heading1_style))
         story.append(Spacer(1, 10))
         
-        features_list = self.builder_config.get('features', [])
-        if not features_list:
-            features_list = [
-                {"title": "Device Independence", "desc": "Fully responsive layouts suitable for desktops, tablets, and mobiles."},
-                {"title": "SEO Friendliness", "desc": "Pre-configured SEO URLs, meta fields, and Google Search Console tags."},
-                {"title": "Security & Encryption", "desc": "Pre-coded SSL certificate integration and encrypted user credentials."}
-            ]
-            
-        for f in features_list:
-            card_story = []
-            f_title = escape_html_except_tags(f.get('title', ''))
-            f_desc = escape_html_except_tags(f.get('desc', ''))
-            card_story.append(Paragraph(f"<b>{f_title}</b>", self.heading2_style))
-            card_story.append(Paragraph(f_desc, self.body_style))
-            
-            # Draw as a rounded card table
-            card_table = Table([[card_story]], colWidths=[480])
-            card_table.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (-1,-1), colors.HexColor(self.tpl['bg_card'])),
-                ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#e2e8f0')),
-                ('TOPPADDING', (0,0), (-1,-1), 10),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 10),
-                ('LEFTPADDING', (0,0), (-1,-1), 12),
-                ('RIGHTPADDING', (0,0), (-1,-1), 12),
-            ]))
-            story.append(card_table)
-            story.append(Spacer(1, 8))
-            
+        content = self.builder_config.get('website_structure', "")
+        if content:
+            story.extend(parse_html_to_flowables(content, self.body_style))
         return story
+
 
     def draw_deliverables(self):
         story = []
@@ -783,100 +782,261 @@ class ProposalPDFGenerator:
         
         return story
  
-    def draw_why_choose_us(self):
+    def draw_additional_charges(self):
         story = []
-        story.append(Paragraph("Why Choose Grehasoft", self.heading1_style))
-        story.append(Spacer(1, 10))
-        
-        why_content = self.builder_config.get('why_choose_us', "")
-        if not why_content:
-            why_content = (
-                "<p>• <b>Experienced Team:</b> Senior engineers with expertise in modern frameworks.</p>"
-                "<p>• <b>SEO Centric Coding:</b> Fast loading speeds and standards-compliant markups.</p>"
-                "<p>• <b>Pixel-Perfect UIs:</b> Premium design aesthetics that reflect your brand identity.</p>"
-                "<p>• <b>Post-launch Support:</b> Dedicated support windows for seamless maintenance.</p>"
-            )
-            
-        story.extend(parse_html_to_flowables(why_content, self.body_style))
-        return story
- 
-    def draw_terms_conditions(self):
-        story = []
-        story.append(Paragraph("Terms & Conditions", self.heading1_style))
-        story.append(Spacer(1, 10))
-        
-        terms_content = self.builder_config.get('terms_conditions', "")
-        if not terms_content:
-            terms_content = (
-                "<p>1. <b>Validity:</b> This proposal remains valid for 30 days from issuance.</p>"
-                "<p>2. <b>Scope Change:</b> Features outside this specification will require a scope change request.</p>"
-                "<p>3. <b>Support:</b> Support is provided on business days between 9:00 AM and 6:00 PM IST.</p>"
-                "<p>4. <b>IP Ownership:</b> Intellectual property rights transfer upon final balance clearance.</p>"
-            )
-            
-        story.extend(parse_html_to_flowables(terms_content, self.body_style))
-        return story
- 
-    def draw_thank_you(self):
-        story = []
-        story.append(Spacer(1, 20))
-        
-        thanks_config = self.builder_config.get('thank_you', {})
-        message = escape_html_except_tags(thanks_config.get('message', "For any queries or clarifications, please feel free to contact us."))
-        
-        # 1. Message block (italicized/styled like the image)
-        msg_style = ParagraphStyle(
-            'ThankYouMessage',
-            parent=self.body_style,
-            fontName=f"{self.tpl['font_title']}" if 'Bold' in self.tpl['font_title'] else f"{self.tpl['font_title']}-Bold",
-            fontSize=10,
-            leading=14
-        )
-        story.append(Paragraph(message, msg_style))
+        story.append(Paragraph("Additional Charges", self.heading1_style))
         story.append(Spacer(1, 15))
         
-        # 2. "WISHING YOU A GREAT DAY!!" heading in accent/primary color
+        table_data = [
+            ["Item", "Description", "Cost"],
+            [
+                Paragraph("<b>1. Domain & Hosting</b>", self.body_style),
+                Paragraph(
+                    "• The client may independently purchase the domain name and provide the login credentials for deployment.<br/>"
+                    "• Alternatively, Grehasoft can register the domain on behalf of the client.<br/>"
+                    "• Website hosting will be provided through Grehasoft's reseller hosting infrastructure.<br/>"
+                    "• The website will be securely deployed, maintained and hosted.",
+                    self.body_style
+                ),
+                Paragraph("Starts from ₹5,000 per year.", self.body_style)
+            ],
+            [
+                Paragraph("<b>2. SSL Certificate</b>", self.body_style),
+                Paragraph(
+                    "If a free SSL certificate is used, no additional charge applies.<br/>"
+                    "If the client requires a premium SSL certificate, it must be purchased separately by the client.",
+                    self.body_style
+                ),
+                Paragraph("-", self.body_style)
+            ]
+        ]
+        
+        charges_table = Table(table_data, colWidths=[120, 240, 120])
+        charges_table.setStyle(TableStyle([
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor(self.tpl['primary'])),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('FONTNAME', (0,0), (-1,0), self.tpl['font_title']),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+            ('TOPPADDING', (0,0), (-1,-1), 8),
+            ('LEFTPADDING', (0,0), (-1,-1), 8),
+            ('RIGHTPADDING', (0,0), (-1,-1), 8),
+        ]))
+        
+        story.append(charges_table)
+        return story
+
+    def draw_maintenance_cost(self):
+        story = []
+        story.append(Paragraph("3. Maintenance Cost", self.heading1_style))
+        
+        grey_style = ParagraphStyle(
+            'MaintSubtitle',
+            parent=self.body_style,
+            fontName=f"{self.tpl['font_body']}-Oblique" if self.tpl['font_body'] == 'Helvetica' else self.tpl['font_body'],
+            textColor=colors.HexColor('#6B7280'),
+            spaceAfter=15
+        )
+        story.append(Paragraph("(* If required by the client only)", grey_style))
+        
+        services_text = (
+            "Maintenance services include:<br/>"
+            "• Security Updates<br/>"
+            "• Plugin Updates<br/>"
+            "• Theme Updates<br/>"
+            "• Content Updates<br/>"
+            "• Backup & Disaster Recovery<br/>"
+            "• User Management"
+        )
+        story.append(Paragraph(services_text, self.body_style))
+        story.append(Spacer(1, 10))
+        
+        pricing_text = (
+            "<b>Pricing</b><br/>"
+            "• Yearly Advance: ₹25,000<br/>"
+            "• Quarterly Advance: ₹7,000<br/>"
+            "• Monthly: ₹3,000"
+        )
+        story.append(Paragraph(pricing_text, self.body_style))
+        story.append(Spacer(1, 15))
+        
+        note_style = ParagraphStyle(
+            'MaintNote',
+            parent=self.body_style,
+            fontName=self.tpl['font_body'],
+            backColor=colors.HexColor(self.tpl['bg_card']),
+            borderColor=colors.HexColor('#cbd5e1'),
+            borderWidth=1,
+            borderPadding=10,
+            spaceBefore=10,
+            spaceAfter=10
+        )
+        note_text = (
+            "If the client does not opt for any maintenance plan, "
+            "future maintenance requests will be charged based on functionality "
+            "or development time at ₹500/hour."
+        )
+        story.append(Paragraph(note_text, note_style))
+        
+        return story
+
+    def draw_terms_conditions(self):
+        story = []
+        story.append(Paragraph("TERMS AND CONDITIONS", self.heading1_style))
+        story.append(Spacer(1, 10))
+        
+        pt = self.builder_config.get('payment_terms', {'advance': 50, 'development': 30, 'deployment': 20})
+        adv = pt.get('advance', 50)
+        dev = pt.get('development', 30)
+        dep = pt.get('deployment', 20)
+        
+        clauses = [
+            (
+                "1. Payment Terms",
+                f"The payment for the project is scheduled as follows:<br/>"
+                f"• <b>{adv}% Advance:</b> payable immediately to kick off the development.<br/>"
+                f"• <b>{dev}% Development Milestone:</b> payable upon completion of core modules.<br/>"
+                f"• <b>{dep}% Final Deployment:</b> payable prior to launching the production workspace."
+            ),
+            (
+                "2. Project Scope & Costs",
+                "• The costs outlined in this proposal are based on the requirements discussed. Any changes, additions, or modifications to the scope of work after the commencement of the project will be treated as extra work and charged separately.<br/>"
+                "• In case of scope changes, a revised quote will be provided for approval before implementation."
+            ),
+            (
+                "3. Scope Limitation",
+                "• Information Website only.<br/>"
+                "• No custom systems.<br/>"
+                "• Additional features will be quoted separately."
+            ),
+            (
+                "4. Design & Banner Images Policy",
+                "• Royalty-free images will be utilized for website design.<br/>"
+                "• AI-generated images may be used to enhance the website aesthetics.<br/>"
+                "• Homepage banner revisions are limited to the revision cycle.<br/>"
+                "• Section image revisions will be handled as part of the overall design revisions."
+            ),
+            (
+                "5. Client Provided Images",
+                "• The client must provide high-quality images and assets.<br/>"
+                "• Grehasoft is not responsible for the poor rendering of low-resolution or poor-quality client-provided images.<br/>"
+                "• Any necessary edits or replacements of client-provided images must be supplied by the client."
+            ),
+            (
+                "6. Design",
+                "• One initial design concept will be presented to the client.<br/>"
+                "• Up to two free revisions are included in the project cost.<br/>"
+                "• Additional revisions beyond the two free rounds are chargeable."
+            ),
+            (
+                "7. Client Responsibilities",
+                "• The client must provide all content, text, logos, branding assets, images, and other materials in a timely manner.<br/>"
+                "• Delays in providing materials or feedback will result in corresponding delays in the project timeline.<br/>"
+                "• The client must verify and approve milestones promptly to ensure progress."
+            ),
+            (
+                "8. E-Commerce Website Requirements",
+                "• Client provides the product list, description, pricing, and images.<br/>"
+                "• For e-commerce websites, initial upload includes a maximum of 50 products. Extra products will be charged at ₹75 per product."
+            ),
+            (
+                "9. Third-Party Integrations",
+                "• Third-party integrations such as CRM integrations and marketing tools will be configured as per requirements.<br/>"
+                "• All third-party subscription costs (e.g., APIs, CRM licenses, premium tools) are to be borne directly by the client.<br/>"
+                "• SSL integration is included. Premium SSL certificates must be purchased separately by the client."
+            ),
+            (
+                "10. Multimedia & Content Embeds",
+                "• Multimedia content like videos should be uploaded by the client to third-party platforms (e.g., YouTube).<br/>"
+                "• Grehasoft will embed these videos on the website using YouTube URLs provided by the client."
+            ),
+            (
+                "11. Legal & Copyright Compliance",
+                "• The client is responsible for obtaining necessary licenses and permissions for all content, text, images, and logos supplied to Grehasoft.<br/>"
+                "• Grehasoft is not liable for any copyright infringement or legal issues arising from client-provided materials.<br/>"
+                "• The website will include standard copyright notice and disclaimer unless otherwise specified."
+            ),
+            (
+                "12. Project Timeline & Communication",
+                "• The project timeline is dependent on prompt communication and feedback from the client.<br/>"
+                "• Approvals for designs or milestones must be provided within 3 business days. Delays in communication will extend the project timeline."
+            ),
+            (
+                "13. Portfolio Rights",
+                "• Grehasoft reserves the right to showcase the completed website, design, and case study in its portfolio, website, marketing materials, and social media channels unless otherwise agreed in writing."
+            ),
+            (
+                "14. Proposal Validity",
+                "• This proposal remains valid for three (3) months from submission."
+            ),
+            (
+                "15. Support & Availability",
+                "• Support channels: Phone, WhatsApp, Botim, Email, Messenger.<br/>"
+                "• Support Hours: 9:00 AM – 6:00 PM IST.<br/>"
+                "• Working Days only."
+            )
+        ]
+        
+        for title, text in clauses:
+            clause_style_title = ParagraphStyle(
+                'ClauseTitle',
+                parent=self.heading2_style,
+                fontSize=13,
+                leading=16,
+                spaceBefore=8,
+                spaceAfter=4,
+                keepWithNext=True
+            )
+            story.append(Paragraph(title, clause_style_title))
+            story.append(Paragraph(text, self.body_style))
+            
+        # Restore closing signature section at the end of the last page
+        story.append(Spacer(1, 20))
+        
         wish_style = ParagraphStyle(
             'WishHeading',
             parent=self.heading1_style,
-            textColor=colors.HexColor(self.tpl['primary'])
+            fontSize=16,
+            leading=20,
+            textColor=colors.HexColor(self.tpl['primary']),
+            spaceBefore=15,
+            spaceAfter=15,
+            keepWithNext=True
         )
         story.append(Paragraph("WISHING YOU A GREAT DAY!!", wish_style))
-        story.append(Spacer(1, 25))
         
-        # 3. Signature & Contact grid
-        rep_name = escape_html_except_tags(thanks_config.get('rep_name', 'Raji T. Skariah'))
-        rep_phone = escape_html_except_tags(thanks_config.get('rep_phone', '+91 89215 40183 | +91 98954 80145'))
-        rep_email = escape_html_except_tags(thanks_config.get('rep_email', 'info@grehasoft.com | grehasoft@gmail.com'))
-        
-        cover_conf = self.builder_config.get('cover_page', {})
-        place = escape_html_except_tags(cover_conf.get('place', '').strip() or "Kochi")
-        doc_date = escape_html_except_tags(cover_conf.get('proposalDate', '').strip())
+        doc_date = self.builder_config.get('cover_page', {}).get('proposalDate', '').strip()
         if not doc_date:
             import datetime
             doc_date = datetime.date.today().strftime("%d-%m-%Y")
             
-        left_text = f"{rep_name}<br/>{rep_phone}<br/>{rep_email}"
-        right_text = f"{place}<br/>{doc_date}"
+        left_text = (
+            "<b>RAJI T. SKARIAH</b><br/>"
+            "+91 89215 40 183 | +91 98950 72 145<br/>"
+            "info@grehasoft.com | grehasoft@gmail.com"
+        )
+        right_text = f"<b>{doc_date}</b>"
         
-        col_style = ParagraphStyle(
-            'ThankYouColumn',
+        sig_col_style = ParagraphStyle(
+            'SigColumn',
             parent=self.body_style,
-            fontSize=10,
-            leading=14
+            fontSize=11,
+            leading=15,
+            textColor=colors.HexColor('#2d3748')
         )
         right_align_style = ParagraphStyle(
-            'ThankYouColumnRight',
-            parent=col_style,
+            'SigColumnRight',
+            parent=sig_col_style,
             alignment=2 # Right aligned
         )
         
-        thanks_table = Table([[
-            Paragraph(left_text, col_style),
+        sig_table = Table([[
+            Paragraph(left_text, sig_col_style),
             Paragraph(right_text, right_align_style)
-        ]], colWidths=[300, 180])
+        ]], colWidths=[320, 160])
         
-        thanks_table.setStyle(TableStyle([
+        sig_table.setStyle(TableStyle([
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
             ('LEFTPADDING', (0,0), (-1,-1), 0),
             ('RIGHTPADDING', (0,0), (-1,-1), 0),
@@ -884,7 +1044,8 @@ class ProposalPDFGenerator:
             ('TOPPADDING', (0,0), (-1,-1), 0),
         ]))
         
-        story.append(thanks_table)
+        story.append(sig_table)
+            
         return story
 
     def generate_pdf(self):
@@ -904,57 +1065,65 @@ class ProposalPDFGenerator:
         story = []
         
         # Read the section execution order
-        sections = self.builder_config.get('sections', [
-            "cover",
-            "cover_letter",
-            "company_profile",
-            "project_overview",
-            "scope",
-            "features",
-            "deliverables",
-            "pricing",
-            "payment_terms",
-            "why_us",
-            "terms",
-            "thank_you"
-        ])
+        raw_sections = self.builder_config.get('sections', [])
+        
+        # Enforce approved Grehasoft structure
+        # Pages before pricing:
+        # Cover -> Letter -> Overview -> Scope -> Website Structure -> Deliverables -> Pricing
+        sections = []
+        
+        def was_enabled(sid):
+            if not raw_sections:
+                return True
+            return sid in raw_sections
+            
+        if was_enabled("cover"):
+            sections.append("cover")
+        if was_enabled("cover_letter"):
+            sections.append("cover_letter")
+        if was_enabled("overview") or was_enabled("project_overview"):
+            sections.append("project_overview")
+        if was_enabled("scope") or was_enabled("scope_of_work"):
+            sections.append("scope_of_work")
+        if was_enabled("features") or was_enabled("website_structure"):
+            sections.append("website_structure")
+        if was_enabled("deliverables"):
+            sections.append("deliverables")
+        if was_enabled("pricing"):
+            sections.append("pricing")
+            
+        # Append the fixed sections in the exact order
+        sections.extend(["additional_charges", "maintenance_cost", "terms_conditions"])
         
         # Render sections in order
         for section_id in sections:
-            # Map section_id to their draw function
             section_story = []
             if section_id == "cover":
                 section_story = self.draw_cover_page()
             elif section_id == "cover_letter":
                 section_story = self.draw_cover_letter()
-            elif section_id == "company_profile":
-                section_story = self.draw_company_profile()
-            elif section_id == "overview" or section_id == "project_overview":
+            elif section_id == "project_overview":
                 section_story = self.draw_project_overview()
-            elif section_id == "scope" or section_id == "scope_of_work":
+            elif section_id == "scope_of_work":
                 section_story = self.draw_scope_of_work()
-            elif section_id == "features":
-                section_story = self.draw_features()
+            elif section_id == "website_structure":
+                section_story = self.draw_website_structure()
             elif section_id == "deliverables":
                 section_story = self.draw_deliverables()
-            elif section_id == "timeline":
-                section_story = self.draw_timeline()
             elif section_id == "pricing":
                 section_story = self.draw_pricing()
-            elif section_id == "payment_terms":
-                section_story = self.draw_payment_terms()
-            elif section_id == "why_us" or section_id == "why_choose_us":
-                section_story = self.draw_why_choose_us()
-            elif section_id == "terms" or section_id == "terms_conditions":
+            elif section_id == "additional_charges":
+                section_story = self.draw_additional_charges()
+            elif section_id == "maintenance_cost":
+                section_story = self.draw_maintenance_cost()
+            elif section_id == "terms_conditions":
                 section_story = self.draw_terms_conditions()
-            elif section_id == "thank_you":
-                section_story = self.draw_thank_you()
                 
             if section_story:
                 story.extend(section_story)
                 
-                # Append page break after major sections (except the final thank you)
-                if section_id != "thank_you" and section_id != sections[-1]:
+                # Append page break after major sections (except the final one)
+                if section_id != sections[-1]:
                     story.append(PageBreak())
                     
         # Compile document using NumberedCanvas and draw callbacks

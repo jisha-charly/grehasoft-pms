@@ -113,6 +113,9 @@ export interface BuilderConfig {
   project_overview: string;
   scope_of_work: string;
   features: FeatureCard[];
+  website_structure?: string;
+  additional_charges?: string;
+  maintenance_cost?: string;
   deliverables: DeliverableRow[];
   timeline: string;
   pricing: PricingSection;

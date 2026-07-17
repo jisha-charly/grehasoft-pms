@@ -6,7 +6,7 @@ export interface SectionDefinition {
   displayName: string;
   description: string;
   icon: string;
-  editorType: 'cover' | 'richtext' | 'features' | 'deliverables' | 'pricing' | 'payment_terms' | 'thank_you';
+  editorType: 'cover' | 'richtext' | 'features' | 'deliverables' | 'pricing' | 'payment_terms' | 'thank_you' | 'fixed';
   defaultContent: any;
   enabledByDefault: boolean;
 }
@@ -43,17 +43,7 @@ export const SECTION_CONFIG: SectionDefinition[] = [
     description: 'Initial greeting letter outlining the proposal submission.',
     icon: 'bi-envelope-open',
     editorType: 'richtext',
-    defaultContent: `<p>Dear Sir,</p><p>Thank you for considering GrehaSoft for your software development needs. As discussed, we are pleased to submit a proposal for your consideration.</p><p>At GrehaSoft, we prioritize client satisfaction, delivering modern, secure, and SEO friendly solutions designed for scalability.</p><p>Best regards,</p><p><b>Grehasoft Smart IT Solutions</b></p>`,
-    enabledByDefault: true
-  },
-  {
-    id: 'company_profile',
-    builderKey: 'company_profile',
-    displayName: 'Company Profile',
-    description: 'Outline background and core capabilities of the agency.',
-    icon: 'bi-building',
-    editorType: 'richtext',
-    defaultContent: `<p>Grehasoft Smart IT Solutions is an enterprise software development agency based in Kochi, Infopark.</p><p>We provide comprehensive mobile app, web application, branding, and digital marketing services to clients worldwide.</p>`,
+    defaultContent: `<p>Dear Sir/Madam,</p><p>Thank you for considering Grehasoft for your website development needs. As discussed, we have reviewed your requirements and are pleased to submit this proposal for your consideration.</p><p>At Grehasoft, we understand the challenges of finding the right technology partner for branding, website development, digital marketing, and software solutions. Our top priority is client satisfaction, and we are committed to delivering high-quality, scalable, and future-ready solutions using the latest technologies and industry best practices.</p><p>Throughout the project, our experienced team will work closely with you to ensure that every requirement is understood and implemented with precision. We are also committed to providing dedicated support during our working hours, ensuring that your queries and concerns are addressed promptly and professionally.</p><p>Thank you for considering Grehasoft as your technology partner. We look forward to the opportunity to collaborate with you and build a successful long-term business relationship.</p><p>Best Regards,</p><p>Raji T. Skariah<br/>Grehasoft<br/>+91 89215 40 183 | +91 98950 72 145<br/>info@grehasoft.com | grehasoft@gmail.com</p>`,
     enabledByDefault: true
   },
   {
@@ -77,17 +67,13 @@ export const SECTION_CONFIG: SectionDefinition[] = [
     enabledByDefault: true
   },
   {
-    id: 'features',
-    builderKey: 'features',
-    displayName: 'Features List',
-    description: 'Bullet points highlighting technical features included in design.',
-    icon: 'bi-lightning-charge',
-    editorType: 'features',
-    defaultContent: [
-      { title: 'Device Independence', desc: 'Fully responsive layouts suitable for desktops, tablets, and mobiles.' },
-      { title: 'SEO Friendliness', desc: 'Pre-configured SEO URLs, meta fields, and Google Search Console tags.' },
-      { title: 'Security & Encryption', desc: 'Pre-coded SSL certificate integration and encrypted user credentials.' }
-    ],
+    id: 'website_structure',
+    builderKey: 'website_structure',
+    displayName: 'Proposed Website Structure & Pages',
+    description: 'Render free-form description of pages, hierarchy, and navigation flow.',
+    icon: 'bi-window-sidebar',
+    editorType: 'richtext',
+    defaultContent: '',
     enabledByDefault: true
   },
   {
@@ -102,16 +88,6 @@ export const SECTION_CONFIG: SectionDefinition[] = [
       { phase: 'Phase 2: Core Development', timeline: 'Week 2-3', details: 'Frontend UI elements, backend database, and REST APIs.' },
       { phase: 'Phase 3: UAT & Launch', timeline: 'Week 4', details: 'Unit testing, client acceptance testing, server deployment.' }
     ],
-    enabledByDefault: true
-  },
-  {
-    id: 'timeline',
-    builderKey: 'timeline',
-    displayName: 'Project Timeline',
-    description: 'Overview description of development schedule constraints.',
-    icon: 'bi-hourglass-split',
-    editorType: 'richtext',
-    defaultContent: `<p>The estimated delivery timeline is 4-6 weeks upon contract signoff and advance payment. Any change in scope may affect this estimate.</p>`,
     enabledByDefault: true
   },
   {
@@ -130,56 +106,39 @@ export const SECTION_CONFIG: SectionDefinition[] = [
     enabledByDefault: true
   },
   {
-    id: 'payment_terms',
-    builderKey: 'payment_terms',
-    displayName: 'Payment Terms',
-    description: 'Configure milestone percentage disbursements (Advance, Development, Launch).',
-    icon: 'bi-credit-card',
-    editorType: 'payment_terms',
-    defaultContent: { advance: 50, development: 30, deployment: 20 },
+    id: 'additional_charges',
+    builderKey: 'additional_charges',
+    displayName: 'Additional Charges',
+    description: 'Fixed Additional Charges (Domain, Hosting, SSL).',
+    icon: 'bi-patch-plus',
+    editorType: 'fixed',
+    defaultContent: '',
     enabledByDefault: true
   },
   {
-    id: 'why_us',
-    builderKey: 'why_choose_us',
-    displayName: 'Why Choose Us',
-    description: 'Identify strengths and specialized focus points.',
-    icon: 'bi-award',
-    editorType: 'richtext',
-    defaultContent: `<p>• <b>Experienced Team:</b> Senior engineers with expertise in modern frameworks.</p><p>• <b>SEO Centric Coding:</b> Fast loading speeds and standards-compliant markups.</p><p>• <b>Pixel-Perfect UIs:</b> Premium design aesthetics that reflect your brand identity.</p><p>• <b>Post-launch Support:</b> Dedicated support windows for seamless maintenance.</p>`,
+    id: 'maintenance_cost',
+    builderKey: 'maintenance_cost',
+    displayName: 'Maintenance Cost',
+    description: 'Fixed Maintenance Cost plans and hourly rates.',
+    icon: 'bi-wrench',
+    editorType: 'fixed',
+    defaultContent: '',
     enabledByDefault: true
   },
   {
-    id: 'terms',
+    id: 'terms_conditions',
     builderKey: 'terms_conditions',
     displayName: 'Terms & Conditions',
-    description: 'Specify terms of validity, intellectual property rights, and support.',
+    description: 'Fixed Terms & Conditions clauses.',
     icon: 'bi-shield-check',
-    editorType: 'richtext',
-    defaultContent: `<p>1. <b>Validity:</b> This proposal remains valid for 30 days from issuance.</p><p>2. <b>Scope Change:</b> Features outside this specification will require a scope change request.</p><p>3. <b>Support:</b> Support is provided on business days between 9:00 AM and 6:00 PM IST.</p><p>4. <b>IP Ownership:</b> Intellectual property rights transfer upon final balance clearance.</p>`,
-    enabledByDefault: true
-  },
-  {
-    id: 'thank_you',
-    builderKey: 'thank_you',
-    displayName: 'Thank You',
-    description: 'Sign-off card featuring contact details and message.',
-    icon: 'bi-hand-thumbs-up',
-    editorType: 'thank_you',
-    defaultContent: {
-      message: 'Thank you for the opportunity to work with you. We look forward to a successful collaboration!',
-      contact: 'info@grehasoft.com | +91 89215 40183'
-    },
+    editorType: 'fixed',
+    defaultContent: '',
     enabledByDefault: true
   }
 ];
 
 export const contentLibrary = [
-  { name: 'Company Profile', text: `<p>Grehasoft Smart IT Solutions is an enterprise software development agency based in Kochi, Infopark.</p><p>We provide comprehensive mobile app, web application, branding, and digital marketing services to clients worldwide.</p>` },
-  { name: 'Technology Stack', text: `<p>We build our applications using a robust state-of-the-art stack: Django Rest Framework (Python) for secure backend APIs, React (TypeScript) and Vite for responsive frontends, PostgreSQL/MySQL/SQLite for databases, and AWS/Azure/DigitalOcean for scalable cloud hosting.</p>` },
-  { name: 'Why Choose Grehasoft', text: `<p>• <b>Experienced Team:</b> Senior engineers with expertise in modern frameworks.</p><p>• <b>SEO Centric Coding:</b> Fast loading speeds and standards-compliant markups.</p><p>• <b>Pixel-Perfect UIs:</b> Premium design aesthetics that reflect your brand identity.</p><p>• <b>Post-launch Support:</b> Dedicated support windows for seamless maintenance.</p>` },
-  { name: 'Terms & Conditions', text: `<p>1. <b>Validity:</b> This proposal remains valid for 30 days from issuance.</p><p>2. <b>Scope Change:</b> Features outside this specification will require a scope change request.</p><p>3. <b>Support:</b> Support is provided on business days between 9:00 AM and 6:00 PM IST.</p><p>4. <b>IP Ownership:</b> Intellectual property rights transfer upon final balance clearance.</p>` },
-  { name: 'Payment Terms', text: `<p>The payment for the project is scheduled as follows:<br/>• 50% Advance: payable immediately to kick off the development.<br/>• 30% Development Milestone: payable upon completion of core modules.<br/>• 20% Final Deployment: payable prior to launching the workspace.</p>` }
+  { name: 'Technology Stack', text: `<p>We build our applications using a robust state-of-the-art stack: Django Rest Framework (Python) for secure backend APIs, React (TypeScript) and Vite for responsive frontends, PostgreSQL/MySQL/SQLite for databases, and AWS/Azure/DigitalOcean for scalable cloud hosting.</p>` }
 ];
 
 export const colorPresets = [

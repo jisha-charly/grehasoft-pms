@@ -59,16 +59,14 @@ const defaultBuilderConfig = {
   sections: [
     'cover',
     'cover_letter',
-    'company_profile',
     'project_overview',
     'scope',
-    'features',
+    'website_structure',
     'deliverables',
     'pricing',
-    'payment_terms',
-    'why_us',
-    'terms',
-    'thank_you'
+    'additional_charges',
+    'maintenance_cost',
+    'terms_conditions'
   ],
   cover_page: {
     title: '',
@@ -85,32 +83,20 @@ const defaultBuilderConfig = {
     proposalDate: '',
     place: 'Kochi'
   },
-  cover_letter: `<p>Dear Sir,</p><p>Thank you for considering GrehaSoft for your software development needs. As discussed, we are pleased to submit a proposal for your consideration.</p><p>At GrehaSoft, we prioritize client satisfaction, delivering modern, secure, and SEO friendly solutions designed for scalability.</p><p>Best regards,</p><p><b>Grehasoft Smart IT Solutions</b></p>`,
-  company_profile: `<p>Grehasoft Smart IT Solutions is an enterprise software development agency based in Kochi, Infopark.</p><p>We provide comprehensive mobile app, web application, branding, and digital marketing services to clients worldwide.</p>`,
+  cover_letter: `<p>Dear Sir/Madam,</p><p>Thank you for considering Grehasoft for your website development needs. As discussed, we have reviewed your requirements and are pleased to submit this proposal for your consideration.</p><p>At Grehasoft, we understand the challenges of finding the right technology partner for branding, website development, digital marketing, and software solutions. Our top priority is client satisfaction, and we are committed to delivering high-quality, scalable, and future-ready solutions using the latest technologies and industry best practices.</p><p>Throughout the project, our experienced team will work closely with you to ensure that every requirement is understood and implemented with precision. We are also committed to providing dedicated support during our working hours, ensuring that your queries and concerns are addressed promptly and professionally.</p><p>Thank you for considering Grehasoft as your technology partner. We look forward to the opportunity to collaborate with you and build a successful long-term business relationship.</p><p>Best Regards,</p><p>Raji T. Skariah<br/>Grehasoft<br/>+91 89215 40 183 | +91 98950 72 145<br/>info@grehasoft.com | grehasoft@gmail.com</p>`,
   project_overview: '',
   scope_of_work: '',
-  features: [
-    { title: 'Device Independence', desc: 'Fully responsive layouts suitable for desktops, tablets, and mobiles.' },
-    { title: 'SEO Friendliness', desc: 'Pre-configured SEO URLs, meta fields, and Google Search Console tags.' },
-    { title: 'Security & Encryption', desc: 'Pre-coded SSL certificate integration and encrypted user credentials.' }
-  ],
+  website_structure: '',
+  additional_charges: '',
+  maintenance_cost: '',
+  terms_conditions: '',
   deliverables: [
     { phase: 'Phase 1: Wireframes', timeline: 'Week 1', details: 'Initial layout mockups, user flow, and design review.' },
     { phase: 'Phase 2: Core Development', timeline: 'Week 2-3', details: 'Frontend UI elements, backend database, and REST APIs.' },
     { phase: 'Phase 3: UAT & Launch', timeline: 'Week 4', details: 'Unit testing, client acceptance testing, server deployment.' }
   ],
-  timeline: `<p>The estimated delivery timeline is 4-6 weeks upon contract signoff and advance payment. Any change in scope may affect this estimate.</p>`,
   pricing: { items: [] as ProposalItem[], subtotal: 0, discount: 0, amount: 0 },
-  payment_terms: { advance: 50, development: 30, deployment: 20 },
-  why_choose_us: `<p>• <b>Experienced Team:</b> Senior engineers with expertise in modern frameworks.</p><p>• <b>SEO Centric Coding:</b> Fast loading speeds and standards-compliant markups.</p><p>• <b>Pixel-Perfect UIs:</b> Premium design aesthetics that reflect your brand identity.</p><p>• <b>Post-launch Support:</b> Dedicated support windows for seamless maintenance.</p>`,
-  terms_conditions: `<p>1. <b>Validity:</b> This proposal remains valid for 30 days from issuance.</p><p>2. <b>Scope Change:</b> Features outside this specification will require a scope change request.</p><p>3. <b>Support:</b> Support is provided on business days between 9:00 AM and 6:00 PM IST.</p><p>4. <b>IP Ownership:</b> Intellectual property rights transfer upon final balance clearance.</p>`,
-  thank_you: {
-    message: 'For any queries or clarifications, please feel free to contact us.',
-    contact: 'info@grehasoft.com | +91 89215 40183',
-    rep_name: 'Raji T. Skariah',
-    rep_phone: '+91 89215 40183 | +91 98954 80145',
-    rep_email: 'info@grehasoft.com | grehasoft@gmail.com'
-  }
+  payment_terms: { advance: 50, development: 30, deployment: 20 }
 };
 
 const contentLibrary = [
@@ -596,18 +582,11 @@ const handleConvert = async (proposal: Proposal) => {
         },
         // Auto-populate empty sections with defaults
         cover_letter: fetchedProposal.builder_config?.cover_letter || defaultBuilderConfig.cover_letter,
-        company_profile: fetchedProposal.builder_config?.company_profile || defaultBuilderConfig.company_profile,
         project_overview: fetchedProposal.builder_config?.project_overview || defaultBuilderConfig.project_overview,
         scope_of_work: fetchedProposal.builder_config?.scope_of_work || defaultBuilderConfig.scope_of_work,
-        timeline: fetchedProposal.builder_config?.timeline || defaultBuilderConfig.timeline,
-        why_choose_us: fetchedProposal.builder_config?.why_choose_us || defaultBuilderConfig.why_choose_us,
-        terms_conditions: fetchedProposal.builder_config?.terms_conditions || defaultBuilderConfig.terms_conditions,
-        features: (fetchedProposal.builder_config?.features && fetchedProposal.builder_config.features.length > 0) ? fetchedProposal.builder_config.features : defaultBuilderConfig.features,
+        website_structure: fetchedProposal.builder_config?.website_structure || defaultBuilderConfig.website_structure,
         deliverables: (fetchedProposal.builder_config?.deliverables && fetchedProposal.builder_config.deliverables.length > 0) ? fetchedProposal.builder_config.deliverables : defaultBuilderConfig.deliverables,
-        thank_you: {
-          ...defaultBuilderConfig.thank_you,
-          ...(fetchedProposal.builder_config?.thank_you || {})
-        }
+        payment_terms: fetchedProposal.builder_config?.payment_terms || defaultBuilderConfig.payment_terms
       };
       
       setBuilderConfig(config);
